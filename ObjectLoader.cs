@@ -78,7 +78,7 @@ public class ObjectLoader : Node
         /// A reference to an element in the Material array of the containing Mesh structure.
         /// - note this is a reference to the actual material from parent material list
         /// </summary>
-        public int material;
+        public int materialIndex;
 
         /// <summary>A bit mask combining constants of the MeshFace structure.</summary>
         public byte flags;
@@ -86,7 +86,7 @@ public class ObjectLoader : Node
         public MeshFace()
         {
             this.verticeIndexes = new List<MeshFaceVertex>();
-            material = 0;
+            materialIndex = 0;
         }
 
         public MeshFace(MeshFaceVertex[] vertices) :
@@ -95,7 +95,7 @@ public class ObjectLoader : Node
 
             this.verticeIndexes.AddRange(vertices);
 
-            this.material = 0;
+            this.materialIndex = 0;
             this.flags = 0;
         }
         internal void Flip()
@@ -270,12 +270,18 @@ public class ObjectLoader : Node
 
 
                     // Apply texture
-                    if (face.material < submeshBuilders[i].materials.Count)
+                    if (face.materialIndex < submeshBuilders[i].materials.Count)
                     {
-                        SpatialMaterial mt = new SpatialMaterial();                   
-                        
-                        MeshMaterial mat = submeshBuilders[i].materials[face.material];
+                        SpatialMaterial mt = new SpatialMaterial();
 
+                        if ((face.flags & MeshFace.FACE_2_MASK) == MeshFace.FACE_2_MASK)
+                        {
+                            // 2 sided face (e.g. FACE2)
+                            mt.ParamsCullMode = SpatialMaterial.CullMode.Disabled;
+                        }
+                        
+                        MeshMaterial mat = submeshBuilders[i].materials[face.materialIndex];
+                        
                         if (!string.IsNullOrEmpty(mat.dayTexture) && System.IO.File.Exists(mat.dayTexture))
                         {
                             // TODO only BMP supported right now... 
@@ -286,7 +292,7 @@ public class ObjectLoader : Node
                             {
                                 ImageTexture tex = new ImageTexture();
                                 Error e = tex.Load(mat.dayTexture);
-                                mt.AlbedoTexture = tex;                                
+                                mt.AlbedoTexture = tex;
                             }
 
                         }
@@ -294,6 +300,9 @@ public class ObjectLoader : Node
                         {
                             mt.AlbedoColor = mat.color;
                         }
+
+                        mt.FlagsTransparent = true;
+
                         gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, mt);
 
                     }
@@ -362,7 +371,7 @@ public class ObjectLoader : Node
         GD.Print("Processing {0} lines from {1}", lines.Length, fileName);
 
         // Overall object mesh is made up of one or more submesh builders (i.e. "CreateMeshBuilder" command)
-        MeshBuilder currentMesh = null;
+        MeshBuilder currentSubMesh = null;
         List<MeshBuilder> entireObjectMesh = new List<MeshBuilder>(); 
 
         Vector3[] normals = new Vector3[4];
@@ -429,14 +438,14 @@ public class ObjectLoader : Node
                             GD.Print("0 arguments are expected in {0} - at line {1} in file {2} ", command, i, fileName);
                         }
 
-                        if (currentMesh != null)
+                        if (currentSubMesh != null)
                         {
                             // Completed previous submesh, add to list before moving to next
-                            entireObjectMesh.Add(currentMesh);
+                            entireObjectMesh.Add(currentSubMesh);
                         }
 
                         // Prepare next submesh
-                        currentMesh = new MeshBuilder();
+                        currentSubMesh = new MeshBuilder();
                         normals = new Vector3[4];
 
                         break;
@@ -494,14 +503,14 @@ public class ObjectLoader : Node
                         // todo: float/double conversions
                         Vector3 coords = new Vector3((float)nx,(float)ny,(float)nz);
                         
-                        while (currentMesh.vertices.Count >= normals.Length)
+                        while (currentSubMesh.vertices.Count >= normals.Length)
                         {
                             Array.Resize<Vector3>(ref normals, normals.Length << 1);
                         }
-                        normals[currentMesh.vertices.Count] = coords.Normalized();
+                        normals[currentSubMesh.vertices.Count] = coords.Normalized();
 
                         // vertices
-                        currentMesh.vertices.Add(new Vector3((float)vx, (float)vy, (float)vz));
+                        currentSubMesh.vertices.Add(new Vector3((float)vx, (float)vy, (float)vz));
 
                         break;
 
@@ -538,6 +547,7 @@ public class ObjectLoader : Node
                                 GD.Print("Face2 is not a supported command - did you mean AddFace2? - at line {0} in file {1} ", i + 1, fileName);
                             }
                         }
+
                         if (arguments.Length < 3)
                         {
                             GD.Print("At least 3 arguments are required in {0} - at line {1} in file {2} ", command, i + 1, fileName);
@@ -554,7 +564,7 @@ public class ObjectLoader : Node
                                     valid = false;
                                     break;
                                 }
-                                else if (faceVertexIndices[j] < 0 | faceVertexIndices[j] >= currentMesh.vertices.Count)
+                                else if (faceVertexIndices[j] < 0 | faceVertexIndices[j] >= currentSubMesh.vertices.Count)
                                 {
                                     GD.Print("v{0} references a non-existing vertex in {1} - at line {2} in file {3} ", j, command, i + 1, fileName);
                                     valid = false;
@@ -572,7 +582,7 @@ public class ObjectLoader : Node
                             {
                                 MeshFace f = new MeshFace();
 
-                                while (currentMesh.vertices.Count > normals.Length)
+                                while (currentSubMesh.vertices.Count > normals.Length)
                                 {
                                     Array.Resize<Vector3>(ref normals, normals.Length << 1);
                                 }
@@ -591,7 +601,7 @@ public class ObjectLoader : Node
                                     f.flags = (byte)MeshFace.FACE_2_MASK;
                                 }
 
-                                currentMesh.faces.Add(f);
+                                currentSubMesh.faces.Add(f);
                             }
                         }
                         break;
@@ -629,9 +639,9 @@ public class ObjectLoader : Node
                             dayTexture = !String.IsNullOrEmpty(tday) ? System.IO.Path.Combine(containingFolder, tday) : null, 
                             nightTexture = !String.IsNullOrEmpty(tnight) ? System.IO.Path.Combine(containingFolder, tnight) : null };
 
-                        currentMesh.materials.Add(mm);
+                        currentSubMesh.materials.Add(mm);
                         
-                        currentMesh.faces[currentMesh.faces.Count-1].material = currentMesh.materials.Count-1;
+                        currentSubMesh.faces[currentSubMesh.faces.Count-1].materialIndex = currentSubMesh.materials.Count-1;
 
                         break;
 
@@ -673,9 +683,9 @@ public class ObjectLoader : Node
                             y = 0.0f;
                         }
 
-                        if (k >= 0 & k < currentMesh.vertices.Count)
+                        if (k >= 0 & k < currentSubMesh.vertices.Count)
                         {
-                            currentMesh.uvs.Add(new Vector2(x, y));
+                            currentSubMesh.uvs.Add(new Vector2(x, y));
                         }
                         else
                         {
@@ -744,9 +754,9 @@ public class ObjectLoader : Node
 
                         MeshMaterial mmcolor = new MeshMaterial();
                         mmcolor.color = Color.Color8((byte)r, (byte)g, (byte)b, (byte)a);
-                        currentMesh.materials.Add(mmcolor);
+                        currentSubMesh.materials.Add(mmcolor);
 
-                        currentMesh.faces[currentMesh.faces.Count-1].material = currentMesh.materials.Count-1;
+                        currentSubMesh.faces[currentSubMesh.faces.Count-1].materialIndex = currentSubMesh.materials.Count-1;
 
                         break;
 
@@ -774,7 +784,7 @@ public class ObjectLoader : Node
                                 zt = 0.0;
                             }
 
-                            ApplyTranslation(currentMesh, xt, yt, zt);
+                            ApplyTranslation(currentSubMesh, xt, yt, zt);
 
                             // todo: translateall
                             if (cmd == "translateall")
@@ -823,7 +833,7 @@ public class ObjectLoader : Node
                             sz = 1.0;
                         }
 
-                        ApplyScale(currentMesh, sx, sy, sz);
+                        ApplyScale(currentSubMesh, sx, sy, sz);
 
                         if (cmd == "scaleall")
                         {
@@ -876,7 +886,7 @@ public class ObjectLoader : Node
                             rz *= rt;
                             ra *= 0.0174532925199433;
 
-                            ApplyRotation(currentMesh, rx, ry, rz, ra);
+                            ApplyRotation(ref currentSubMesh, rx, ry, rz, ra);
 
                             if (cmd == "rotateall")
                             {
@@ -886,7 +896,7 @@ public class ObjectLoader : Node
                         }
 
                         break;
-                        
+
                     case "shear":
                     case "shearall":
 
@@ -980,7 +990,7 @@ public class ObjectLoader : Node
                             //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Height in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
                             cyl_h = 1.0;
                         }
-                        CreateCylinder(ref currentMesh, cyl_n, cyl_r1, cyl_r2, cyl_h);
+                        CreateCylinder(ref currentSubMesh, cyl_n, cyl_r1, cyl_r2, cyl_h);
                         break;
 
                     case "cube":
@@ -1006,7 +1016,7 @@ public class ObjectLoader : Node
                             //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument HalfDepth in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
                             cube_z = 1.0;
                         }
-                        CreateCube(ref currentMesh, cube_x, cube_y, cube_z);
+                        CreateCube(ref currentSubMesh, cube_x, cube_y, cube_z);
                         break;
 
                     default:
@@ -1018,8 +1028,8 @@ public class ObjectLoader : Node
         }
        
         // Add the last meshbuilder
-        if (entireObjectMesh.Count == 0 || currentMesh != entireObjectMesh.Last())
-            entireObjectMesh.Add(currentMesh);
+        if (entireObjectMesh.Count == 0 || currentSubMesh != entireObjectMesh.Last())
+            entireObjectMesh.Add(currentSubMesh);
 
         // Finally, create the godot engine mesh based on the consolidated MeshBuilder instances for the overall object     	
 		return MeshBuilder.GenerateGodotMesh(entireObjectMesh.ToArray());
@@ -1225,12 +1235,15 @@ public class ObjectLoader : Node
         float ry2 = ry * ry;
         float rz2 = rz * rz;
 
-        Vector3[] vertexArray = builder.vertices.ToArray();
-        for (int i = 0; i < vertexArray.Length; i++)
+        for (int i = 0; i < builder.vertices.Count; i++)
         {
-            vertexArray[i].z *= (float)x;
-            vertexArray[i].y *= (float)y;
-            vertexArray[i].z *= (float)z;
+            Vector3 v = builder.vertices[i];        // need a copy because struct is value type
+
+            v.z *= (float)x;
+            v.y *= (float)y;
+            v.z *= (float)z;
+
+            builder.vertices[i] = v;
         }
 
         foreach (MeshFace f in builder.faces)
@@ -1244,9 +1257,11 @@ public class ObjectLoader : Node
                 if (u != 0.0)
                 {
                     u = (float)Math.Sqrt((double)((nx2 + ny2 + nz2) / u));
-                    f.verticeIndexes[j].normal.x *= rx * u;
-                    f.verticeIndexes[j].normal.y *= ry * u;
-                    f.verticeIndexes[j].normal.z *= rz * u;
+                    Vector3 n = f.verticeIndexes[j].normal;     // need a copy because struct is value type
+                    n.x *= rx * u;
+                    n.y *= ry * u;
+                    n.z *= rz * u;
+                    f.verticeIndexes[j].normal = n;
                 }
             }
         }
@@ -1264,31 +1279,35 @@ public class ObjectLoader : Node
     {
         for (int i = 0; i < builder.vertices.Count; i++)
         {
-            Vector3 v = builder.vertices[i];
+            Vector3 v = builder.vertices[i];    // careful - need a copy because struct is value type
             v.x += (float)x;
             v.y += (float)y;
             v.z += (float)z;
+            builder.vertices[i] = v;
+
         }
     }
 
     // apply rotation
-    private static void ApplyRotation(MeshBuilder builder, double x, double y, double z, double a)
+    private static void ApplyRotation(ref MeshBuilder builder, double x, double y, double z, double a)
     {
         double cosa = Math.Cos(a);
         double sina = Math.Sin(a);
 
         for (int i = 0; i < builder.vertices.Count; i++)
         {
-            Vector3 v = builder.vertices[i];
+            Vector3 v = builder.vertices[i];    // careful - need a copy because struct is value type
             Calc.Rotate(ref v.x, ref v.y, ref v.z, x, y, z, cosa, sina); 
+            builder.vertices[i] = v;
         }
 
         foreach (MeshFace f in builder.faces)
         {
             for (int j = 0; j < f.verticeIndexes.Count; j++)
             {
-                Vector3 n = f.verticeIndexes[j].normal; 
+                Vector3 n = f.verticeIndexes[j].normal;  // careful - need a copy because struct is value type
                 Calc.Rotate(ref n.x, ref n.y, ref n.z, x, y, z, cosa, sina);
+                f.verticeIndexes[j].normal = n;
             }
         }
     }

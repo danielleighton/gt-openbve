@@ -8,7 +8,7 @@ public class SceneLoader : Node {
 //		MeshInstance mi = ObjectLoader.LoadFromFile(@"C:\Users\danie\Desktop\Test\Objects\Compatibility\Signals\signal_post.csv", System.Text.Encoding.ASCII,true, true);
 
 
-		MeshInstance mi = ObjectLoader.LoadFromFile(@"C:\Users\danie\Desktop\Test\Objects\Compatibility\Poles\pole_1.csv", System.Text.Encoding.ASCII,true, true);
+		MeshInstance mi = ObjectLoader.LoadFromFile(@"C:\Users\danie\Desktop\Test\Objects\reren\EDtozai\bridge\EdoBridge.csv", System.Text.Encoding.ASCII,true, true);
 
 
 
