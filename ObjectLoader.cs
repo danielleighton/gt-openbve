@@ -260,35 +260,11 @@ public class ObjectLoader : Node
                     // TODO: support more than quads and triangles
                     if (face.verticeIndexes.Count == 4)
                     {
-                        // st.AddUv(joinedUVs[0]); //0
-                        // st.AddVertex(submeshBuilders[i].vertices[face.verticeIndexes[0].indexToMeshVertices + offset]);
-                        // st.AddUv(joinedUVs[1]); //1
-                        // st.AddVertex(submeshBuilders[i].vertices[face.verticeIndexes[1].indexToMeshVertices + offset]);
-                        // st.AddUv(joinedUVs[2]); //2
-                        // st.AddVertex(submeshBuilders[i].vertices[face.verticeIndexes[2].indexToMeshVertices + offset]);
-
-                        // // Triangle 2
-                        // st.AddUv(joinedUVs[2]); //2
-                        // st.AddVertex(submeshBuilders[i].vertices[face.verticeIndexes[2].indexToMeshVertices + offset]);
-                        // st.AddUv(joinedUVs[3]); //3
-                        // st.AddVertex(submeshBuilders[i].vertices[face.verticeIndexes[3].indexToMeshVertices + offset]);
-                        // st.AddUv(joinedUVs[0]); //0
-                        // st.AddVertex(submeshBuilders[i].vertices[face.verticeIndexes[0].indexToMeshVertices + offset]);
-
-                        Vector2 [] uvs = new Vector2 [] {joinedUVs[0],joinedUVs[1],joinedUVs[2],joinedUVs[3]};
-
+//                        Vector2 [] uvs = new Vector2 [] {joinedUVs[0],joinedUVs[1],joinedUVs[2],joinedUVs[3]};
                         gdMesh = AddFace(gdMesh, submeshBuilders[i].vertices.ToArray(), face.verticeIndexes.ToArray(), joinedUVs.ToArray());
                     }
                     else if (face.verticeIndexes.Count == 3)
                     {
-                        // st.AddVertex(submeshBuilders[i].vertices[face.verticeIndexes[0].indexToMeshVertices + offset]);
-                        // st.AddVertex(submeshBuilders[i].vertices[face.verticeIndexes[1].indexToMeshVertices + offset]);
-                        // st.AddVertex(submeshBuilders[i].vertices[face.verticeIndexes[2].indexToMeshVertices + offset]);
-
-                        // currFaceTriangles.Add(face.verticeIndexes[0].indexToMeshVertices + offset);
-                        // currFaceTriangles.Add(face.verticeIndexes[1].indexToMeshVertices + offset);
-                        // currFaceTriangles.Add(face.verticeIndexes[2].indexToMeshVertices + offset);
-
                         gdMesh = AddFace(gdMesh, submeshBuilders[i].vertices.ToArray(), face.verticeIndexes.ToArray(), joinedUVs.ToArray());
                     }
                     else
@@ -330,22 +306,8 @@ public class ObjectLoader : Node
                 }
 
             }
-    
-            // Colors
-            // SpatialMaterial[] m = make_materials(gdMesh.GetSurfaceCount());
-            // for (int i=0; i<gdMesh.GetSurfaceCount(); i++)
-            // {
-            //     gdMesh.SurfaceSetMaterial(i, m[i]);
-            // }
-
-            // Textures
-            // for (int i=0; i<tex.Count; i++)
-            // {
-            //     SpatialMaterial mt = new SpatialMaterial();
-            //     mt.AlbedoTexture = tex[i];
-            //     gdMesh.SurfaceSetMaterial(i, mt);
-            // }
-
+   
+            
             gdMeshInstance.Mesh = gdMesh;
             return gdMeshInstance;
 
@@ -1106,9 +1068,6 @@ public class ObjectLoader : Node
     /// 
     private static void CreateCylinder(ref MeshBuilder builder, int n, double r1, double r2, double h)
     {
-        //GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-
-
         // parameters
         bool uppercap = r1 > 0.0;
         bool lowercap = r2 > 0.0;
@@ -1148,6 +1107,7 @@ public class ObjectLoader : Node
             normals[2 * i + 1] = new Vector3((float)nx, (float)ny, (float)nz);
             t += d;
         }
+        
         // faces
         int f = builder.faces.Count;
         //Array.Resize<World.MeshFace>(ref builder.Faces, f + n + m);
