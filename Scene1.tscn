@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=2]
 
 [ext_resource path="res://Camera.cs" type="Script" id=1]
-[ext_resource path="res://Something.cs" type="Script" id=2]
+[ext_resource path="res://SceneLoader.cs" type="Script" id=2]
 
 [node name="Scene1" type="Spatial"]
 transform = Transform( 0.997672, 0.0376771, -0.0568468, -0.0438844, 0.992713, -0.112226, 0.0522042, 0.114459, 0.992055, 0, 0, 0 )

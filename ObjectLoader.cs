@@ -258,12 +258,7 @@ public class ObjectLoader : Node
                     offset = 0; // TODO: confused about offset now           
 
                     // TODO: support more than quads and triangles
-                    if (face.verticeIndexes.Count == 4)
-                    {
-//                        Vector2 [] uvs = new Vector2 [] {joinedUVs[0],joinedUVs[1],joinedUVs[2],joinedUVs[3]};
-                        gdMesh = AddFace(gdMesh, submeshBuilders[i].vertices.ToArray(), face.verticeIndexes.ToArray(), joinedUVs.ToArray());
-                    }
-                    else if (face.verticeIndexes.Count == 3)
+                    if (face.verticeIndexes.Count == 4 || face.verticeIndexes.Count == 3)
                     {
                         gdMesh = AddFace(gdMesh, submeshBuilders[i].vertices.ToArray(), face.verticeIndexes.ToArray(), joinedUVs.ToArray());
                     }
@@ -366,9 +361,9 @@ public class ObjectLoader : Node
 
         GD.Print("Processing {0} lines from {1}", lines.Length, fileName);
 
-        List<MeshBuilder> objectMesh = new List<MeshBuilder>(); // overall object mesh is made up of one or more submesh builders
-
-        MeshBuilder meshBuilder = null;
+        // Overall object mesh is made up of one or more submesh builders (i.e. "CreateMeshBuilder" command)
+        MeshBuilder currentMesh = null;
+        List<MeshBuilder> entireObjectMesh = new List<MeshBuilder>(); 
 
         Vector3[] normals = new Vector3[4];
 
@@ -434,14 +429,14 @@ public class ObjectLoader : Node
                             GD.Print("0 arguments are expected in {0} - at line {1} in file {2} ", command, i, fileName);
                         }
 
-                        // TODO: Apply the existing mesh before recreating and moving to next (OpenBVE ApplyMeshBuilder())
-                        if (meshBuilder != null)
+                        if (currentMesh != null)
                         {
-                            // completed previous submesh, add to list before moving to next
-                            objectMesh.Add(meshBuilder);
+                            // Completed previous submesh, add to list before moving to next
+                            entireObjectMesh.Add(currentMesh);
                         }
-                        // prepare next submesh                        
-                        meshBuilder = new MeshBuilder();
+
+                        // Prepare next submesh
+                        currentMesh = new MeshBuilder();
                         normals = new Vector3[4];
 
                         break;
@@ -499,14 +494,14 @@ public class ObjectLoader : Node
                         // todo: float/double conversions
                         Vector3 coords = new Vector3((float)nx,(float)ny,(float)nz);
                         
-                        while (meshBuilder.vertices.Count >= normals.Length)
+                        while (currentMesh.vertices.Count >= normals.Length)
                         {
                             Array.Resize<Vector3>(ref normals, normals.Length << 1);
                         }
-                        normals[meshBuilder.vertices.Count] = coords.Normalized();
+                        normals[currentMesh.vertices.Count] = coords.Normalized();
 
                         // vertices
-                        meshBuilder.vertices.Add(new Vector3((float)vx, (float)vy, (float)vz));
+                        currentMesh.vertices.Add(new Vector3((float)vx, (float)vy, (float)vz));
 
                         break;
 
@@ -559,7 +554,7 @@ public class ObjectLoader : Node
                                     valid = false;
                                     break;
                                 }
-                                else if (faceVertexIndices[j] < 0 | faceVertexIndices[j] >= meshBuilder.vertices.Count)
+                                else if (faceVertexIndices[j] < 0 | faceVertexIndices[j] >= currentMesh.vertices.Count)
                                 {
                                     GD.Print("v{0} references a non-existing vertex in {1} - at line {2} in file {3} ", j, command, i + 1, fileName);
                                     valid = false;
@@ -577,7 +572,7 @@ public class ObjectLoader : Node
                             {
                                 MeshFace f = new MeshFace();
 
-                                while (meshBuilder.vertices.Count > normals.Length)
+                                while (currentMesh.vertices.Count > normals.Length)
                                 {
                                     Array.Resize<Vector3>(ref normals, normals.Length << 1);
                                 }
@@ -596,7 +591,7 @@ public class ObjectLoader : Node
                                     f.flags = (byte)MeshFace.FACE_2_MASK;
                                 }
 
-                                meshBuilder.faces.Add(f);
+                                currentMesh.faces.Add(f);
                             }
                         }
                         break;
@@ -634,12 +629,9 @@ public class ObjectLoader : Node
                             dayTexture = !String.IsNullOrEmpty(tday) ? System.IO.Path.Combine(containingFolder, tday) : null, 
                             nightTexture = !String.IsNullOrEmpty(tnight) ? System.IO.Path.Combine(containingFolder, tnight) : null };
 
-                        meshBuilder.materials.Add(mm);
+                        currentMesh.materials.Add(mm);
                         
-                        meshBuilder.faces[meshBuilder.faces.Count-1].material = meshBuilder.materials.Count-1;
-
-
-                        
+                        currentMesh.faces[currentMesh.faces.Count-1].material = currentMesh.materials.Count-1;
 
                         break;
 
@@ -681,9 +673,9 @@ public class ObjectLoader : Node
                             y = 0.0f;
                         }
 
-                        if (k >= 0 & k < meshBuilder.vertices.Count)
+                        if (k >= 0 & k < currentMesh.vertices.Count)
                         {
-                            meshBuilder.uvs.Add(new Vector2(x, y));
+                            currentMesh.uvs.Add(new Vector2(x, y));
                         }
                         else
                         {
@@ -752,9 +744,9 @@ public class ObjectLoader : Node
 
                         MeshMaterial mmcolor = new MeshMaterial();
                         mmcolor.color = Color.Color8((byte)r, (byte)g, (byte)b, (byte)a);
-                        meshBuilder.materials.Add(mmcolor);
+                        currentMesh.materials.Add(mmcolor);
 
-                        meshBuilder.faces[meshBuilder.faces.Count-1].material = meshBuilder.materials.Count-1;
+                        currentMesh.faces[currentMesh.faces.Count-1].material = currentMesh.materials.Count-1;
 
                         break;
 
@@ -781,7 +773,9 @@ public class ObjectLoader : Node
                                 //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Z in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
                                 zt = 0.0;
                             }
-                            ApplyTranslation(meshBuilder, xt, yt, zt);
+
+                            ApplyTranslation(currentMesh, xt, yt, zt);
+
                             // todo: translateall
                             if (cmd == "translateall")
                             {
@@ -828,13 +822,16 @@ public class ObjectLoader : Node
                             //Debug.AddMessage(Debug.MessageType.Error, false, "Z is required to be different from zero in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
                             sz = 1.0;
                         }
-                        ApplyScale(meshBuilder, sx, sy, sz);
+
+                        ApplyScale(currentMesh, sx, sy, sz);
+
                         if (cmd == "scaleall")
                         {
                             // ApplyScale(Object, x, y, z);
                         }
 
                         break;
+
                     case "rotate":
                     case "rotateall":
                         if (arguments.Length > 4)
@@ -870,6 +867,7 @@ public class ObjectLoader : Node
                             rz = 0.0;
                             rt = 1.0;
                         }
+
                         if (ra != 0.0)
                         {
                             rt = 1.0 / Math.Sqrt(rt);
@@ -877,7 +875,9 @@ public class ObjectLoader : Node
                             ry *= rt;
                             rz *= rt;
                             ra *= 0.0174532925199433;
-                            ApplyRotation(meshBuilder, rx, ry, rz, ra);
+
+                            ApplyRotation(currentMesh, rx, ry, rz, ra);
+
                             if (cmd == "rotateall")
                             {
                                 //TODO
@@ -886,6 +886,7 @@ public class ObjectLoader : Node
                         }
 
                         break;
+                        
                     case "shear":
                     case "shearall":
 
@@ -979,8 +980,7 @@ public class ObjectLoader : Node
                             //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Height in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
                             cyl_h = 1.0;
                         }
-                        CreateCylinder(ref meshBuilder, cyl_n, cyl_r1, cyl_r2, cyl_h);
-
+                        CreateCylinder(ref currentMesh, cyl_n, cyl_r1, cyl_r2, cyl_h);
                         break;
 
                     case "cube":
@@ -1006,7 +1006,7 @@ public class ObjectLoader : Node
                             //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument HalfDepth in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
                             cube_z = 1.0;
                         }
-                        CreateCube(ref meshBuilder, cube_x, cube_y, cube_z);
+                        CreateCube(ref currentMesh, cube_x, cube_y, cube_z);
                         break;
 
                     default:
@@ -1018,12 +1018,11 @@ public class ObjectLoader : Node
         }
        
         // Add the last meshbuilder
-        if (objectMesh.Count == 0 || meshBuilder != objectMesh.Last())
-            objectMesh.Add(meshBuilder);
+        if (entireObjectMesh.Count == 0 || currentMesh != entireObjectMesh.Last())
+            entireObjectMesh.Add(currentMesh);
 
-
-      	
-		return MeshBuilder.GenerateGodotMesh(objectMesh.ToArray());
+        // Finally, create the godot engine mesh based on the consolidated MeshBuilder instances for the overall object     	
+		return MeshBuilder.GenerateGodotMesh(entireObjectMesh.ToArray());
 
     }
 
@@ -1052,7 +1051,7 @@ public class ObjectLoader : Node
     }
 
     /// <summary>
-    /// TODO: wonder if we can just use Unity built-in cylinder?
+    /// 
     /// </summary>
     /// <param name="builder"></param>
     /// <param name="n"></param>
@@ -1261,65 +1260,38 @@ public class ObjectLoader : Node
         }
     }
 
+    private static void ApplyTranslation(MeshBuilder builder, double x, double y, double z)
+    {
+        for (int i = 0; i < builder.vertices.Count; i++)
+        {
+            Vector3 v = builder.vertices[i];
+            v.x += (float)x;
+            v.y += (float)y;
+            v.z += (float)z;
+        }
+    }
+
     // apply rotation
     private static void ApplyRotation(MeshBuilder builder, double x, double y, double z, double a)
     {
         double cosa = Math.Cos(a);
         double sina = Math.Sin(a);
 
-        Vector3[] vertexArray = builder.vertices.ToArray();
-        for (int i = 0; i < vertexArray.Length; i++)
+        for (int i = 0; i < builder.vertices.Count; i++)
         {
-            Calc.Rotate(ref vertexArray[i].x, ref vertexArray[i].y, ref vertexArray[i].z, x, y, z, cosa, sina);
+            Vector3 v = builder.vertices[i];
+            Calc.Rotate(ref v.x, ref v.y, ref v.z, x, y, z, cosa, sina); 
         }
 
         foreach (MeshFace f in builder.faces)
         {
             for (int j = 0; j < f.verticeIndexes.Count; j++)
             {
-                Calc.Rotate(ref f.verticeIndexes[j].normal.x, ref f.verticeIndexes[j].normal.y, ref f.verticeIndexes[j].normal.z, x, y, z, cosa, sina);
+                Vector3 n = f.verticeIndexes[j].normal; 
+                Calc.Rotate(ref n.x, ref n.y, ref n.z, x, y, z, cosa, sina);
             }
         }
     }
-    //private static void ApplyRotation(StaticObject Object, double x, double y, double z, double a)
-    //{
-    //    double cosa = Math.Cos(a);
-    //    double sina = Math.Sin(a);
-    //    for (int j = 0; j < Object.Mesh.Vertices.Length; j++)
-    //    {
-    //        Calc.Rotate(ref Object.Mesh.Vertices[j].Coordinates.X, ref Object.Mesh.Vertices[j].Coordinates.Y, ref Object.Mesh.Vertices[j].Coordinates.Z, x, y, z, cosa, sina);
-    //    }
-    //    for (int j = 0; j < Object.Mesh.Faces.Length; j++)
-    //    {
-    //        for (int k = 0; k < Object.Mesh.Faces[j].Vertices.Length; k++)
-    //        {
-    //            Calc.Rotate(ref Object.Mesh.Faces[j].Vertices[k].Normal.X, ref Object.Mesh.Faces[j].Vertices[k].Normal.Y, ref Object.Mesh.Faces[j].Vertices[k].Normal.Z, x, y, z, cosa, sina);
-    //        }
-    //    }
-    //}
-
-
-
-    private static void ApplyTranslation(MeshBuilder builder, double x, double y, double z)
-    {
-        Vector3[] vertexArray = builder.vertices.ToArray();
-
-        for (int i = 0; i < vertexArray.Length; i++)
-        {
-            vertexArray[i].x += (float)x;
-            vertexArray[i].y += (float)y;
-            vertexArray[i].z += (float)z;
-        }
-    }
-    //private static void ApplyTranslation(ObjectManager.StaticObject Object, double x, double y, double z)
-    //{
-    //    for (int i = 0; i < Object.Mesh.Vertices.Length; i++)
-    //    {
-    //        Object.Mesh.Vertices[i].Coordinates.X += x;
-    //        Object.Mesh.Vertices[i].Coordinates.Y += y;
-    //        Object.Mesh.Vertices[i].Coordinates.Z += z;
-    //    }
-    //}
 
     /// <summary>
     /// Parse arguments from given object file command

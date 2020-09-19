@@ -63,7 +63,7 @@
     <Compile Include="Conversions.cs" />
     <Compile Include="Calc.cs" />
     <Compile Include="repo.cs" />
-    <Compile Include="Something.cs" />
+    <Compile Include="SceneLoader.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>
