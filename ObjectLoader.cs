@@ -309,16 +309,8 @@ public class ObjectLoader : Node
                             //https://godotforums.org/discussion/19348/new-detail-texture-shader 
                             //https://godotengine.org/qa/43789/texture-fragment-shader-is-different-from-original-texture
                             sm1.Shader = ResourceLoader.Load<Shader>("res://simple_trans_tex.shader");
-                            sm1.SetShaderParam("tex1Albedo", tex);
-                            sm1.SetShaderParam("tex1Normal", tex);
-                            sm1.SetShaderParam("tex2Albedo", tex);
-                            sm1.SetShaderParam("tex2Normal", tex);
-
-
-
-                            //
-                            //sm1.SetShaderParam
-                            
+                            sm1.SetShaderParam("day_texture", tex);
+                           
 
                         }
                         else
