@@ -78,7 +78,7 @@ public class ObjectLoader : Node
         /// A reference to an element in the Material array of the containing Mesh structure.
         /// - note this is a reference to the actual material from parent material list
         /// </summary>
-        public int materialIndex;
+        //public int materialIndex;
 
         /// <summary>A bit mask combining constants of the MeshFace structure.</summary>
         public byte flags;
@@ -86,7 +86,7 @@ public class ObjectLoader : Node
         public MeshFace()
         {
             this.verticeIndexes = new List<MeshFaceVertex>();
-            materialIndex = 0;
+            // materialIndex = 0;
         }
 
         public MeshFace(MeshFaceVertex[] vertices) :
@@ -95,7 +95,7 @@ public class ObjectLoader : Node
 
             this.verticeIndexes.AddRange(vertices);
 
-            this.materialIndex = 0;
+            // this.materialIndex = 0;
             this.flags = 0;
         }
         internal void Flip()
@@ -176,14 +176,14 @@ public class ObjectLoader : Node
         public List<MeshFace> faces;    // faces will reference the verticies list below, by index
         public List<Vector3> vertices;  // actual vertices (coordinates thereof)
         public List<Vector2> uvs;
-        public List<MeshMaterial> materials;
+        public MeshMaterial material;
 
         public MeshBuilder()
         {
             vertices = new List<Vector3>();
             uvs = new List<Vector2>();
             faces = new List<MeshFace>();
-            materials = new List<MeshMaterial>();
+            //material = new List<MeshMaterial>();
         }
 
 
@@ -270,9 +270,13 @@ public class ObjectLoader : Node
 
 
                     // Apply texture
-                    if (face.materialIndex < submeshBuilders[i].materials.Count)
+                    if (submeshBuilders[i].material != null) 
                     {
+                        MeshMaterial mat = submeshBuilders[i].material;
+
                         SpatialMaterial mt = new SpatialMaterial();
+
+                        ShaderMaterial sm1 = new ShaderMaterial();
 
                         if ((face.flags & MeshFace.FACE_2_MASK) == MeshFace.FACE_2_MASK)
                         {
@@ -280,20 +284,41 @@ public class ObjectLoader : Node
                             mt.ParamsCullMode = SpatialMaterial.CullMode.Disabled;
                         }
                         
-                        MeshMaterial mat = submeshBuilders[i].materials[face.materialIndex];
-                        
                         if (!string.IsNullOrEmpty(mat.dayTexture) && System.IO.File.Exists(mat.dayTexture))
                         {
-                            // TODO only BMP supported right now... 
                             // TODO don't know if these have to be unloaded somehow later
                             string extn = System.IO.Path.GetExtension(mat.dayTexture).ToLower();
 
-                            if (extn == ".bmp" || extn == ".png")
-                            {
+                            //if (extn == ".bmp" || extn == ".png")
+                            //{
                                 ImageTexture tex = new ImageTexture();
                                 Error e = tex.Load(mat.dayTexture);
+                                
                                 mt.AlbedoTexture = tex;
-                            }
+                            //}
+
+                            mt.FlagsTransparent = (extn == ".png"); // todo
+
+                            // RID shader = VisualServer.MaterialGetShader(mt.GetRid());
+                            // Shader s1 = ResourceLoader.Load<Shader>("res://simple_trans_tex.shader");
+                            //shader.
+                            // Resource shd = ResourceLoader.Load("res://simple_trans_tex.shader");
+                            // VisualServer.MaterialSetShader(shader, shd.GetRid());
+                            //shader
+
+                            //https://godotforums.org/discussion/19348/new-detail-texture-shader 
+                            //https://godotengine.org/qa/43789/texture-fragment-shader-is-different-from-original-texture
+                            sm1.Shader = ResourceLoader.Load<Shader>("res://simple_trans_tex.shader");
+                            sm1.SetShaderParam("tex1Albedo", tex);
+                            sm1.SetShaderParam("tex1Normal", tex);
+                            sm1.SetShaderParam("tex2Albedo", tex);
+                            sm1.SetShaderParam("tex2Normal", tex);
+
+
+
+                            //
+                            //sm1.SetShaderParam
+                            
 
                         }
                         else
@@ -301,9 +326,12 @@ public class ObjectLoader : Node
                             mt.AlbedoColor = mat.color;
                         }
 
-                        mt.FlagsTransparent = true;
+                        
 
-                        gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, mt);
+                        //gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, mt);
+                        gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, sm1);
+
+                        
 
                     }
 
@@ -639,9 +667,9 @@ public class ObjectLoader : Node
                             dayTexture = !String.IsNullOrEmpty(tday) ? System.IO.Path.Combine(containingFolder, tday) : null, 
                             nightTexture = !String.IsNullOrEmpty(tnight) ? System.IO.Path.Combine(containingFolder, tnight) : null };
 
-                        currentSubMesh.materials.Add(mm);
+                        currentSubMesh.material = mm;
                         
-                        currentSubMesh.faces[currentSubMesh.faces.Count-1].materialIndex = currentSubMesh.materials.Count-1;
+                        //  currentSubMesh.faces[currentSubMesh.faces.Count-1].materialIndex = currentSubMesh.materials.Count-1;
 
                         break;
 
@@ -754,9 +782,9 @@ public class ObjectLoader : Node
 
                         MeshMaterial mmcolor = new MeshMaterial();
                         mmcolor.color = Color.Color8((byte)r, (byte)g, (byte)b, (byte)a);
-                        currentSubMesh.materials.Add(mmcolor);
+                        currentSubMesh.material = mmcolor;
 
-                        currentSubMesh.faces[currentSubMesh.faces.Count-1].materialIndex = currentSubMesh.materials.Count-1;
+                        //currentSubMesh.faces[currentSubMesh.faces.Count-1].materialIndex = currentSubMesh.materials.Count-1;
 
                         break;
 
