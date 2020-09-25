@@ -216,22 +216,22 @@ public class ObjectLoader : Node
         public static MeshInstance GenerateGodotMesh(MeshBuilder[] submeshBuilders)
         {
             MeshInstance gdMeshInstance = new MeshInstance();
-            
+
             // Aggregate vertices and set
             List<Vector3> joinedVertices = new List<Vector3>();
             Array.ForEach(submeshBuilders, subMeshElement => joinedVertices.AddRange(subMeshElement.vertices));
-         
+
             ArrayMesh gdMesh = null;
 
             //List<Texture> tex = BuildTextureList(submeshBuilders.ToList<MeshBuilder>());
 
             // Prepare submesh per meshbuilder section
             int offset = 0;
-            
+
             for (int i = 0; i < submeshBuilders.Length; i++)
             {
                 List<Vector2> joinedUVs = new List<Vector2>();
-                
+
                 // Calculate UVs
                 if (submeshBuilders[i].uvs.Count > 0 && submeshBuilders[i].uvs.Count == submeshBuilders[i].vertices.Count)
                 {
@@ -252,7 +252,7 @@ public class ObjectLoader : Node
                 offset += (i == 0 ? 0 : submeshBuilders[i - 1].vertices.Count);
                 List<int> currFaceTriangles = new List<int>();
 
-           
+
                 foreach (MeshFace face in submeshBuilders[i].faces)
                 {
                     offset = 0; // TODO: confused about offset now           
@@ -270,68 +270,59 @@ public class ObjectLoader : Node
 
 
                     // Apply texture
-                    if (submeshBuilders[i].material != null) 
+                    if (submeshBuilders[i].material != null)
                     {
                         MeshMaterial mat = submeshBuilders[i].material;
 
-                        SpatialMaterial mt = new SpatialMaterial();
-
-                        ShaderMaterial sm1 = new ShaderMaterial();
-
-                        if ((face.flags & MeshFace.FACE_2_MASK) == MeshFace.FACE_2_MASK)
-                        {
-                            // 2 sided face (e.g. FACE2)
-                            mt.ParamsCullMode = SpatialMaterial.CullMode.Disabled;
-                        }
-                        
+                    
                         if (!string.IsNullOrEmpty(mat.dayTexture) && System.IO.File.Exists(mat.dayTexture))
                         {
+                            ShaderMaterial matTexture = new ShaderMaterial();
+
                             // TODO don't know if these have to be unloaded somehow later
                             string extn = System.IO.Path.GetExtension(mat.dayTexture).ToLower();
 
+                            // TODO be safer about checking the file type / extension / validity etc
                             //if (extn == ".bmp" || extn == ".png")
-                            //{
-                                ImageTexture tex = new ImageTexture();
-                                Error e = tex.Load(mat.dayTexture);
-                                
-                                mt.AlbedoTexture = tex;
-                            //}
-
-                            mt.FlagsTransparent = (extn == ".png"); // todo
-
-                            // RID shader = VisualServer.MaterialGetShader(mt.GetRid());
-                            // Shader s1 = ResourceLoader.Load<Shader>("res://simple_trans_tex.shader");
-                            //shader.
-                            // Resource shd = ResourceLoader.Load("res://simple_trans_tex.shader");
-                            // VisualServer.MaterialSetShader(shader, shd.GetRid());
-                            //shader
+                            ImageTexture tex = new ImageTexture();
+                            Error e = tex.Load(mat.dayTexture);
 
                             //https://godotforums.org/discussion/19348/new-detail-texture-shader 
                             //https://godotengine.org/qa/43789/texture-fragment-shader-is-different-from-original-texture
-                            sm1.Shader = ResourceLoader.Load<Shader>("res://simple_trans_tex.shader");
-                            sm1.SetShaderParam("day_texture", tex);
-                           
+
+                            // tex_1_side
+                            // tex_2_side
+                            // tex_1_side_trans
+                            // tex_2_side_trans
+
+                            matTexture.Shader = ResourceLoader.Load<Shader>(String.Format("res://{0}{1}.shader", 
+                                                                     (face.flags & MeshFace.FACE_2_MASK) == MeshFace.FACE_2_MASK ? "tex_2_side" : "tex_1_side",
+                                                                     mat.transparentColorUsed ? "_trans" : String.Empty));
+
+                            matTexture.SetShaderParam("day_texture", tex);
+
+                            if (mat.transparentColorUsed) matTexture.SetShaderParam("trans_color", mat.transparentColor);
+
+                            // Set submesh to use to textured shader/material
+                            gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, matTexture);
 
                         }
                         else
                         {
-                            mt.AlbedoColor = mat.color;
+                            // Set submesh to use to simple color shader/material
+                            SpatialMaterial matColor = new SpatialMaterial(); 
+                            matColor.AlbedoColor = mat.color;
+
+                            gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, matColor);
                         }
-
-                        
-
-                        //gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, mt);
-                        gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, sm1);
-
-                        
 
                     }
 
                 }
 
             }
-   
-            
+
+
             gdMeshInstance.Mesh = gdMesh;
             return gdMeshInstance;
 
@@ -339,24 +330,24 @@ public class ObjectLoader : Node
     }
 
 
-    private static ArrayMesh AddFace(ArrayMesh mesh, Vector3 [] verts, MeshFaceVertex [] fv, Vector2[] uvs)
+    private static ArrayMesh AddFace(ArrayMesh mesh, Vector3[] verts, MeshFaceVertex[] fv, Vector2[] uvs)
     {
         if (mesh == null) mesh = new ArrayMesh();
-            
+
         // TODO: Assumes rectangular face
         int[] indices;
 
         if (fv.Length == 4)
-            indices = new int[] { fv[0].indexToMeshVertices, fv[2].indexToMeshVertices, fv[3].indexToMeshVertices, 
+            indices = new int[] { fv[0].indexToMeshVertices, fv[2].indexToMeshVertices, fv[3].indexToMeshVertices,
                                   fv[0].indexToMeshVertices, fv[1].indexToMeshVertices, fv[2].indexToMeshVertices};
-        else    
-            indices = new int[] {fv[0].indexToMeshVertices, fv[1].indexToMeshVertices, fv[2].indexToMeshVertices};
+        else
+            indices = new int[] { fv[0].indexToMeshVertices, fv[1].indexToMeshVertices, fv[2].indexToMeshVertices };
 
-        
+
         // Vector2 [] uv11 = new Vector2[] {new Vector2(0,0), new Vector2(1,0), new Vector2(1,1), new Vector2(0,1)};
-    
-        Vector3 [] no = new Vector3[verts.Count()];
-        for (int i = 0; i<verts.Length; i++) 
+
+        Vector3[] no = new Vector3[verts.Count()];
+        for (int i = 0; i < verts.Length; i++)
         {
             no[i] = verts[i].Normalized();
         }
@@ -378,7 +369,7 @@ public class ObjectLoader : Node
 
 
     #endregion
-    public static MeshInstance LoadFromFile(string fileName, Encoding fileEncoding, bool forceTextureRepeatX, bool forceTextureRepeatY) 
+    public static MeshInstance LoadFromFile(string fileName, Encoding fileEncoding, bool forceTextureRepeatX, bool forceTextureRepeatY)
     {
         // TODO: Not sure if safe to assume textures are always in the object path
         string fileExtension = System.IO.Path.GetExtension(fileName);
@@ -392,7 +383,7 @@ public class ObjectLoader : Node
 
         // Overall object mesh is made up of one or more submesh builders (i.e. "CreateMeshBuilder" command)
         MeshBuilder currentSubMesh = null;
-        List<MeshBuilder> entireObjectMesh = new List<MeshBuilder>(); 
+        List<MeshBuilder> entireObjectMesh = new List<MeshBuilder>();
 
         Vector3[] normals = new Vector3[4];
 
@@ -445,92 +436,96 @@ public class ObjectLoader : Node
                 {
                     case "createmeshbuilder":
                     case "[meshbuilder]":
-                        if (cmd == "createmeshbuilder" & isB3D)
                         {
-                            GD.Print("CreateMeshBuilder is not a supported command - did you mean [MeshBuilder]? - at line {0} in file {1} ", i + 1, fileName);
-                        }
-                        else if (cmd == "[meshbuilder]" & !isB3D)
-                        {
-                            GD.Print("[MeshBuilder] is not a supported command - did you mean CreateMeshBuilder? - at line {0} in file {1} ", i + 1, fileName);
-                        }
-                        if (arguments.Length > 0)
-                        {
-                            GD.Print("0 arguments are expected in {0} - at line {1} in file {2} ", command, i, fileName);
-                        }
+                            if (cmd == "createmeshbuilder" & isB3D)
+                            {
+                                GD.Print("CreateMeshBuilder is not a supported command - did you mean [MeshBuilder]? - at line {0} in file {1} ", i + 1, fileName);
+                            }
+                            else if (cmd == "[meshbuilder]" & !isB3D)
+                            {
+                                GD.Print("[MeshBuilder] is not a supported command - did you mean CreateMeshBuilder? - at line {0} in file {1} ", i + 1, fileName);
+                            }
+                            if (arguments.Length > 0)
+                            {
+                                GD.Print("0 arguments are expected in {0} - at line {1} in file {2} ", command, i, fileName);
+                            }
 
-                        if (currentSubMesh != null)
-                        {
-                            // Completed previous submesh, add to list before moving to next
-                            entireObjectMesh.Add(currentSubMesh);
-                        }
+                            if (currentSubMesh != null)
+                            {
+                                // Completed previous submesh, add to list before moving to next
+                                entireObjectMesh.Add(currentSubMesh);
+                            }
 
-                        // Prepare next submesh
-                        currentSubMesh = new MeshBuilder();
-                        normals = new Vector3[4];
+                            // Prepare next submesh
+                            currentSubMesh = new MeshBuilder();
+                            normals = new Vector3[4];
+                        }
 
                         break;
 
                     case "addvertex":
                     case "vertex":
-                        if (cmd == "addvertex" & isB3D)
                         {
-                            GD.Print("AddVertex is not a supported command - did you mean Vertex? - at line {0} in file {1} ", i + 1, fileName);
-                        }
-                        else if (cmd == "vertex" & !isB3D)
-                        {
-                            GD.Print("Vertex is not a supported command - did you mean AddVertex? - at line {0} in file {1} ", i + 1, fileName);
-                        }
-                        if (arguments.Length > 6)
-                        {
-                            GD.Print("At most 6 arguments are expected in {0} - at line {1} in file {2} ", command, i + 1, fileName);
-                        }
-                        double vx = 0.0, vy = 0.0, vz = 0.0;
-                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out vx))
-                        {
-                            GD.Print("Invalid argument vX in {0} - at line {1} in file {2} ", command, i + 1, fileName);
-                            vx = 0.0;
-                        }
-                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out vy))
-                        {
-                            GD.Print("Invalid argument vY in {0} - at line {1} in file {2} ", command, i + 1, fileName);
-                            vy = 0.0;
-                        }
-                        if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out vz))
-                        {
-                            GD.Print("Invalid argument vZ in {0} - at line {1} in file {2} ", command, i + 1, fileName);
-                            vz = 0.0;
-                        }
-                        double nx = 0.0, ny = 0.0, nz = 0.0;
-                        if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], out nx))
-                        {
-                            GD.Print("Invalid argument nX in {0} - at line {1} in file {2} ", command, i + 1, fileName);
-                            nx = 0.0;
-                        }
-                        if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out ny))
-                        {
-                            GD.Print("Invalid argument nY in {0} - at line {1} in file {2} ", command, i + 1, fileName);
-                            ny = 0.0;
-                        }
-                        if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out nz))
-                        {
-                            GD.Print("Invalid argument nZ in {0} - at line {1} in file {2} ", command, i + 1, fileName);
-                            nz = 0.0;
-                        }
+                            if (cmd == "addvertex" & isB3D)
+                            {
+                                GD.Print("AddVertex is not a supported command - did you mean Vertex? - at line {0} in file {1} ", i + 1, fileName);
+                            }
+                            else if (cmd == "vertex" & !isB3D)
+                            {
+                                GD.Print("Vertex is not a supported command - did you mean AddVertex? - at line {0} in file {1} ", i + 1, fileName);
+                            }
+                            if (arguments.Length > 6)
+                            {
+                                GD.Print("At most 6 arguments are expected in {0} - at line {1} in file {2} ", command, i + 1, fileName);
+                            }
+                            double vx = 0.0, vy = 0.0, vz = 0.0;
+                            if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out vx))
+                            {
+                                GD.Print("Invalid argument vX in {0} - at line {1} in file {2} ", command, i + 1, fileName);
+                                vx = 0.0;
+                            }
+                            if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out vy))
+                            {
+                                GD.Print("Invalid argument vY in {0} - at line {1} in file {2} ", command, i + 1, fileName);
+                                vy = 0.0;
+                            }
+                            if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out vz))
+                            {
+                                GD.Print("Invalid argument vZ in {0} - at line {1} in file {2} ", command, i + 1, fileName);
+                                vz = 0.0;
+                            }
+                            double nx = 0.0, ny = 0.0, nz = 0.0;
+                            if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], out nx))
+                            {
+                                GD.Print("Invalid argument nX in {0} - at line {1} in file {2} ", command, i + 1, fileName);
+                                nx = 0.0;
+                            }
+                            if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out ny))
+                            {
+                                GD.Print("Invalid argument nY in {0} - at line {1} in file {2} ", command, i + 1, fileName);
+                                ny = 0.0;
+                            }
+                            if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out nz))
+                            {
+                                GD.Print("Invalid argument nZ in {0} - at line {1} in file {2} ", command, i + 1, fileName);
+                                nz = 0.0;
+                            }
 
-                        vz *= -1;
+                            vz *= -1;
 
-                        // normals
-                        // todo: float/double conversions
-                        Vector3 coords = new Vector3((float)nx,(float)ny,(float)nz);
-                        
-                        while (currentSubMesh.vertices.Count >= normals.Length)
-                        {
-                            Array.Resize<Vector3>(ref normals, normals.Length << 1);
+                            // normals
+                            // todo: float/double conversions
+                            Vector3 coords = new Vector3((float)nx, (float)ny, (float)nz);
+
+                            while (currentSubMesh.vertices.Count >= normals.Length)
+                            {
+                                Array.Resize<Vector3>(ref normals, normals.Length << 1);
+                            }
+                            normals[currentSubMesh.vertices.Count] = coords.Normalized();
+
+                            // vertices
+                            currentSubMesh.vertices.Add(new Vector3((float)vx, (float)vy, (float)vz));
                         }
-                        normals[currentSubMesh.vertices.Count] = coords.Normalized();
-
-                        // vertices
-                        currentSubMesh.vertices.Add(new Vector3((float)vx, (float)vy, (float)vz));
 
                         break;
 
@@ -538,246 +533,308 @@ public class ObjectLoader : Node
                     case "addface2":
                     case "face":
                     case "face2":
-
-                        // The index corresponds to the order in which the vertices have been created by the Vertex command, thus the Face command needs to be stated after the 
-                        // corresponding Vertex commands. The first Vertex command used creates index 0, and subsequent Vertex commands create indices 1, 2, 3 and so on.
-                        // The order in which the vertex indices appear is important. They need to be given in clockwise order when looking at the front of the face. 
-                        // The back of the face will not be visible. However, the Face2 command can be used to create a face which is visible from both sides. Only convex polygons are supported.
-
-
-                        if (isB3D)
                         {
-                            if (cmd == "addface")
-                            {
-                                GD.Print("AddFace is not a supported command - did you mean Face? - at line {0} in file {1} ", i + 1, fileName);
-                            }
-                            else if (cmd == "addface2")
-                            {
-                                GD.Print("AddFace2 is not a supported command - did you mean Face2? - at line {0} in file {1} ", i + 1, fileName);
-                            }
-                        }
-                        else
-                        {
-                            if (cmd == "face")
-                            {
-                                GD.Print("Face is not a supported command - did you mean AddFace? - at line {0} in file {1} ", i + 1, fileName);
-                            }
-                            else if (cmd == "face2")
-                            {
-                                GD.Print("Face2 is not a supported command - did you mean AddFace2? - at line {0} in file {1} ", i + 1, fileName);
-                            }
-                        }
+                            // The index corresponds to the order in which the vertices have been created by the Vertex command, thus the Face command needs to be stated after the 
+                            // corresponding Vertex commands. The first Vertex command used creates index 0, and subsequent Vertex commands create indices 1, 2, 3 and so on.
+                            // The order in which the vertex indices appear is important. They need to be given in clockwise order when looking at the front of the face. 
+                            // The back of the face will not be visible. However, the Face2 command can be used to create a face which is visible from both sides. Only convex polygons are supported.
 
-                        if (arguments.Length < 3)
-                        {
-                            GD.Print("At least 3 arguments are required in {0} - at line {1} in file {2} ", command, i + 1, fileName);
-                        }
-                        else
-                        {
-                            bool valid = true;
-                            int[] faceVertexIndices = new int[arguments.Length];
-                            for (int j = 0; j < arguments.Length; j++)
+                            if (isB3D)
                             {
-                                if (!Conversions.TryParseIntVb6(arguments[j], out faceVertexIndices[j]))
+                                if (cmd == "addface")
                                 {
-                                    GD.Print("v{0} is invalid in {1} - at line {2} in file {3} ", j, command, i + 1, fileName);
-                                    valid = false;
-                                    break;
+                                    GD.Print("AddFace is not a supported command - did you mean Face? - at line {0} in file {1} ", i + 1, fileName);
                                 }
-                                else if (faceVertexIndices[j] < 0 | faceVertexIndices[j] >= currentSubMesh.vertices.Count)
+                                else if (cmd == "addface2")
                                 {
-                                    GD.Print("v{0} references a non-existing vertex in {1} - at line {2} in file {3} ", j, command, i + 1, fileName);
-                                    valid = false;
-                                    break;
+                                    GD.Print("AddFace2 is not a supported command - did you mean Face2? - at line {0} in file {1} ", i + 1, fileName);
                                 }
-                                else if (faceVertexIndices[j] > 65535)
+                            }
+                            else
+                            {
+                                if (cmd == "face")
                                 {
-                                    GD.Print("v{0} indexes a vertex above 65535 which is not currently supported in {1} - at line {2} in file {3} ", j, command, i + 1, fileName);
-                                    valid = false;
-                                    break;
+                                    GD.Print("Face is not a supported command - did you mean AddFace? - at line {0} in file {1} ", i + 1, fileName);
+                                }
+                                else if (cmd == "face2")
+                                {
+                                    GD.Print("Face2 is not a supported command - did you mean AddFace2? - at line {0} in file {1} ", i + 1, fileName);
                                 }
                             }
 
-                            if (valid)
+                            if (arguments.Length < 3)
                             {
-                                MeshFace f = new MeshFace();
-
-                                while (currentSubMesh.vertices.Count > normals.Length)
-                                {
-                                    Array.Resize<Vector3>(ref normals, normals.Length << 1);
-                                }
-
+                                GD.Print("At least 3 arguments are required in {0} - at line {1} in file {2} ", command, i + 1, fileName);
+                            }
+                            else
+                            {
+                                bool valid = true;
+                                int[] faceVertexIndices = new int[arguments.Length];
                                 for (int j = 0; j < arguments.Length; j++)
                                 {
-                                    MeshFaceVertex v = new MeshFaceVertex((ushort)faceVertexIndices[j]);
-
-                                    v.indexToMeshVertices = (ushort)faceVertexIndices[j];
-                                    v.normal = normals[faceVertexIndices[j]];
-                                    f.verticeIndexes.Add(v);
+                                    if (!Conversions.TryParseIntVb6(arguments[j], out faceVertexIndices[j]))
+                                    {
+                                        GD.Print("v{0} is invalid in {1} - at line {2} in file {3} ", j, command, i + 1, fileName);
+                                        valid = false;
+                                        break;
+                                    }
+                                    else if (faceVertexIndices[j] < 0 | faceVertexIndices[j] >= currentSubMesh.vertices.Count)
+                                    {
+                                        GD.Print("v{0} references a non-existing vertex in {1} - at line {2} in file {3} ", j, command, i + 1, fileName);
+                                        valid = false;
+                                        break;
+                                    }
+                                    else if (faceVertexIndices[j] > 65535)
+                                    {
+                                        GD.Print("v{0} indexes a vertex above 65535 which is not currently supported in {1} - at line {2} in file {3} ", j, command, i + 1, fileName);
+                                        valid = false;
+                                        break;
+                                    }
                                 }
 
-                                if (cmd == "addface2" | cmd == "face2")
+                                if (valid)
                                 {
-                                    f.flags = (byte)MeshFace.FACE_2_MASK;
-                                }
+                                    MeshFace f = new MeshFace();
 
-                                currentSubMesh.faces.Add(f);
+                                    while (currentSubMesh.vertices.Count > normals.Length)
+                                    {
+                                        Array.Resize<Vector3>(ref normals, normals.Length << 1);
+                                    }
+
+                                    for (int j = 0; j < arguments.Length; j++)
+                                    {
+                                        MeshFaceVertex v = new MeshFaceVertex((ushort)faceVertexIndices[j]);
+
+                                        v.indexToMeshVertices = (ushort)faceVertexIndices[j];
+                                        v.normal = normals[faceVertexIndices[j]];
+                                        f.verticeIndexes.Add(v);
+                                    }
+
+                                    if (cmd == "addface2" | cmd == "face2")
+                                    {
+                                        f.flags = (byte)MeshFace.FACE_2_MASK;
+                                    }
+
+                                    currentSubMesh.faces.Add(f);
+                                }
                             }
                         }
                         break;
 
                     case "loadtexture":
                     case "load":
-
-                        if (cmd == "loadtexture" & isB3D)
                         {
-                            GD.Print("LoadTexture is not a supported B3D file command - did you mean Load? - at line {0} in file {1} ", i + 1, fileName);
+                            if (cmd == "loadtexture" & isB3D)
+                            {
+                                GD.Print("LoadTexture is not a supported B3D file command - did you mean Load? - at line {0} in file {1} ", i + 1, fileName);
+                            }
+                            else if (cmd == "load" & !isB3D)
+                            {
+                                GD.Print("Load is not a supported CSV file command - did you mean LoadTexture? - at line {0} in file {1} ", i + 1, fileName);
+
+                            }
+                            if (arguments.Length > 2)
+                            {
+                                GD.Print("At most 2 arguments are expected in {0} - at line {1} in file {2} ", cmd, i + 1, fileName);
+                            }
+
+                            // todo: far more error handling
+                            string tday = null, tnight = null;
+                            if (arguments.Length >= 1 && arguments[0].Length != 0)
+                            {
+                                tday = System.IO.Path.Combine(containingFolder, arguments[0]);
+                            }
+
+                            if (arguments.Length >= 2 && arguments[1].Length != 0)
+                            {
+                                tnight = System.IO.Path.Combine(containingFolder, arguments[1]);
+                            }
+
+                            MeshMaterial mm = new MeshMaterial()
+                            {
+                                dayTexture = !String.IsNullOrEmpty(tday) ? System.IO.Path.Combine(containingFolder, tday) : null,
+                                nightTexture = !String.IsNullOrEmpty(tnight) ? System.IO.Path.Combine(containingFolder, tnight) : null
+                            };
+
+                            currentSubMesh.material = mm;
+
+                            //  currentSubMesh.faces[currentSubMesh.faces.Count-1].materialIndex = currentSubMesh.materials.Count-1;
                         }
-                        else if (cmd == "load" & !isB3D)
-                        {
-                            GD.Print("Load is not a supported CSV file command - did you mean LoadTexture? - at line {0} in file {1} ", i + 1, fileName);
-
-                        }
-                        if (arguments.Length > 2)
-                        {
-                            GD.Print("At most 2 arguments are expected in {0} - at line {1} in file {2} ", cmd, i + 1, fileName);
-                        }
-
-                        // todo: far more error handling
-                        string tday = null, tnight = null;
-                        if (arguments.Length >= 1 && arguments[0].Length != 0)
-                        {
-                            tday = System.IO.Path.Combine(containingFolder, arguments[0]);
-                        }
-
-                        if (arguments.Length >= 2 && arguments[1].Length != 0)
-                        {
-                            tnight = System.IO.Path.Combine(containingFolder, arguments[1]);
-                        }
-
-                        MeshMaterial mm = new MeshMaterial() { 
-                            dayTexture = !String.IsNullOrEmpty(tday) ? System.IO.Path.Combine(containingFolder, tday) : null, 
-                            nightTexture = !String.IsNullOrEmpty(tnight) ? System.IO.Path.Combine(containingFolder, tnight) : null };
-
-                        currentSubMesh.material = mm;
-                        
-                        //  currentSubMesh.faces[currentSubMesh.faces.Count-1].materialIndex = currentSubMesh.materials.Count-1;
-
                         break;
 
                     case "settexturecoordinates":
                     case "coordinates":
-                        if (cmd == "settexturecoordinates" & isB3D)
                         {
-                            GD.Print("SetTextureCoordinates is not a supported B3D file command - did you mean Coordinates? - at line {0} in file {1} ", i + 1, fileName);
-                            //    Debug.AddMessage(Debug.MessageType.Warning, false, "SetTextureCoordinates is not a supported command - did you mean Coordinates? - at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                        }
-                        else if (cmd == "coordinates" & !isB3D)
-                        {
-                            GD.Print("SetTextureCoordinates is not a supported CSV file command - did you mean Coordinates? - at line {0} in file {1} ", i + 1, fileName);
-                            //    Debug.AddMessage(Debug.MessageType.Warning, false, "Coordinates is not a supported command - did you mean SetTextureCoordinates? - at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                        }
-                        if (arguments.Length > 3)
-                        {
-                            GD.Print("At most 3 arguments are expected in {0} - at line {1} in file {2} ", cmd, i + 1, fileName);
-                            //    Debug.AddMessage(Debug.MessageType.Warning, false, "At most 3 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                        }
+                            if (cmd == "settexturecoordinates" & isB3D)
+                            {
+                                GD.Print("SetTextureCoordinates is not a supported B3D file command - did you mean Coordinates? - at line {0} in file {1} ", i + 1, fileName);
+                                //    Debug.AddMessage(Debug.MessageType.Warning, false, "SetTextureCoordinates is not a supported command - did you mean Coordinates? - at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            }
+                            else if (cmd == "coordinates" & !isB3D)
+                            {
+                                GD.Print("SetTextureCoordinates is not a supported CSV file command - did you mean Coordinates? - at line {0} in file {1} ", i + 1, fileName);
+                                //    Debug.AddMessage(Debug.MessageType.Warning, false, "Coordinates is not a supported command - did you mean SetTextureCoordinates? - at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            }
+                            if (arguments.Length > 3)
+                            {
+                                GD.Print("At most 3 arguments are expected in {0} - at line {1} in file {2} ", cmd, i + 1, fileName);
+                                //    Debug.AddMessage(Debug.MessageType.Warning, false, "At most 3 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            }
 
-                        int k = 0; float x = 0.0f, y = 0.0f;
-                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out k))
-                        {
-                            GD.Print("Invalid argument VertexIndex in {0} - at line {1} in file {2} ", cmd, i + 1, fileName);
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument VertexIndex in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            k = 0;
-                        }
-                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseFloatVb6(arguments[1], out x))
-                        {
-                            GD.Print("Invalid argument X in {0} - at line {1} in file {2} ", cmd, i + 1, fileName);
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument X in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            x = 0.0f;
-                        }
-                        if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseFloatVb6(arguments[2], out y))
-                        {
-                            GD.Print("Invalid argument Y in {0} - at line {1} in file {2} ", cmd, i + 1, fileName);
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Y in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            y = 0.0f;
-                        }
+                            int k = 0; float x = 0.0f, y = 0.0f;
+                            if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out k))
+                            {
+                                GD.Print("Invalid argument VertexIndex in {0} - at line {1} in file {2} ", cmd, i + 1, fileName);
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument VertexIndex in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                k = 0;
+                            }
+                            if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseFloatVb6(arguments[1], out x))
+                            {
+                                GD.Print("Invalid argument X in {0} - at line {1} in file {2} ", cmd, i + 1, fileName);
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument X in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                x = 0.0f;
+                            }
+                            if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseFloatVb6(arguments[2], out y))
+                            {
+                                GD.Print("Invalid argument Y in {0} - at line {1} in file {2} ", cmd, i + 1, fileName);
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Y in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                y = 0.0f;
+                            }
 
-                        if (k >= 0 & k < currentSubMesh.vertices.Count)
-                        {
-                            currentSubMesh.uvs.Add(new Vector2(x, y));
+                            if (k >= 0 & k < currentSubMesh.vertices.Count)
+                            {
+                                currentSubMesh.uvs.Add(new Vector2(x, y));
+                            }
+                            else
+                            {
+                                GD.Print("VertexIndex references a non-existing vertex in {0} - at line {1} in file {2} ", command, i + 1, fileName);
+                            }
                         }
-                        else
-                        {
-                            GD.Print("VertexIndex references a non-existing vertex in {0} - at line {1} in file {2} ", command, i + 1, fileName);
-                        }
-
                         break;
 
                     case "setcolor":
                     case "color":
+                        {
 
-                        if (cmd == "setcolor" & isB3D)
-                        {
-                            GD.Print("SetColor is not a supported B3D file command - did you mean Color? - at line {0} in file {1} ", i + 1, fileName);
-                        }
-                        else if (cmd == "color" & !isB3D)
-                        {
-                            GD.Print("Color is not a supported CSV file command - did you mean SetColor? - at line {0} in file {1} ", i + 1, fileName);
-                        }
-                        if (arguments.Length > 4)
-                        {
-                            GD.Print("At most 4 arguments are expected in {0} - at line {1} in file {2} ", command, i + 1, fileName);
+                            if (cmd == "setcolor" & isB3D)
+                            {
+                                GD.Print("SetColor is not a supported B3D file command - did you mean Color? - at line {0} in file {1} ", i + 1, fileName);
+                            }
+                            else if (cmd == "color" & !isB3D)
+                            {
+                                GD.Print("Color is not a supported CSV file command - did you mean SetColor? - at line {0} in file {1} ", i + 1, fileName);
+                            }
+                            if (arguments.Length > 4)
+                            {
+                                GD.Print("At most 4 arguments are expected in {0} - at line {1} in file {2} ", command, i + 1, fileName);
 
-                        }
-                        int r = 0, g = 0, b = 0, a = 255;
-                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out r))
-                        {
-                            r = 0;
-                        }
-                        else if (r < 0 | r > 255)
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Red is required to be within the range from 0 to 255 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            r = r < 0 ? 0 : 255;
-                        }
-                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out g))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Green in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            g = 0;
-                        }
-                        else if (g < 0 | g > 255)
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Green is required to be within the range from 0 to 255 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            g = g < 0 ? 0 : 255;
-                        }
-                        if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out b))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Blue in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            b = 0;
-                        }
-                        else if (b < 0 | b > 255)
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Blue is required to be within the range from 0 to 255 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            b = b < 0 ? 0 : 255;
-                        }
-                        if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out a))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Alpha in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            a = 255;
-                        }
-                        else if (a < 0 | a > 255)
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Alpha is required to be within the range from 0 to 255 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            a = a < 0 ? 0 : 255;
-                        }
+                            }
+                            int r = 0, g = 0, b = 0, a = 255;
+                            if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out r))
+                            {
+                                r = 0;
+                            }
+                            else if (r < 0 | r > 255)
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Red is required to be within the range from 0 to 255 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                r = r < 0 ? 0 : 255;
+                            }
+                            if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out g))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Green in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                g = 0;
+                            }
+                            else if (g < 0 | g > 255)
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Green is required to be within the range from 0 to 255 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                g = g < 0 ? 0 : 255;
+                            }
+                            if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out b))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Blue in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                b = 0;
+                            }
+                            else if (b < 0 | b > 255)
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Blue is required to be within the range from 0 to 255 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                b = b < 0 ? 0 : 255;
+                            }
+                            if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out a))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Alpha in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                a = 255;
+                            }
+                            else if (a < 0 | a > 255)
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Alpha is required to be within the range from 0 to 255 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                a = a < 0 ? 0 : 255;
+                            }
 
 
-                        MeshMaterial mmcolor = new MeshMaterial();
-                        mmcolor.color = Color.Color8((byte)r, (byte)g, (byte)b, (byte)a);
-                        currentSubMesh.material = mmcolor;
+                            MeshMaterial mmcolor = new MeshMaterial();
+                            mmcolor.color = Color.Color8((byte)r, (byte)g, (byte)b, (byte)a);
+                            currentSubMesh.material = mmcolor;
 
-                        //currentSubMesh.faces[currentSubMesh.faces.Count-1].materialIndex = currentSubMesh.materials.Count-1;
+                            //currentSubMesh.faces[currentSubMesh.faces.Count-1].materialIndex = currentSubMesh.materials.Count-1;
+                        }
+                        break;
 
+                    case "setdecaltransparentcolor":
+                    case "transparent":
+                        {
+                            if (cmd == "setdecaltransparentcolor" & isB3D)
+                            {
+                                //currentHost.AddMessage(MessageType.Warning, false, "SetDecalTransparentColor is not a supported command - did you mean Transparent? - at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            }
+                            else if (cmd == "transparent" & !isB3D)
+                            {
+                                //currentHost.AddMessage(MessageType.Warning, false, "Transparent is not a supported command - did you mean SetDecalTransparentColor? - at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            }
+                            if (arguments.Length > 3)
+                            {
+                                // currentHost.AddMessage(MessageType.Warning, false, "At most 3 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            }
+                            int r = 0, g = 0, b = 0;
+                            if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out r))
+                            {
+                                // currentHost.AddMessage(MessageType.Error, false, "Invalid argument Red in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                r = 0;
+                            }
+                            else if (r < 0 | r > 255)
+                            {
+                                // currentHost.AddMessage(MessageType.Error, false, "Red is required to be within the range from 0 to 255 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                r = r < 0 ? 0 : 255;
+                            }
+                            if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out g))
+                            {
+                                // currentHost.AddMessage(MessageType.Error, false, "Invalid argument Green in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                g = 0;
+                            }
+                            else if (g < 0 | g > 255)
+                            {
+                                // currentHost.AddMessage(MessageType.Error, false, "Green is required to be within the range from 0 to 255 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                g = g < 0 ? 0 : 255;
+                            }
+                            if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out b))
+                            {
+                                // currentHost.AddMessage(MessageType.Error, false, "Invalid argument Blue in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                b = 0;
+                            }
+                            else if (b < 0 | b > 255)
+                            {
+                                // currentHost.AddMessage(MessageType.Error, false, "Blue is required to be within the range from 0 to 255 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                b = b < 0 ? 0 : 255;
+                            }
+
+                            currentSubMesh.material.transparentColor = Color.Color8((byte)r, (byte)g, (byte)b);
+                            currentSubMesh.material.transparentColorUsed = true;
+
+                            // for (int j = 0; j < Builder.Materials.Length; j++)
+                            // {
+                            //     Builder.Materials[j].TransparentColor = new Color24((byte)r, (byte)g, (byte)b);
+                            //     Builder.Materials[j].TransparentColorUsed = true;
+                            // }
+                        }
                         break;
 
                     case "translate":
@@ -816,243 +873,248 @@ public class ObjectLoader : Node
 
                     case "scale":
                     case "scaleall":
+                        {
+                            if (arguments.Length > 3)
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Warning, false, "At most 3 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            }
+                            double sx = 1.0, sy = 1.0, sz = 1.0;
+                            if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out sx))
+                            {
+                                //    Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument X in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                sx = 1.0;
+                            }
+                            else if (sx == 0.0)
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "X is required to be different from zero in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                sx = 1.0;
+                            }
+                            if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out sy))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Y in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                sy = 1.0;
+                            }
+                            else if (sy == 0.0)
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Y is required to be different from zero in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                sy = 1.0;
+                            }
+                            if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out sz))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Z in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                sz = 1.0;
+                            }
+                            else if (sz == 0.0)
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Z is required to be different from zero in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                sz = 1.0;
+                            }
 
-                        if (arguments.Length > 3)
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Warning, false, "At most 3 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                        }
-                        double sx = 1.0, sy = 1.0, sz = 1.0;
-                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out sx))
-                        {
-                            //    Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument X in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            sx = 1.0;
-                        }
-                        else if (sx == 0.0)
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "X is required to be different from zero in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            sx = 1.0;
-                        }
-                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out sy))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Y in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            sy = 1.0;
-                        }
-                        else if (sy == 0.0)
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Y is required to be different from zero in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            sy = 1.0;
-                        }
-                        if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out sz))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Z in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            sz = 1.0;
-                        }
-                        else if (sz == 0.0)
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Z is required to be different from zero in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            sz = 1.0;
-                        }
+                            ApplyScale(currentSubMesh, sx, sy, sz);
 
-                        ApplyScale(currentSubMesh, sx, sy, sz);
-
-                        if (cmd == "scaleall")
-                        {
-                            // ApplyScale(Object, x, y, z);
+                            if (cmd == "scaleall")
+                            {
+                                // ApplyScale(Object, x, y, z);
+                            }
                         }
-
                         break;
 
                     case "rotate":
                     case "rotateall":
-                        if (arguments.Length > 4)
                         {
-                            //Debug.AddMessage(Debug.MessageType.Warning, false, "At most 4 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                        }
-                        double rx = 0.0, ry = 0.0, rz = 0.0, ra = 0.0;
-                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out rx))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument X in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            rx = 0.0;
-                        }
-                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out ry))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Y in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            ry = 0.0;
-                        }
-                        if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out rz))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Z in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            rz = 0.0;
-                        }
-                        if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], out ra))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Angle in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            ra = 0.0;
-                        }
-                        double rt = rx * rx + ry * ry + rz * rz;
-                        if (rt == 0.0)
-                        {
-                            rx = 1.0;
-                            ry = 0.0;
-                            rz = 0.0;
-                            rt = 1.0;
-                        }
-
-                        if (ra != 0.0)
-                        {
-                            rt = 1.0 / Math.Sqrt(rt);
-                            rx *= rt;
-                            ry *= rt;
-                            rz *= rt;
-                            ra *= 0.0174532925199433;
-
-                            ApplyRotation(ref currentSubMesh, rx, ry, rz, ra);
-
-                            if (cmd == "rotateall")
+                            if (arguments.Length > 4)
                             {
-                                //TODO
-                                //ApplyRotation(Object, x, y, z, a);
+                                //Debug.AddMessage(Debug.MessageType.Warning, false, "At most 4 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            }
+                            double rx = 0.0, ry = 0.0, rz = 0.0, ra = 0.0;
+                            if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out rx))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument X in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                rx = 0.0;
+                            }
+                            if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out ry))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Y in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                ry = 0.0;
+                            }
+                            if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out rz))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Z in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                rz = 0.0;
+                            }
+                            if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], out ra))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Angle in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                ra = 0.0;
+                            }
+                            double rt = rx * rx + ry * ry + rz * rz;
+                            if (rt == 0.0)
+                            {
+                                rx = 1.0;
+                                ry = 0.0;
+                                rz = 0.0;
+                                rt = 1.0;
+                            }
+
+                            if (ra != 0.0)
+                            {
+                                rt = 1.0 / Math.Sqrt(rt);
+                                rx *= rt;
+                                ry *= rt;
+                                rz *= rt;
+                                ra *= 0.0174532925199433;
+
+                                ApplyRotation(ref currentSubMesh, rx, ry, rz, ra);
+
+                                if (cmd == "rotateall")
+                                {
+                                    //TODO
+                                    //ApplyRotation(Object, x, y, z, a);
+                                }
                             }
                         }
-
                         break;
 
                     case "shear":
                     case "shearall":
+                        {
+                            if (arguments.Length > 7)
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Warning, false, "At most 7 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            }
+                            double shdx = 0.0, shdy = 0.0, shdz = 0.0;
+                            double shsx = 0.0, shsy = 0.0, shsz = 0.0;
+                            double shr = 0.0;
+                            if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out shdx))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument dX in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                shdx = 0.0;
+                            }
+                            if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out shdy))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument dY in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                shdy = 0.0;
+                            }
+                            if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out shdz))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument dZ in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                shdz = 0.0;
+                            }
+                            if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], out shsx))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument sX in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                shsx = 0.0;
+                            }
+                            if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out shsy))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument sY in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                shsy = 0.0;
+                            }
+                            if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out shsz))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument sZ in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                shsz = 0.0;
+                            }
+                            if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[6], out shr))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Ratio in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                shr = 0.0;
+                            }
 
-                        if (arguments.Length > 7)
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Warning, false, "At most 7 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                        }
-                        double shdx = 0.0, shdy = 0.0, shdz = 0.0;
-                        double shsx = 0.0, shsy = 0.0, shsz = 0.0;
-                        double shr = 0.0;
-                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out shdx))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument dX in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            shdx = 0.0;
-                        }
-                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out shdy))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument dY in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            shdy = 0.0;
-                        }
-                        if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out shdz))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument dZ in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            shdz = 0.0;
-                        }
-                        if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], out shsx))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument sX in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            shsx = 0.0;
-                        }
-                        if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out shsy))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument sY in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            shsy = 0.0;
-                        }
-                        if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out sz))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument sZ in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            shsz = 0.0;
-                        }
-                        if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[6], out shr))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Ratio in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            shr = 0.0;
-                        }
 
-
-                        //TODO
-                        // Calc.Normalize(ref shdx, ref shdy, ref shdz);
-                        // Calc.Normalize(ref shsx, ref shsy, ref shsz);
-
-                        // ApplyShear(meshBuilder, shdx, shdy, shdz, shsx, shsy, shsz, shr);
-
-                        if (cmd == "shearall")
-                        {
                             //TODO
-                            //ApplyShear(Object, dx, dy, dz, sx, sy, sz, r);
-                        }
+                            // Calc.Normalize(ref shdx, ref shdy, ref shdz);
+                            // Calc.Normalize(ref shsx, ref shsy, ref shsz);
 
+                            // ApplyShear(meshBuilder, shdx, shdy, shdz, shsx, shsy, shsz, shr);
+
+                            if (cmd == "shearall")
+                            {
+                                //TODO
+                                //ApplyShear(Object, dx, dy, dz, sx, sy, sz, r);
+                            }
+                        }
                         break;
 
                     case "cylinder":
-                        if (arguments.Length > 4)
                         {
-                            //Debug.AddMessage(Debug.MessageType.Warning, false, "At most 4 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            if (arguments.Length > 4)
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Warning, false, "At most 4 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            }
+                            int cyl_n = 8;
+                            if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out cyl_n))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument n in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                cyl_n = 8;
+                            }
+                            if (cyl_n < 2)
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "n is expected to be at least 2 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                cyl_n = 8;
+                            }
+                            double cyl_r1 = 0.0, cyl_r2 = 0.0, cyl_h = 1.0;
+                            if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out cyl_r1))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument UpperRadius in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                cyl_r1 = 1.0;
+                            }
+                            if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out cyl_r2))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument LowerRadius in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                cyl_r2 = 1.0;
+                            }
+                            if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], out cyl_h))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Height in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                cyl_h = 1.0;
+                            }
+                            CreateCylinder(ref currentSubMesh, cyl_n, cyl_r1, cyl_r2, cyl_h);
                         }
-                        int cyl_n = 8;
-                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out cyl_n))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument n in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            cyl_n = 8;
-                        }
-                        if (cyl_n < 2)
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "n is expected to be at least 2 in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            cyl_n = 8;
-                        }
-                        double cyl_r1 = 0.0, cyl_r2 = 0.0, cyl_h = 1.0;
-                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out cyl_r1))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument UpperRadius in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            cyl_r1 = 1.0;
-                        }
-                        if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out cyl_r2))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument LowerRadius in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            cyl_r2 = 1.0;
-                        }
-                        if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], out cyl_h))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument Height in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            cyl_h = 1.0;
-                        }
-                        CreateCylinder(ref currentSubMesh, cyl_n, cyl_r1, cyl_r2, cyl_h);
                         break;
 
                     case "cube":
-
-                        if (arguments.Length > 3)
                         {
-                            //Debug.AddMessage(Debug.MessageType.Warning, false, "At most 3 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            if (arguments.Length > 3)
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Warning, false, "At most 3 arguments are expected in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                            }
+                            double cube_x = 0.0;
+                            if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out cube_x))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument HalfWidth in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                cube_x = 1.0;
+                            }
+                            double cube_y = cube_x, cube_z = cube_x;
+                            if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out cube_y))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument HalfHeight in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                cube_y = 1.0;
+                            }
+                            if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out cube_z))
+                            {
+                                //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument HalfDepth in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
+                                cube_z = 1.0;
+                            }
+                            CreateCube(ref currentSubMesh, cube_x, cube_y, cube_z);
                         }
-                        double cube_x = 0.0;
-                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out cube_x))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument HalfWidth in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            cube_x = 1.0;
-                        }
-                        double cube_y = cube_x, cube_z = cube_x;
-                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out cube_y))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument HalfHeight in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            cube_y = 1.0;
-                        }
-                        if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out cube_z))
-                        {
-                            //Debug.AddMessage(Debug.MessageType.Error, false, "Invalid argument HalfDepth in " + Command + " at line " + (i + 1).ToString(Culture) + " in file " + FileName);
-                            cube_z = 1.0;
-                        }
-                        CreateCube(ref currentSubMesh, cube_x, cube_y, cube_z);
                         break;
 
                     default:
+
                         GD.Print("Unknown command '{0}' - at line {1} in file {2}", command, i + 1, fileName);
                         break;
 
                 }
             }
         }
-       
+
         // Add the last meshbuilder
         if (entireObjectMesh.Count == 0 || currentSubMesh != entireObjectMesh.Last())
             entireObjectMesh.Add(currentSubMesh);
 
         // Finally, create the godot engine mesh based on the consolidated MeshBuilder instances for the overall object     	
-		return MeshBuilder.GenerateGodotMesh(entireObjectMesh.ToArray());
+        return MeshBuilder.GenerateGodotMesh(entireObjectMesh.ToArray());
 
     }
 
@@ -1136,7 +1198,7 @@ public class ObjectLoader : Node
             normals[2 * i + 1] = new Vector3((float)nx, (float)ny, (float)nz);
             t += d;
         }
-        
+
         // faces
         int f = builder.faces.Count;
         //Array.Resize<World.MeshFace>(ref builder.Faces, f + n + m);
@@ -1317,7 +1379,7 @@ public class ObjectLoader : Node
         for (int i = 0; i < builder.vertices.Count; i++)
         {
             Vector3 v = builder.vertices[i];    // careful - need a copy because struct is value type
-            Calc.Rotate(ref v.x, ref v.y, ref v.z, x, y, z, cosa, sina); 
+            Calc.Rotate(ref v.x, ref v.y, ref v.z, x, y, z, cosa, sina);
             builder.vertices[i] = v;
         }
 
