@@ -642,18 +642,18 @@ public class ObjectLoader : Node
                             string tday = null, tnight = null;
                             if (arguments.Length >= 1 && arguments[0].Length != 0)
                             {
-                                tday = System.IO.Path.Combine(containingFolder, arguments[0]);
+                                tday =  System.IO.Path.GetFullPath(System.IO.Path.Combine(containingFolder, arguments[0]));
                             }
 
                             if (arguments.Length >= 2 && arguments[1].Length != 0)
                             {
-                                tnight = System.IO.Path.Combine(containingFolder, arguments[1]);
+                                tnight = System.IO.Path.GetFullPath(System.IO.Path.Combine(containingFolder, arguments[1]));
                             }
 
                             MeshMaterial mm = new MeshMaterial()
                             {
-                                dayTexture = !String.IsNullOrEmpty(tday) ? System.IO.Path.Combine(containingFolder, tday) : null,
-                                nightTexture = !String.IsNullOrEmpty(tnight) ? System.IO.Path.Combine(containingFolder, tnight) : null
+                                dayTexture = !String.IsNullOrEmpty(tday) ? tday : null,
+                                nightTexture = !String.IsNullOrEmpty(tnight) ? tnight : null
                             };
 
                             currentSubMesh.material = mm;
@@ -770,10 +770,11 @@ public class ObjectLoader : Node
                                 a = a < 0 ? 0 : 255;
                             }
 
+                            
+                            if (currentSubMesh.material == null) 
+                                currentSubMesh.material = new MeshMaterial();
 
-                            MeshMaterial mmcolor = new MeshMaterial();
-                            mmcolor.color = Color.Color8((byte)r, (byte)g, (byte)b, (byte)a);
-                            currentSubMesh.material = mmcolor;
+                            currentSubMesh.material.color = Color.Color8((byte)r, (byte)g, (byte)b, (byte)a);
 
                             //currentSubMesh.faces[currentSubMesh.faces.Count-1].materialIndex = currentSubMesh.materials.Count-1;
                         }

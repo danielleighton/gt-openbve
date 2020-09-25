@@ -17,7 +17,7 @@ public class SceneLoader : Node {
 //		MeshInstance mi = ObjectLoader.LoadFromFile(@"C:\Users\danie\Desktop\Test\Objects\reren\Sjyou\car\Bus_A.csv", System.Text.Encoding.ASCII,true, true);
 
 
-		MeshInstance mi = ObjectLoader.LoadFromFile(@"C:\Users\danie\Desktop\Test\Objects\reren\Sjyou\car\Estima.csv", System.Text.Encoding.ASCII,true, true);
+		MeshInstance mi = ObjectLoader.LoadFromFile(@"C:\Users\danie\Desktop\Test\Objects\reren\EDtozai\Form\barakiformB.csv", System.Text.Encoding.ASCII,true, true);
 
 		
 		// Hello this is a program :) 
