@@ -5,11 +5,9 @@ using System.Text;
 using System.Linq;
 using System.Collections.Generic;
 
-
-public class ObjectLoader : Node
+public class CsvB3dObjectParser
 {
-
-    #region Helper Classes
+    #region Helper classes
 
     private class MeshFaceVertex
     {
@@ -74,28 +72,18 @@ public class ObjectLoader : Node
         /// </summary>
         public List<MeshFaceVertex> verticeIndexes;
 
-        /// <summary>
-        /// A reference to an element in the Material array of the containing Mesh structure.
-        /// - note this is a reference to the actual material from parent material list
-        /// </summary>
-        //public int materialIndex;
-
         /// <summary>A bit mask combining constants of the MeshFace structure.</summary>
         public byte flags;
 
         public MeshFace()
         {
             this.verticeIndexes = new List<MeshFaceVertex>();
-            // materialIndex = 0;
         }
 
         public MeshFace(MeshFaceVertex[] vertices) :
             this()
         {
-
             this.verticeIndexes.AddRange(vertices);
-
-            // this.materialIndex = 0;
             this.flags = 0;
         }
         internal void Flip()
@@ -131,15 +119,18 @@ public class ObjectLoader : Node
         public Color color;
 
         public Color emissiveColor;
+
         public bool emissiveColorUsed;
 
         public Color transparentColor;
+
         public bool transparentColorUsed;
 
         //public World.MeshMaterialBlendMode BlendMode;
         public ushort glowAttenuationData;
 
         public string dayTexture;
+
         public string nightTexture;
 
         public MeshMaterial()
@@ -183,29 +174,7 @@ public class ObjectLoader : Node
             vertices = new List<Vector3>();
             uvs = new List<Vector2>();
             faces = new List<MeshFace>();
-            //material = new List<MeshMaterial>();
         }
-
-
-
-
-        private static SpatialMaterial[] make_materials(int n)
-        {
-            List<SpatialMaterial> matlist = new List<SpatialMaterial>();
-            RandomNumberGenerator rng = new RandomNumberGenerator();
-            rng.Randomize();
-            for (int i = 0; i < n; i++)
-            {
-                SpatialMaterial m = new SpatialMaterial();
-                Color c = new Color(rng.RandfRange(0.0f, 1.0f), rng.RandfRange(0.0f, 1.0f), rng.RandfRange(0.0f, 1.0f));
-                m.AlbedoColor = c;
-                matlist.Add(m);
-            }
-            return matlist.ToArray();
-        }
-
-
-
 
         /// <summary>
         /// Generate unity mesh from list of object submesh builders 
@@ -222,8 +191,6 @@ public class ObjectLoader : Node
             Array.ForEach(submeshBuilders, subMeshElement => joinedVertices.AddRange(subMeshElement.vertices));
 
             ArrayMesh gdMesh = null;
-
-            //List<Texture> tex = BuildTextureList(submeshBuilders.ToList<MeshBuilder>());
 
             // Prepare submesh per meshbuilder section
             int offset = 0;
@@ -273,10 +240,11 @@ public class ObjectLoader : Node
                     if (submeshBuilders[i].material != null)
                     {
                         MeshMaterial mat = submeshBuilders[i].material;
-
                     
+                        // TODO - possibly a better way of determining whether texture is used
                         if (!string.IsNullOrEmpty(mat.dayTexture) && System.IO.File.Exists(mat.dayTexture))
                         {
+                            // Textured face
                             ShaderMaterial matTexture = new ShaderMaterial();
 
                             // TODO don't know if these have to be unloaded somehow later
@@ -289,18 +257,16 @@ public class ObjectLoader : Node
 
                             //https://godotforums.org/discussion/19348/new-detail-texture-shader 
                             //https://godotengine.org/qa/43789/texture-fragment-shader-is-different-from-original-texture
-
-                            // tex_1_side
-                            // tex_2_side
-                            // tex_1_side_trans
-                            // tex_2_side_trans
-
+                  
+                            // Determine appropriate shader based on two-sidedness, transparency, etc
                             matTexture.Shader = ResourceLoader.Load<Shader>(String.Format("res://{0}{1}.shader", 
                                                                      (face.flags & MeshFace.FACE_2_MASK) == MeshFace.FACE_2_MASK ? "tex_2_side" : "tex_1_side",
                                                                      mat.transparentColorUsed ? "_trans" : String.Empty));
 
+                            // TODO night texture
                             matTexture.SetShaderParam("day_texture", tex);
 
+                            // Send transparency color (where used) to shader
                             if (mat.transparentColorUsed) matTexture.SetShaderParam("trans_color", mat.transparentColor);
 
                             // Set submesh to use to textured shader/material
@@ -309,10 +275,11 @@ public class ObjectLoader : Node
                         }
                         else
                         {
-                            // Set submesh to use to simple color shader/material
+                            // Simple colored face    
                             SpatialMaterial matColor = new SpatialMaterial(); 
                             matColor.AlbedoColor = mat.color;
 
+                            // Set submesh to use to simple color shader/material
                             gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, matColor);
                         }
 
@@ -322,53 +289,16 @@ public class ObjectLoader : Node
 
             }
 
-
             gdMeshInstance.Mesh = gdMesh;
             return gdMeshInstance;
 
         }
     }
 
-
-    private static ArrayMesh AddFace(ArrayMesh mesh, Vector3[] verts, MeshFaceVertex[] fv, Vector2[] uvs)
-    {
-        if (mesh == null) mesh = new ArrayMesh();
-
-        // TODO: Assumes rectangular face
-        int[] indices;
-
-        if (fv.Length == 4)
-            indices = new int[] { fv[0].indexToMeshVertices, fv[2].indexToMeshVertices, fv[3].indexToMeshVertices,
-                                  fv[0].indexToMeshVertices, fv[1].indexToMeshVertices, fv[2].indexToMeshVertices};
-        else
-            indices = new int[] { fv[0].indexToMeshVertices, fv[1].indexToMeshVertices, fv[2].indexToMeshVertices };
-
-
-        // Vector2 [] uv11 = new Vector2[] {new Vector2(0,0), new Vector2(1,0), new Vector2(1,1), new Vector2(0,1)};
-
-        Vector3[] no = new Vector3[verts.Count()];
-        for (int i = 0; i < verts.Length; i++)
-        {
-            no[i] = verts[i].Normalized();
-        }
-
-
-        Godot.Collections.Array mesh_arrays = new Godot.Collections.Array();
-        mesh_arrays.Resize((int)Mesh.ArrayType.Max);
-        mesh_arrays[(int)ArrayMesh.ArrayType.Vertex] = verts;
-        //mesh_arrays[(int)ArrayMesh.ArrayType.Normal] = no;
-        mesh_arrays[(int)ArrayMesh.ArrayType.Index] = indices;
-        mesh_arrays[(int)ArrayMesh.ArrayType.TexUv] = uvs;
-
-        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, mesh_arrays);
-        return mesh;
-    }
-
-
-
-
-
     #endregion
+
+    #region Public methods
+
     public static MeshInstance LoadFromFile(string fileName, Encoding fileEncoding, bool forceTextureRepeatX, bool forceTextureRepeatY)
     {
         // TODO: Not sure if safe to assume textures are always in the object path
@@ -642,18 +572,18 @@ public class ObjectLoader : Node
                             string tday = null, tnight = null;
                             if (arguments.Length >= 1 && arguments[0].Length != 0)
                             {
-                                tday =  System.IO.Path.GetFullPath(System.IO.Path.Combine(containingFolder, arguments[0]));
+                                tday = System.IO.Path.Combine(containingFolder, arguments[0]);
                             }
 
                             if (arguments.Length >= 2 && arguments[1].Length != 0)
                             {
-                                tnight = System.IO.Path.GetFullPath(System.IO.Path.Combine(containingFolder, arguments[1]));
+                                tnight = System.IO.Path.Combine(containingFolder, arguments[1]);
                             }
 
                             MeshMaterial mm = new MeshMaterial()
                             {
-                                dayTexture = !String.IsNullOrEmpty(tday) ? tday : null,
-                                nightTexture = !String.IsNullOrEmpty(tnight) ? tnight : null
+                                dayTexture = !String.IsNullOrEmpty(tday) ? System.IO.Path.GetFullPath(System.IO.Path.Combine(containingFolder, tday)) : null,
+                                nightTexture = !String.IsNullOrEmpty(tnight) ? System.IO.Path.GetFullPath(System.IO.Path.Combine(containingFolder, tnight)) : null
                             };
 
                             currentSubMesh.material = mm;
@@ -770,11 +700,10 @@ public class ObjectLoader : Node
                                 a = a < 0 ? 0 : 255;
                             }
 
-                            
-                            if (currentSubMesh.material == null) 
-                                currentSubMesh.material = new MeshMaterial();
 
-                            currentSubMesh.material.color = Color.Color8((byte)r, (byte)g, (byte)b, (byte)a);
+                            MeshMaterial mmcolor = new MeshMaterial();
+                            mmcolor.color = Color.Color8((byte)r, (byte)g, (byte)b, (byte)a);
+                            currentSubMesh.material = mmcolor;
 
                             //currentSubMesh.faces[currentSubMesh.faces.Count-1].materialIndex = currentSubMesh.materials.Count-1;
                         }
@@ -1119,6 +1048,44 @@ public class ObjectLoader : Node
 
     }
 
+    #endregion
+
+    #region Helper methods
+
+    private static ArrayMesh AddFace(ArrayMesh mesh, Vector3[] verts, MeshFaceVertex[] fv, Vector2[] uvs)
+    {
+        if (mesh == null) mesh = new ArrayMesh();
+
+        // TODO: Assumes rectangular face
+        int[] indices;
+
+        if (fv.Length == 4)
+            indices = new int[] { fv[0].indexToMeshVertices, fv[2].indexToMeshVertices, fv[3].indexToMeshVertices,
+                                  fv[0].indexToMeshVertices, fv[1].indexToMeshVertices, fv[2].indexToMeshVertices};
+        else
+            indices = new int[] { fv[0].indexToMeshVertices, fv[1].indexToMeshVertices, fv[2].indexToMeshVertices };
+
+
+        // Vector2 [] uv11 = new Vector2[] {new Vector2(0,0), new Vector2(1,0), new Vector2(1,1), new Vector2(0,1)};
+
+        Vector3[] no = new Vector3[verts.Count()];
+        for (int i = 0; i < verts.Length; i++)
+        {
+            no[i] = verts[i].Normalized();
+        }
+
+
+        Godot.Collections.Array mesh_arrays = new Godot.Collections.Array();
+        mesh_arrays.Resize((int)Mesh.ArrayType.Max);
+        mesh_arrays[(int)ArrayMesh.ArrayType.Vertex] = verts;
+        //mesh_arrays[(int)ArrayMesh.ArrayType.Normal] = no;
+        mesh_arrays[(int)ArrayMesh.ArrayType.Index] = indices;
+        mesh_arrays[(int)ArrayMesh.ArrayType.TexUv] = uvs;
+
+        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, mesh_arrays);
+        return mesh;
+    }
+
     // create cube
     private static void CreateCube(ref MeshBuilder builder, double sx, double sy, double sz)
     {
@@ -1428,21 +1395,6 @@ public class ObjectLoader : Node
         }
     }
 
+    #endregion
 
-
-    // Declare member variables here. Examples:
-    // private int a = 2;
-    // private string b = "text";
-
-    // Called when the node enters the scene tree for the first time.
-    public override void _Ready()
-    {
-
-    }
-
-    //  // Called every frame. 'delta' is the elapsed time since the previous frame.
-    //  public override void _Process(float delta)
-    //  {
-    //      
-    //  }
 }

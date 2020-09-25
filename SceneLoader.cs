@@ -17,11 +17,11 @@ public class SceneLoader : Node {
 //		MeshInstance mi = ObjectLoader.LoadFromFile(@"C:\Users\danie\Desktop\Test\Objects\reren\Sjyou\car\Bus_A.csv", System.Text.Encoding.ASCII,true, true);
 
 
-		MeshInstance mi = ObjectLoader.LoadFromFile(@"C:\Users\danie\Desktop\Test\Objects\reren\EDtozai\Form\barakiformB.csv", System.Text.Encoding.ASCII,true, true);
-
-		
-		// Hello this is a program :) 
+		MeshInstance mi = CsvB3dObjectParser.LoadFromFile(@"C:\Users\danie\Desktop\Test\Objects\gaku\kitatono.csv", System.Text.Encoding.ASCII,true, true);
 		AddChild(mi);
+
+		MeshInstance mi2 = CsvB3dObjectParser.LoadFromFile(@"C:\Users\danie\Desktop\Test\Objects\reren\EDtozai\bridge\EdoBridge.csv", System.Text.Encoding.ASCII,true, true);
+		AddChild(mi2);
 	}
 
 
