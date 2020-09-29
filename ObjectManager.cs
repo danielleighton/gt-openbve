@@ -60,9 +60,12 @@ internal class ObjectManager
     //UnifiedObject Prototype, Vector3D Position, World.Transformation BaseTransformation, World.Transformation AuxTransformation, bool AccurateObjectDisposal, double StartingDistance, double EndingDistance, double BlockLength, double TrackPosition) {
     public UnifiedObject InstantiateObject(Node parent, UnifiedObject template, Vector3 position, Transformation baseTransformation, Transformation auxTransformation, bool accurateObjectDisposal, double startingDistance, double endingDistance, double blockLength, double trackPosition)
     {
-        Node instantiatedObject = new Node();
-        instantiatedObject.Name = "some_object";
+        MeshInstance instantiatedObject = (MeshInstance)((MeshInstance)(((StaticObject)template).Mesh)).Duplicate((int)Node.DuplicateFlags.UseInstancing);
 
+        instantiatedObject.Translate(position);
+        
+        parent.AddChild(instantiatedObject);
+        
         // GameObject instantiatedObject = (GameObject)GameObject.Instantiate(template.gameObject, position, Quaternion.identity);
         // instantiatedObject.SetActive(true);
 
@@ -77,6 +80,11 @@ internal class ObjectManager
         //     Calc.Rotate(ref vertices[i].x, ref vertices[i].y, ref vertices[i].z, baseTransformation);
         // }
         // mesh.vertices = vertices;
+
+
+
+        // ------
+
 
         //Object.Mesh.Vertices = new World.Vertex[Prototype.Mesh.Vertices.Length];
         //for (int j = 0; j < Prototype.Mesh.Vertices.Length; j++)
@@ -117,15 +125,15 @@ internal class ObjectManager
             //CreateStaticObject(s, Position, BaseTransformation, AuxTransformation, AccurateObjectDisposal, 0.0, StartingDistance, EndingDistance, BlockLength, TrackPosition, Brightness, DuplicateMaterials);
             retObject = new StaticObject();
             retObject.gameObject = instantiatedObject;
-          
-
+       
+            
         }
         else if (template is AnimatedObjectCollection)
         {
             //AnimatedObjectCollection a = (AnimatedObjectCollection)template;
             //CreateAnimatedWorldObjects(a.Objects, Position, BaseTransformation, AuxTransformation, SectionIndex, AccurateObjectDisposal, StartingDistance, EndingDistance, BlockLength, TrackPosition, Brightness, DuplicateMaterials);
-            retObject = new AnimatedObjectCollection();
-            retObject.gameObject = instantiatedObject;
+            //retObject = new AnimatedObjectCollection();
+            //retObject.gameObject = instantiatedObject;
         }
 
         return retObject;

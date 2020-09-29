@@ -100,7 +100,7 @@ public class Camera : Godot.Camera
         UpdateMouseLook();
 
         // increase speed if pressed left control
-        _vel_multiplier = pressed_ctrl ? 20 : 4;
+        _vel_multiplier = pressed_ctrl ? 50 : 4;
 
         _direction = new Vector3(Convert.ToSingle(pressed_d) - Convert.ToSingle(pressed_a), 0f, Convert.ToSingle(pressed_s) - Convert.ToSingle(pressed_w));
 

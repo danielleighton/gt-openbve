@@ -1170,10 +1170,9 @@ public static class CsvRwRouteParser
     }
 
     // parse route
-    internal static void ParseRoute(string fileName, Encoding fileEncoding, bool isRW, string trainPath, string objectPath, string soundPath, bool previewOnly)
+    internal static void ParseRoute(Node root, string fileName, Encoding fileEncoding, bool isRW, string trainPath, string objectPath, string soundPath, bool previewOnly)
     {
         // initialize data
-        //string CompatibilityFolder = Program.FileSystem.GetDataFolder("Compatibility");
         string compatibilityFolder = System.IO.Path.Combine(objectPath, "Compatibility");
 
         RouteData routeData = new RouteData();
@@ -1371,7 +1370,7 @@ public static class CsvRwRouteParser
 
         //Game.RouteUnitOfLength = UnitOfLength;
         // >> End OpenBVE ParseRouteForData()
-        ApplyRouteData(fileName, compatibilityFolder, fileEncoding, ref routeData, previewOnly);
+        ApplyRouteData(root, fileName, compatibilityFolder, fileEncoding, ref routeData, previewOnly);
         // >> End OpenBVE ParseRoute
 
 
@@ -5879,7 +5878,8 @@ public static class CsvRwRouteParser
         }
     }
 
-    private static void ApplyRouteData(string fileName, string compatibilityFolder, Encoding fileEncoding, ref RouteData routeData, bool previewOnly)
+
+    private static void ApplyRouteData(Node rootForRouteObjects, string fileName, string compatibilityFolder, Encoding fileEncoding, ref RouteData routeData, bool previewOnly)
     {
         string signalPath, limitPath, limitGraphicsPath, transponderPath;
         UnifiedObject signalPost, limitPostStraight, limitPostLeft, limitPostRight, limitPostInfinite;
@@ -5984,10 +5984,7 @@ public static class CsvRwRouteParser
                 }
             }
         }
-
-        Node rootForRouteObjects = new Node();//("Route1");
-        rootForRouteObjects.Name = "Route1";
-
+     
 
         // create objects and track
         Vector3 position = new Vector3(0.0f, 0.0f, 0.0f);
