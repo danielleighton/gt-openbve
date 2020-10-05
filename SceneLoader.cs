@@ -57,9 +57,9 @@ public class SceneLoader : Node {
         string trainFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Train"));
         string soundFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Sound"));
 
-		string routePath = System.IO.Path.Combine(routeFolder, @"C:\Users\danie\Desktop\Test\Route\Taipei Rapid Transit  Zhonghe Line-Down.csv");
+		//string routePath = System.IO.Path.Combine(routeFolder, @"C:\Users\danie\Desktop\Test\Route\Taipei Rapid Transit  Zhonghe Line-Down.csv");
 
-		//string routePath = System.IO.Path.Combine(routeFolder, @"C:\Users\danie\Desktop\Test\Route\test.csv");
+		string routePath = System.IO.Path.Combine(routeFolder, @"C:\Users\danie\Desktop\Test\Route\test.csv");
 
         CsvRwRouteParser.ParseRoute(n2, routePath, Encoding.Default, false, trainFolder, objectFolder, "", false);
    

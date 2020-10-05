@@ -6008,9 +6008,8 @@ public static class CsvRwRouteParser
         {
             double startingDistance = (double)i * routeData.BlockInterval;
             double endingDistance = startingDistance + routeData.BlockInterval;
-
-            // Calc.Normalize
-            //World.Calc.Normalize(ref Direction.X, ref Direction.Y);
+            
+            direction = direction.Normalized();
 
             // track
             if (!previewOnly)
@@ -6027,14 +6026,15 @@ public static class CsvRwRouteParser
                     }
                 }
             }
-            TrackManager.TrackElement WorldTrackElement = routeData.Blocks[i].CurrentTrackState;
+
+            TrackManager.TrackElement worldTrackElement = routeData.Blocks[i].CurrentTrackState;
             int n = currentTrackLength;
             if (n >= TrackManager.CurrentTrack.Elements.Length)
             {
                 Array.Resize<TrackManager.TrackElement>(ref TrackManager.CurrentTrack.Elements, TrackManager.CurrentTrack.Elements.Length << 1);
             }
             currentTrackLength++;
-            TrackManager.CurrentTrack.Elements[n] = WorldTrackElement;
+            TrackManager.CurrentTrack.Elements[n] = worldTrackElement;
             TrackManager.CurrentTrack.Elements[n].WorldPosition = position;
             TrackManager.CurrentTrack.Elements[n].WorldDirection = Calc.GetNormalizedVector3(direction, routeData.Blocks[i].Pitch);
             TrackManager.CurrentTrack.Elements[n].WorldSide = new Vector3(direction.y, 0.0f, -direction.x);
@@ -6303,37 +6303,43 @@ public static class CsvRwRouteParser
             //    }
             //}
 
-            //turn
+            // turn
             if (routeData.Blocks[i].Turn != 0.0)
             {
                 double ag = -Math.Atan(routeData.Blocks[i].Turn);
                 double cosag = Math.Cos(ag);
                 double sinag = Math.Sin(ag);
 
-                //direction = Quaternion.Euler(0, 0, (float)ag) * direction;  // World.Rotate(ref direction, cosag, sinag);
+                
                 direction = direction.Rotated((float)ag);
 
-//                TrackManager.CurrentTrack.Elements[n].WorldDirection = Quaternion.Euler(0, 0, (float)ag) * TrackManager.CurrentTrack.Elements[n].WorldDirection;    //World.RotatePlane(ref TrackManager.CurrentTrack.Elements[n].WorldDirection, cosag, sinag);
-                //TrackManager.CurrentTrack.Elements[n].WorldSide = Quaternion.Euler(0, 0, (float)ag) * TrackManager.CurrentTrack.Elements[n].WorldSide;              //World.RotatePlane(ref TrackManager.CurrentTrack.Elements[n].WorldSide, cosag, sinag);
+                // Program.CurrentRoute.Tracks[0].Elements[n].WorldDirection.RotatePlane(cosag, sinag);
+                // Program.CurrentRoute.Tracks[0].Elements[n].WorldSide.RotatePlane(cosag, sinag);
+                // Program.CurrentRoute.Tracks[0].Elements[n].WorldUp = Vector3.Cross(Program.CurrentRoute.Tracks[0].Elements[n].WorldDirection, Program.CurrentRoute.Tracks[0].Elements[n].WorldSide);                           
+                TrackManager.CurrentTrack.Elements[n].WorldDirection = TrackManager.CurrentTrack.Elements[n].WorldDirection.Rotated(Vector3.Left,(float)ag);
+                TrackManager.CurrentTrack.Elements[n].WorldSide = TrackManager.CurrentTrack.Elements[n].WorldSide.Rotated(Vector3.Left,(float)ag);
+                TrackManager.CurrentTrack.Elements[n].WorldUp = TrackManager.CurrentTrack.Elements[n].WorldDirection.Cross(TrackManager.CurrentTrack.Elements[n].WorldSide);
+            }
 
-                //World.Cross(TrackManager.CurrentTrack.Elements[n].WorldDirection.X, TrackManager.CurrentTrack.Elements[n].WorldDirection.Y, TrackManager.CurrentTrack.Elements[n].WorldDirection.Z, TrackManager.CurrentTrack.Elements[n].WorldSide.X, TrackManager.CurrentTrack.Elements[n].WorldSide.Y, TrackManager.CurrentTrack.Elements[n].WorldSide.Z, out TrackManager.CurrentTrack.Elements[n].WorldUp.X, out TrackManager.CurrentTrack.Elements[n].WorldUp.Y, out TrackManager.CurrentTrack.Elements[n].WorldUp.Z);
-                Calc.Cross( TrackManager.CurrentTrack.Elements[n].WorldDirection.x, TrackManager.CurrentTrack.Elements[n].WorldDirection.y, 
-                            TrackManager.CurrentTrack.Elements[n].WorldDirection.z, TrackManager.CurrentTrack.Elements[n].WorldSide.x, 
-                            TrackManager.CurrentTrack.Elements[n].WorldSide.y, TrackManager.CurrentTrack.Elements[n].WorldSide.z, 
-                            out TrackManager.CurrentTrack.Elements[n].WorldUp.x, 
-                            out TrackManager.CurrentTrack.Elements[n].WorldUp.y, 
-                            out TrackManager.CurrentTrack.Elements[n].WorldUp.z); 
+            //Pitch
+            if (routeData.Blocks[i].Pitch != 0.0)
+            {
+                TrackManager.CurrentTrack.Elements[n].Pitch = routeData.Blocks[i].Pitch;
+            }
+            else
+            {
+                TrackManager.CurrentTrack.Elements[n].Pitch = 0.0;
             }
 
             // curves
             double a = 0.0;
             double c = routeData.BlockInterval;
             double h = 0.0;
-            if (WorldTrackElement.CurveRadius != 0.0 & routeData.Blocks[i].Pitch != 0.0)
+            if (worldTrackElement.CurveRadius != 0.0 & routeData.Blocks[i].Pitch != 0.0)
             {
                 double d = routeData.BlockInterval;
                 double p = routeData.Blocks[i].Pitch;
-                double r = WorldTrackElement.CurveRadius;
+                double r = worldTrackElement.CurveRadius;
                 double s = d / Math.Sqrt(1.0 + p * p);
                 h = s * p;
                 double b = s / Math.Abs(r);
@@ -6342,10 +6348,10 @@ public static class CsvRwRouteParser
                 // Calc.Rotate(ref direction, Math.Cos(-a), Math.Sin(-a));
                 direction = direction.Rotated((float)-a);
             }
-            else if (WorldTrackElement.CurveRadius != 0.0)
+            else if (worldTrackElement.CurveRadius != 0.0)
             {
                 double d = routeData.BlockInterval;
-                double r = WorldTrackElement.CurveRadius;
+                double r = worldTrackElement.CurveRadius;
                 double b = d / Math.Abs(r);
                 c = Math.Sqrt(2.0 * r * r * (1.0 - Math.Cos(b)));
                 a = 0.5 * (double)Math.Sign(r) * b;

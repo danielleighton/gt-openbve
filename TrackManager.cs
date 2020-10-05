@@ -68,6 +68,8 @@ internal class TrackManager
         internal double CurveCantTangent;
         internal double AdhesionMultiplier;
         internal double CsvRwAccuracyLevel;
+        internal double Pitch;
+
         internal Vector3 WorldPosition;
         internal Vector3 WorldDirection;
         internal Vector3 WorldUp;
@@ -86,6 +88,7 @@ internal class TrackManager
             this.WorldUp = new Vector3(0.0f, 1.0f, 0.0f);
             this.WorldSide = new Vector3(1.0f, 0.0f, 0.0f);
             this.Events = new GeneralEvent[] { };
+            this.Pitch = 0.0;
         }
     }
 
