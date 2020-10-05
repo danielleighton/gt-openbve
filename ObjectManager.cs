@@ -58,11 +58,13 @@ internal class ObjectManager
     }
 
     //UnifiedObject Prototype, Vector3D Position, World.Transformation BaseTransformation, World.Transformation AuxTransformation, bool AccurateObjectDisposal, double StartingDistance, double EndingDistance, double BlockLength, double TrackPosition) {
-    public UnifiedObject InstantiateObject(Node parent, UnifiedObject template, Vector3 position, Transformation baseTransformation, Transformation auxTransformation, bool accurateObjectDisposal, double startingDistance, double endingDistance, double blockLength, double trackPosition)
+    public UnifiedObject InstantiateObject(Node parent, UnifiedObject template, Vector3 position, Transform baseTransformation, Transform auxTransformation, bool accurateObjectDisposal, double startingDistance, double endingDistance, double blockLength, double trackPosition)
     {
         MeshInstance instantiatedObject = (MeshInstance)((MeshInstance)(((StaticObject)template).Mesh)).Duplicate((int)Node.DuplicateFlags.UseInstancing);
+  
+        Transform finalTrans = baseTransformation * auxTransformation;
 
-        instantiatedObject.Translate(position);
+        instantiatedObject.GlobalTransform = new Transform(finalTrans.basis, position);
         
         parent.AddChild(instantiatedObject);
         

@@ -27,20 +27,20 @@ public static class Calc
 
     #region Rotation 
 
-    public static void Rotate(ref Vector2 Vector, double cosa, double sina)
+    public static void Rotate(ref Vector2 vector, double cosa, double sina)
     {
-        double u = Vector.x * cosa - Vector.y * sina;
-        double v = Vector.x * sina + Vector.y * cosa;
-        Vector.x = (float)u;
-        Vector.y = (float)v;
+        double u = vector.x * cosa - vector.y * sina;
+        double v = vector.x * sina + vector.y * cosa;
+        vector.x = (float)u;
+        vector.y = (float)v;
     }
 
-    public static void Rotate(ref Vector2 Vector, float cosa, float sina)
+    public static void Rotate(ref Vector2 vector, float cosa, float sina)
     {
-        float u = Vector.x * cosa - Vector.y * sina;
-        float v = Vector.x * sina + Vector.y * cosa;
-        Vector.x = u;
-        Vector.y = v;
+        float u = vector.x * cosa - vector.y * sina;
+        float v = vector.x * sina + vector.y * cosa;
+        vector.x = u;
+        vector.y = v;
     }
 
     // public static void Rotate(ref float px, ref float py, ref float pz, Transformation t)
