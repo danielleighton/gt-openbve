@@ -18,7 +18,7 @@ public class Camera : Godot.Camera
     private Vector3 _direction = new Vector3(0.0f, 0.0f, 0.0f);
 
     private Vector3 _velocity = new Vector3(0.0f, 0.0f, 0.0f);
-    float _acceleration = 30;
+    float _acceleration = 120;
     float _deceleration = -10;
     float _vel_multiplier = 4;
 
@@ -100,7 +100,7 @@ public class Camera : Godot.Camera
         UpdateMouseLook();
 
         // increase speed if pressed left control
-        _vel_multiplier = pressed_ctrl ? 50 : 4;
+        _vel_multiplier = pressed_ctrl ? _acceleration : 4;
 
         _direction = new Vector3(Convert.ToSingle(pressed_d) - Convert.ToSingle(pressed_a), 0f, Convert.ToSingle(pressed_s) - Convert.ToSingle(pressed_w));
 

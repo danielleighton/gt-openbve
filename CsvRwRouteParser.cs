@@ -6016,7 +6016,7 @@ public static class CsvRwRouteParser
             {
                 if (routeData.Blocks[i].Cycle.Length == 1 && routeData.Blocks[i].Cycle[0] == -1)
                 {
-                    if (routeData.Structure.Cycle.Length == 0 || routeData.Structure.Cycle[0] == null)
+                     if (routeData.Structure.Cycle.Length == 0 || routeData.Structure.Cycle[0] == null)
                     {
                         routeData.Blocks[i].Cycle = new int[] { 0 };
                     }
@@ -6034,6 +6034,7 @@ public static class CsvRwRouteParser
                 Array.Resize<TrackManager.TrackElement>(ref TrackManager.CurrentTrack.Elements, TrackManager.CurrentTrack.Elements.Length << 1);
             }
             currentTrackLength++;
+            
             TrackManager.CurrentTrack.Elements[n] = worldTrackElement;
             TrackManager.CurrentTrack.Elements[n].WorldPosition = position;
             TrackManager.CurrentTrack.Elements[n].WorldDirection = Calc.GetNormalizedVector3(direction, routeData.Blocks[i].Pitch);
@@ -6307,9 +6308,6 @@ public static class CsvRwRouteParser
             if (routeData.Blocks[i].Turn != 0.0)
             {
                 double ag = -Math.Atan(routeData.Blocks[i].Turn);
-                double cosag = Math.Cos(ag);
-                double sinag = Math.Sin(ag);
-
                 
                 direction = direction.Rotated((float)ag);
 
@@ -6380,7 +6378,7 @@ public static class CsvRwRouteParser
 
             Transform trackTransformation = new Transform(Basis.Identity,  Vector3.Zero);
             trackTransformation = trackTransformation.Rotated(Vector3.Up, (float)trackYaw);
-            trackTransformation = trackTransformation.Rotated(Vector3.Left, (float)trackPitch);
+            trackTransformation = trackTransformation.Rotated(Vector3.Right, (float)trackPitch);
 
             Transform nullTransformation = new Transform(Basis.Identity,  Vector3.Zero);
 
@@ -6421,8 +6419,8 @@ public static class CsvRwRouteParser
 
                     Transform gafTran = new Transform(Basis.Identity, Vector3.Zero);
                     gafTran = gafTran.Rotated(Vector3.Up, (float)routeData.Blocks[i].GroundFreeObj[j].Yaw);
-                    gafTran = gafTran.Rotated(Vector3.Left, (float)routeData.Blocks[i].GroundFreeObj[j].Pitch);
-                    gafTran = gafTran.Rotated(Vector3.Back, (float)routeData.Blocks[i].GroundFreeObj[j].Roll);
+                    gafTran = gafTran.Rotated(Vector3.Right, (float)routeData.Blocks[i].GroundFreeObj[j].Pitch);
+                    gafTran = gafTran.Rotated(Vector3.Forward, (float)routeData.Blocks[i].GroundFreeObj[j].Roll);
 
                     ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FreeObj[sttype], wpos, groundTransformation, gafTran, 
                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, tpos);
@@ -6443,12 +6441,11 @@ public static class CsvRwRouteParser
                     if (j == 0)
                     {
                         // rail 0
-                        pos = position;
                         planar = 0.0;
                         updown = 0.0;
                         railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);//, planar, updown, 0.0);
                         railTransformation = railTransformation.Rotated(Vector3.Up, (float)planar);
-                        railTransformation = railTransformation.Rotated(Vector3.Left, (float)updown);
+                        railTransformation = railTransformation.Rotated(Vector3.Right, (float)updown);
                         pos = position;
                     }
                     else
@@ -6456,7 +6453,7 @@ public static class CsvRwRouteParser
                         // rails 1-infinity
                         double x = routeData.Blocks[i].Rail[j].RailStartX;
                         double y = routeData.Blocks[i].Rail[j].RailStartY;
-                        Vector3 offset = new Vector3((float)(direction.y * x), (float)y, (float)(-direction.x * x));
+                        Vector3 offset = new Vector3((float)(direction.y * x), (float)y, -(float)(direction.x * x));
                         pos = position + offset;
                         double dh;
                         if (i < routeData.Blocks.Length - 1 && routeData.Blocks[i + 1].Rail.Length > j)
@@ -6466,21 +6463,21 @@ public static class CsvRwRouteParser
                             Vector3 position2 = position;
                             position2.x += (float)(direction.x * c);
                             position2.y += (float)h;
-                            position2.z += (float)(direction.y * c);
+                            position2.z -= (float)(direction.y * c);
 
                             if (a != 0.0)
                             {
                                 //Direction2.Rotate(Math.Cos(-a), Math.Sin(-a));
-                                direction2 = direction2.Rotated((float)-a);
+                                direction2 = direction2.Rotated(-(float)a);
                             }
 
                             if (routeData.Blocks[i + 1].Turn != 0.0)
                             {
-                                double ag = -Math.Atan(routeData.Blocks[i + 1].Turn);
+                                double ag = Math.Atan(routeData.Blocks[i + 1].Turn);
                                 // double cosag = Math.Cos(ag);
                                 // double sinag = Math.Sin(ag);
                                 // Direction2.Rotate(cosag, sinag);
-                                direction2 = direction2.Rotated((float)ag);
+                                direction2 = direction2.Rotated(-(float)ag);
                             }
 
                             double a2 = 0.0;
@@ -6497,7 +6494,7 @@ public static class CsvRwRouteParser
                                 // c2 = Math.Sqrt(2.0 * r2 * r2 * (1.0 - Math.Cos(b2)));
                                 a2 = 0.5 * (double)Math.Sign(r2) * b2;
                                 // direction2.Rotate(Math.Cos(-a2), Math.Sin(-a2));
-                                direction2 = direction2.Rotated((float)-a2);
+                                direction2 = direction2.Rotated(-(float)a2);
                             }
                             else if (routeData.Blocks[i + 1].CurrentTrackState.CurveRadius != 0.0)
                             {
@@ -6507,7 +6504,7 @@ public static class CsvRwRouteParser
                                 // c2 = Math.Sqrt(2.0 * r2 * r2 * (1.0 - Math.Cos(b2)));
                                 a2 = 0.5 * (double)Math.Sign(r2) * b2;
                                 //Direction2.Rotate(Math.Cos(-a2), Math.Sin(-a2));
-                                direction2 = direction2.Rotated((float)-a2);
+                                direction2 = direction2.Rotated(-(float)a2);
                             }
                             else if (routeData.Blocks[i + 1].Pitch != 0.0)
                             {
@@ -6522,7 +6519,7 @@ public static class CsvRwRouteParser
                             // Transformation TrackTransformation2 = new Transformation(TrackYaw2, TrackPitch2, 0.0);
                             double x2 = routeData.Blocks[i + 1].Rail[j].RailEndX;
                             double y2 = routeData.Blocks[i + 1].Rail[j].RailEndY;
-                            Vector3 offset2 = new Vector3((float)(direction2.y * x2), (float)y2, (float)(-direction2.x * x2));
+                            Vector3 offset2 = new Vector3((float)(direction2.y * x2), (float)y2, (float)(direction2.x * x2));
                             Vector3 pos2 = position2 + offset2;
                             Vector3 r = new Vector3(pos2.x - pos.x, pos2.y - pos.y, pos2.z - pos.z);
                             r = r.Normalized();
@@ -7064,9 +7061,8 @@ public static class CsvRwRouteParser
                             // new Transformation((float)routeData.Blocks[i].RailFreeObj[j][k].Yaw, (float)routeData.Blocks[i].RailFreeObj[j][k].Pitch, (float)routeData.Blocks[i].RailFreeObj[j][k].Roll)
                             Transform foTran = new Transform(Basis.Identity, new Vector3(0, 0, 0));
                             foTran = foTran.Rotated(Vector3.Up, (float)routeData.Blocks[i].RailFreeObj[j][k].Yaw);
-                            foTran = foTran.Rotated(Vector3.Left, (float)routeData.Blocks[i].RailFreeObj[j][k].Pitch);
-                            foTran = foTran.Rotated(Vector3.Back, (float)routeData.Blocks[i].RailFreeObj[j][k].Roll);
-
+                            foTran = foTran.Rotated(Vector3.Right, (float)routeData.Blocks[i].RailFreeObj[j][k].Pitch);
+                            foTran = foTran.Rotated(Vector3.Forward, (float)routeData.Blocks[i].RailFreeObj[j][k].Roll);
 
                             ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FreeObj[sttype], wpos, railTransformation, foTran, false, 
                                                                         startingDistance, endingDistance, routeData.BlockInterval, tpos);
@@ -7443,11 +7439,11 @@ public static class CsvRwRouteParser
             // finalize block
             position.x += (float)(direction.x * c);
             position.y += (float)h;
-            position.z += (float)(direction.y * c);
+            position.z -= (float)(direction.y * c);
             if (a != 0.0)
             {
                 // Calc.Rotate(ref direction, Math.Cos(-a), Math.Sin(-a));
-                direction = direction.Rotated((float)-a);
+                direction = direction.Rotated(-(float)a);
             }
         }
 

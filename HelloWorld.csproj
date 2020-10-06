@@ -68,7 +68,6 @@
     <Compile Include="ObjectManager.cs" />
     <Compile Include="SceneLoader.cs" />
     <Compile Include="StaticObject.cs" />
-    <Compile Include="Transformation.cs" />
     <Compile Include="TrackManager.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />

@@ -4,10 +4,10 @@
 [ext_resource path="res://SceneLoader.cs" type="Script" id=2]
 
 [node name="Scene1" type="Spatial"]
-transform = Transform( 0.997672, 0.0376771, -0.0568468, -0.0438844, 0.992713, -0.112226, 0.0522042, 0.114459, 0.992055, 0, 0, 0 )
+transform = Transform( 0.997672, 0.0376771, -0.0568468, -0.0438844, 0.992713, -0.112226, 0.0522042, 0.114459, 0.992055, -0.106289, -0.032312, 0.0369281 )
 script = ExtResource( 2 )
 
 [node name="Camera" type="Camera" parent="."]
-transform = Transform( 1, -3.3062e-08, 4.84288e-08, 2.09548e-08, 1, 3.72529e-07, 3.72529e-09, 3.72529e-08, 1, 0.0988393, 0.190194, 1.64374 )
+transform = Transform( 1, -1.20606e-07, 4.09782e-08, 1.08965e-07, 1, 3.8743e-07, 1.86265e-08, 7.45058e-09, 1, 0.216074, 0.187765, 1.57641 )
 far = 1047.3
 script = ExtResource( 1 )
