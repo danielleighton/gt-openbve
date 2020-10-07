@@ -6411,7 +6411,10 @@ public static class CsvRwRouteParser
                     double d = routeData.Blocks[i].GroundFreeObj[j].TrackPosition - startingDistance;
                     double dx = routeData.Blocks[i].GroundFreeObj[j].X;
                     double dy = routeData.Blocks[i].GroundFreeObj[j].Y;
-                    Vector3 wpos = position + new Vector3((float)(direction.x * d + direction.y * dx), (float)(dy - routeData.Blocks[i].Height), (float)(direction.y * d - direction.x * dx));
+                    
+                    Vector3 wpos = position + new Vector3(  (float)(direction.x * d + direction.y * dx), 
+                                                            (float)(dy - routeData.Blocks[i].Height), 
+                                                            (float)(direction.y * d - direction.x * dx));
                     double tpos = routeData.Blocks[i].GroundFreeObj[j].TrackPosition;
                     //ObjectManager.Instance.InstantiateObject(rootForRouteObjects, Data.Structure.FreeObj[sttype], wpos, GroundTransformation, new World.Transformation(Data.Blocks[i].GroundFreeObj[j].Yaw, Data.Blocks[i].GroundFreeObj[j].Pitch, Data.Blocks[i].GroundFreeObj[j].Roll), Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, tpos);
 
@@ -6642,13 +6645,13 @@ public static class CsvRwRouteParser
                     if (routeData.Blocks[i].RailWall.Length > j && routeData.Blocks[i].RailWall[j].Exists)
                     {
                         if (routeData.Blocks[i].RailWall[j].Direction <= 0)
-                        {
+                        {                
                             //ObjectManager.CreateObject(routeData.Structure.WallL[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                             ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.WallL[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, 
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                         if (routeData.Blocks[i].RailWall[j].Direction >= 0)
-                        {
+                        {                            
                             //ObjectManager.CreateObject(routeData.Structure.WallR[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                             ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.WallR[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, 
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
@@ -6661,13 +6664,13 @@ public static class CsvRwRouteParser
                         if (routeData.Blocks[i].RailDike[j].Direction <= 0)
                         {
                             //ObjectManager.CreateObject(routeData.Structure.DikeL[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.blockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.DikeL[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation, 
+                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.DikeL[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation,
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                         if (routeData.Blocks[i].RailDike[j].Direction >= 0)
                         {
                             //ObjectManager.CreateObject(routeData.Structure.DikeR[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.blockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.DikeR[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation, 
+                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.DikeR[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation,
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                     }

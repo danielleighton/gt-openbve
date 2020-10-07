@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using Godot;
+
 
 // unified objects
 public abstract class UnifiedObject
@@ -10,6 +12,8 @@ public abstract class UnifiedObject
 // static objects
 public class StaticObject : UnifiedObject
 {
+    internal string SourceFile;
+
     internal MeshInstance Mesh;
 
     /// <summary>The index to the Renderer.Object array, plus 1. The value of zero represents that the object is not currently shown by the renderer.</summary>

@@ -160,6 +160,8 @@ internal class ObjectManager
         }
 
         StaticObject loadedObject = new StaticObject();
+        loadedObject.SourceFile = fileName;
+        
         switch (System.IO.Path.GetExtension(fileName).ToLowerInvariant())
         {
             case ".csv":
