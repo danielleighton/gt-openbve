@@ -6374,10 +6374,10 @@ public static class CsvRwRouteParser
             */
 
             Transform groundTransformation = new Transform(Basis.Identity,  Vector3.Zero);
-            groundTransformation = groundTransformation.Rotated(Vector3.Up, (float)trackYaw);
+            groundTransformation = groundTransformation.Rotated(Vector3.Up, -(float)trackYaw);
 
             Transform trackTransformation = new Transform(Basis.Identity,  Vector3.Zero);
-            trackTransformation = trackTransformation.Rotated(Vector3.Up, (float)trackYaw);
+            trackTransformation = trackTransformation.Rotated(Vector3.Up, -(float)trackYaw);
             trackTransformation = trackTransformation.Rotated(Vector3.Right, (float)trackPitch);
 
             Transform nullTransformation = new Transform(Basis.Identity,  Vector3.Zero);
@@ -6418,7 +6418,7 @@ public static class CsvRwRouteParser
                     //new Transformation((float)routeData.Blocks[i].GroundFreeObj[j].Yaw, (float)routeData.Blocks[i].GroundFreeObj[j].Pitch, (float)routeData.Blocks[i].GroundFreeObj[j].Roll)
 
                     Transform gafTran = new Transform(Basis.Identity, Vector3.Zero);
-                    gafTran = gafTran.Rotated(Vector3.Up, (float)routeData.Blocks[i].GroundFreeObj[j].Yaw);
+                    gafTran = gafTran.Rotated(Vector3.Up, -(float)routeData.Blocks[i].GroundFreeObj[j].Yaw);
                     gafTran = gafTran.Rotated(Vector3.Right, (float)routeData.Blocks[i].GroundFreeObj[j].Pitch);
                     gafTran = gafTran.Rotated(Vector3.Forward, (float)routeData.Blocks[i].GroundFreeObj[j].Roll);
 
@@ -6443,8 +6443,9 @@ public static class CsvRwRouteParser
                         // rail 0
                         planar = 0.0;
                         updown = 0.0;
-                        railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);//, planar, updown, 0.0);
-                        railTransformation = railTransformation.Rotated(Vector3.Up, (float)planar);
+                        // RailTransformation = new World.Transformation(TrackTransformation, planar, updown, 0.0);
+                        railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);
+                        railTransformation = railTransformation.Rotated(Vector3.Up, -(float)planar);
                         railTransformation = railTransformation.Rotated(Vector3.Right, (float)updown);
                         pos = position;
                     }
@@ -6463,37 +6464,30 @@ public static class CsvRwRouteParser
                             Vector3 position2 = position;
                             position2.x += (float)(direction.x * c);
                             position2.y += (float)h;
-                            position2.z -= (float)(direction.y * c);
-
+                            position2.z += (float)(direction.y * c);
                             if (a != 0.0)
                             {
-                                //Direction2.Rotate(Math.Cos(-a), Math.Sin(-a));
                                 direction2 = direction2.Rotated(-(float)a);
                             }
-
                             if (routeData.Blocks[i + 1].Turn != 0.0)
                             {
                                 double ag = Math.Atan(routeData.Blocks[i + 1].Turn);
-                                // double cosag = Math.Cos(ag);
-                                // double sinag = Math.Sin(ag);
-                                // Direction2.Rotate(cosag, sinag);
                                 direction2 = direction2.Rotated(-(float)ag);
                             }
-
                             double a2 = 0.0;
-                            // double c2 = Data.BlockInterval;
-                            // double h2 = 0.0;
+                            double c2 = routeData.BlockInterval;
+                            double h2 = 0.0;
                             if (routeData.Blocks[i + 1].CurrentTrackState.CurveRadius != 0.0 & routeData.Blocks[i + 1].Pitch != 0.0)
                             {
                                 double d2 = routeData.BlockInterval;
                                 double p2 = routeData.Blocks[i + 1].Pitch;
                                 double r2 = routeData.Blocks[i + 1].CurrentTrackState.CurveRadius;
                                 double s2 = d2 / Math.Sqrt(1.0 + p2 * p2);
-                                // h2 = s2 * p2;
+                                h2 = s2 * p2;
                                 double b2 = s2 / Math.Abs(r2);
-                                // c2 = Math.Sqrt(2.0 * r2 * r2 * (1.0 - Math.Cos(b2)));
+                                c2 = Math.Sqrt(2.0 * r2 * r2 * (1.0 - Math.Cos(b2)));
                                 a2 = 0.5 * (double)Math.Sign(r2) * b2;
-                                // direction2.Rotate(Math.Cos(-a2), Math.Sin(-a2));
+                                // World.Rotate(ref Direction2, Math.Cos(-a2), Math.Sin(-a2));
                                 direction2 = direction2.Rotated(-(float)a2);
                             }
                             else if (routeData.Blocks[i + 1].CurrentTrackState.CurveRadius != 0.0)
@@ -6501,41 +6495,52 @@ public static class CsvRwRouteParser
                                 double d2 = routeData.BlockInterval;
                                 double r2 = routeData.Blocks[i + 1].CurrentTrackState.CurveRadius;
                                 double b2 = d2 / Math.Abs(r2);
-                                // c2 = Math.Sqrt(2.0 * r2 * r2 * (1.0 - Math.Cos(b2)));
+                                c2 = Math.Sqrt(2.0 * r2 * r2 * (1.0 - Math.Cos(b2)));
                                 a2 = 0.5 * (double)Math.Sign(r2) * b2;
-                                //Direction2.Rotate(Math.Cos(-a2), Math.Sin(-a2));
+                                //World.Rotate(ref Direction2, Math.Cos(-a2), Math.Sin(-a2));
                                 direction2 = direction2.Rotated(-(float)a2);
                             }
                             else if (routeData.Blocks[i + 1].Pitch != 0.0)
                             {
-                                // double p2 = Data.Blocks[i + 1].Pitch;
-                                // double d2 = Data.BlockInterval;
-                                // c2 = d2 / Math.Sqrt(1.0 + p2 * p2);
-                                // h2 = c2 * p2;
+                                double p2 = routeData.Blocks[i + 1].Pitch;
+                                double d2 = routeData.BlockInterval;
+                                c2 = d2 / Math.Sqrt(1.0 + p2 * p2);
+                                h2 = c2 * p2;
                             }
-                            // double TrackYaw2 = Math.Atan2(Direction2.X, Direction2.Y);
-                            // double TrackPitch2 = Math.Atan(Data.Blocks[i + 1].Pitch);
-                            // Transformation GroundTransformation2 = new Transformation(TrackYaw2, 0.0, 0.0);
-                            // Transformation TrackTransformation2 = new Transformation(TrackYaw2, TrackPitch2, 0.0);
-                            double x2 = routeData.Blocks[i + 1].Rail[j].RailEndX;
-                            double y2 = routeData.Blocks[i + 1].Rail[j].RailEndY;
-                            Vector3 offset2 = new Vector3((float)(direction2.y * x2), (float)y2, (float)(direction2.x * x2));
-                            Vector3 pos2 = position2 + offset2;
-                            Vector3 r = new Vector3(pos2.x - pos.x, pos2.y - pos.y, pos2.z - pos.z);
-                            r = r.Normalized();
-                            railTransformation.basis.z = r;
-                            railTransformation.basis.x = new Vector3(r.z, 0.0f, -r.x);
-                            railTransformation.basis.x = railTransformation.basis.x.Normalized();
-                            //World.Normalize(ref railTransformation.X.X, ref railTransformation.X.Z);
-                            
-                            //railTransformation.basis.y = Vector3.Cross(railTransformation.basis.z, railTransformation.basis.x);
-                            railTransformation.basis.y = railTransformation.basis.z.Cross(railTransformation.basis.x);
 
+                            //These generate a compiler warning, as secondary tracks do not generate yaw, as they have no
+                            //concept of a curve, but rather are a straight line between two points
+                            //TODO: Revist the handling of secondary tracks ==> !!BACKWARDS INCOMPATIBLE!!
+                            /*
+                            double TrackYaw2 = Math.Atan2(Direction2.X, Direction2.Y);
+                            double TrackPitch2 = Math.Atan(Data.Blocks[i + 1].Pitch);
+                            World.Transformation GroundTransformation2 = new World.Transformation(TrackYaw2, 0.0, 0.0);
+                            World.Transformation TrackTransformation2 = new World.Transformation(TrackYaw2, TrackPitch2, 0.0);
+                             */
+                            // double x2 = routeData.Blocks[i + 1].Rail[j].RailEndX;
+                            // double y2 = routeData.Blocks[i + 1].Rail[j].RailEndY;
+                            // Vector3 offset2 = new Vector3((float)(direction2.y * x2), (float)y2, -(float)(direction2.x * x2));
+                            // Vector3 pos2 = position2 + offset2;
+                            // float rx = pos2.x - pos.x;
+                            // float ry = pos2.y - pos.y;
+                            // float rz = pos2.z - pos.z;
+                            // // World.Normalize(ref rx, ref ry, ref rz);
+                            // railTransformation.basis.z = new Vector3(rx, ry, rz).Normalized();
+                            // railTransformation.basis.x = new Vector3(rz, 0.0f, -rx);
+                            // //World.Normalize(ref RailTransformation.X.X, ref RailTransformation.X.Z);
+                            // railTransformation.basis.x = railTransformation.basis.x.Normalized();
+
+                            // railTransformation.basis.y = railTransformation.basis.z.Cross(railTransformation.basis.x);
+                            //railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);
                             double dx = routeData.Blocks[i + 1].Rail[j].RailEndX - routeData.Blocks[i].Rail[j].RailStartX;
                             double dy = routeData.Blocks[i + 1].Rail[j].RailEndY - routeData.Blocks[i].Rail[j].RailStartY;
                             planar = Math.Atan(dx / c);
+                            
                             dh = dy / c;
                             updown = Math.Atan(dh);
+
+                            railTransformation = trackTransformation.Rotated(Vector3.Up, -(float)planar);
+                            railTransformation = railTransformation.Rotated(Vector3.Right, (float)updown);
                         }
                         else
                         {
@@ -7060,7 +7065,7 @@ public static class CsvRwRouteParser
                             
                             // new Transformation((float)routeData.Blocks[i].RailFreeObj[j][k].Yaw, (float)routeData.Blocks[i].RailFreeObj[j][k].Pitch, (float)routeData.Blocks[i].RailFreeObj[j][k].Roll)
                             Transform foTran = new Transform(Basis.Identity, new Vector3(0, 0, 0));
-                            foTran = foTran.Rotated(Vector3.Up, (float)routeData.Blocks[i].RailFreeObj[j][k].Yaw);
+                            foTran = foTran.Rotated(Vector3.Up, -(float)routeData.Blocks[i].RailFreeObj[j][k].Yaw);
                             foTran = foTran.Rotated(Vector3.Right, (float)routeData.Blocks[i].RailFreeObj[j][k].Pitch);
                             foTran = foTran.Rotated(Vector3.Forward, (float)routeData.Blocks[i].RailFreeObj[j][k].Roll);
 

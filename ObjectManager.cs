@@ -65,6 +65,7 @@ internal class ObjectManager
         Transform finalTrans = baseTransformation * auxTransformation;
 
         instantiatedObject.GlobalTransform = new Transform(finalTrans.basis, position);
+        //instantiatedObject.Transform = new Transform(finalTrans.basis, position);
         
         parent.AddChild(instantiatedObject);
         
