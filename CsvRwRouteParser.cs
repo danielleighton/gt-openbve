@@ -6033,13 +6033,21 @@ public static class CsvRwRouteParser
             {
                 Array.Resize<TrackManager.TrackElement>(ref TrackManager.CurrentTrack.Elements, TrackManager.CurrentTrack.Elements.Length << 1);
             }
+
             currentTrackLength++;
-            
             TrackManager.CurrentTrack.Elements[n] = worldTrackElement;
             TrackManager.CurrentTrack.Elements[n].WorldPosition = position;
             TrackManager.CurrentTrack.Elements[n].WorldDirection = Calc.GetNormalizedVector3(direction, routeData.Blocks[i].Pitch);
             TrackManager.CurrentTrack.Elements[n].WorldSide = new Vector3(direction.y, 0.0f, -direction.x);
-            //World.Cross(TrackManager.CurrentTrack.Elements[n].WorldDirection.X, TrackManager.CurrentTrack.Elements[n].WorldDirection.Y, TrackManager.CurrentTrack.Elements[n].WorldDirection.Z, TrackManager.CurrentTrack.Elements[n].WorldSide.X, TrackManager.CurrentTrack.Elements[n].WorldSide.Y, TrackManager.CurrentTrack.Elements[n].WorldSide.Z, out TrackManager.CurrentTrack.Elements[n].WorldUp.X, out TrackManager.CurrentTrack.Elements[n].WorldUp.Y, out TrackManager.CurrentTrack.Elements[n].WorldUp.Z);
+            // World.Cross(TrackManager.CurrentTrack.Elements[n].WorldDirection.X, 
+            //             TrackManager.CurrentTrack.Elements[n].WorldDirection.Y, 
+            //             TrackManager.CurrentTrack.Elements[n].WorldDirection.Z, 
+            //             TrackManager.CurrentTrack.Elements[n].WorldSide.X, 
+            //             TrackManager.CurrentTrack.Elements[n].WorldSide.Y, 
+            //             TrackManager.CurrentTrack.Elements[n].WorldSide.Z, 
+            //             out TrackManager.CurrentTrack.Elements[n].WorldUp.X, 
+            //             out TrackManager.CurrentTrack.Elements[n].WorldUp.Y, 
+            //             out TrackManager.CurrentTrack.Elements[n].WorldUp.Z);
             TrackManager.CurrentTrack.Elements[n].StartingTrackPosition = startingDistance;
             TrackManager.CurrentTrack.Elements[n].Events = new TrackManager.GeneralEvent[] { };
             TrackManager.CurrentTrack.Elements[n].AdhesionMultiplier = routeData.Blocks[i].AdhesionMultiplier;
@@ -6304,22 +6312,21 @@ public static class CsvRwRouteParser
             //    }
             //}
 
-            // turn
+            // Turn
             if (routeData.Blocks[i].Turn != 0.0)
             {
                 double ag = -Math.Atan(routeData.Blocks[i].Turn);
-                
                 direction = direction.Rotated((float)ag);
 
-                // Program.CurrentRoute.Tracks[0].Elements[n].WorldDirection.RotatePlane(cosag, sinag);
-                // Program.CurrentRoute.Tracks[0].Elements[n].WorldSide.RotatePlane(cosag, sinag);
-                // Program.CurrentRoute.Tracks[0].Elements[n].WorldUp = Vector3.Cross(Program.CurrentRoute.Tracks[0].Elements[n].WorldDirection, Program.CurrentRoute.Tracks[0].Elements[n].WorldSide);                           
+                // World.RotatePlane(ref TrackManager.CurrentTrack.Elements[n].WorldDirection, cosag, sinag);
+				// World.RotatePlane(ref TrackManager.CurrentTrack.Elements[n].WorldSide, cosag, sinag);
+				// World.Cross(TrackManager.CurrentTrack.Elements[n].WorldDirection.X, TrackManager.CurrentTrack.Elements[n].WorldDirection.Y, TrackManager.CurrentTrack.Elements[n].WorldDirection.Z, TrackManager.CurrentTrack.Elements[n].WorldSide.X, TrackManager.CurrentTrack.Elements[n].WorldSide.Y, TrackManager.CurrentTrack.Elements[n].WorldSide.Z, out TrackManager.CurrentTrack.Elements[n].WorldUp.X, out TrackManager.CurrentTrack.Elements[n].WorldUp.Y, out TrackManager.CurrentTrack.Elements[n].WorldUp.Z);
                 TrackManager.CurrentTrack.Elements[n].WorldDirection = TrackManager.CurrentTrack.Elements[n].WorldDirection.Rotated(Vector3.Left,(float)ag);
                 TrackManager.CurrentTrack.Elements[n].WorldSide = TrackManager.CurrentTrack.Elements[n].WorldSide.Rotated(Vector3.Left,(float)ag);
                 TrackManager.CurrentTrack.Elements[n].WorldUp = TrackManager.CurrentTrack.Elements[n].WorldDirection.Cross(TrackManager.CurrentTrack.Elements[n].WorldSide);
             }
 
-            //Pitch
+            // Pitch
             if (routeData.Blocks[i].Pitch != 0.0)
             {
                 TrackManager.CurrentTrack.Elements[n].Pitch = routeData.Blocks[i].Pitch;
@@ -6329,7 +6336,7 @@ public static class CsvRwRouteParser
                 TrackManager.CurrentTrack.Elements[n].Pitch = 0.0;
             }
 
-            // curves
+            // Curves
             double a = 0.0;
             double c = routeData.BlockInterval;
             double h = 0.0;
@@ -6343,7 +6350,6 @@ public static class CsvRwRouteParser
                 double b = s / Math.Abs(r);
                 c = Math.Sqrt(2.0 * r * r * (1.0 - Math.Cos(b)));
                 a = 0.5 * (double)Math.Sign(r) * b;
-                // Calc.Rotate(ref direction, Math.Cos(-a), Math.Sin(-a));
                 direction = direction.Rotated((float)-a);
             }
             else if (worldTrackElement.CurveRadius != 0.0)
@@ -6353,7 +6359,6 @@ public static class CsvRwRouteParser
                 double b = d / Math.Abs(r);
                 c = Math.Sqrt(2.0 * r * r * (1.0 - Math.Cos(b)));
                 a = 0.5 * (double)Math.Sign(r) * b;
-                //Calc.Rotate(ref direction, Math.Cos(-a), Math.Sin(-a));
                 direction = direction.Rotated((float)-a);
             }
             else if (routeData.Blocks[i].Pitch != 0.0)
@@ -6367,12 +6372,6 @@ public static class CsvRwRouteParser
             double trackYaw = Math.Atan2(direction.x, direction.y);
             double trackPitch = Math.Atan(routeData.Blocks[i].Pitch);
 
-            /*
-            Transform groundTransformation = new Transformation(trackYaw, 0.0, 0.0);
-            Transform trackTransformation = new Transformation(trackYaw, trackPitch, 0.0);
-            Transform nullTransformation = new Transformation(0.0, 0.0, 0.0);
-            */
-
             Transform groundTransformation = new Transform(Basis.Identity,  Vector3.Zero);
             groundTransformation = groundTransformation.Rotated(Vector3.Up, -(float)trackYaw);
 
@@ -6382,7 +6381,7 @@ public static class CsvRwRouteParser
 
             Transform nullTransformation = new Transform(Basis.Identity,  Vector3.Zero);
 
-            // ground
+            // Ground
             if (!previewOnly)
             {
                 int cb = (int)Math.Floor((double)i + 0.001);
@@ -6416,9 +6415,6 @@ public static class CsvRwRouteParser
                                                             (float)(dy - routeData.Blocks[i].Height), 
                                                             (float)(direction.y * d - direction.x * dx));
                     double tpos = routeData.Blocks[i].GroundFreeObj[j].TrackPosition;
-                    //ObjectManager.Instance.InstantiateObject(rootForRouteObjects, Data.Structure.FreeObj[sttype], wpos, GroundTransformation, new World.Transformation(Data.Blocks[i].GroundFreeObj[j].Yaw, Data.Blocks[i].GroundFreeObj[j].Pitch, Data.Blocks[i].GroundFreeObj[j].Roll), Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, tpos);
-
-                    //new Transformation((float)routeData.Blocks[i].GroundFreeObj[j].Yaw, (float)routeData.Blocks[i].GroundFreeObj[j].Pitch, (float)routeData.Blocks[i].GroundFreeObj[j].Roll)
 
                     Transform gafTran = new Transform(Basis.Identity, Vector3.Zero);
                     gafTran = gafTran.Rotated(Vector3.Up, -(float)routeData.Blocks[i].GroundFreeObj[j].Yaw);
@@ -6430,14 +6426,14 @@ public static class CsvRwRouteParser
                 }
             }
 
-            // rail-aligned objects
+            // Rail-aligned objects
             if (!previewOnly)
             {
                 for (int j = 0; j < routeData.Blocks[i].Rail.Length; j++)
                 {
                     if (j > 0 && !routeData.Blocks[i].Rail[j].RailStart) continue;
 
-                    // rail
+                    // Rail
                     Vector3 pos;
                     Transform railTransformation = new Transform(Basis.Identity, Vector3.Zero);
                     double planar, updown;
@@ -6446,7 +6442,6 @@ public static class CsvRwRouteParser
                         // rail 0
                         planar = 0.0;
                         updown = 0.0;
-                        // RailTransformation = new World.Transformation(TrackTransformation, planar, updown, 0.0);
                         railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);
                         railTransformation = railTransformation.Rotated(Vector3.Up, -(float)planar);
                         railTransformation = railTransformation.Rotated(Vector3.Right, (float)updown);
@@ -6490,7 +6485,6 @@ public static class CsvRwRouteParser
                                 double b2 = s2 / Math.Abs(r2);
                                 c2 = Math.Sqrt(2.0 * r2 * r2 * (1.0 - Math.Cos(b2)));
                                 a2 = 0.5 * (double)Math.Sign(r2) * b2;
-                                // World.Rotate(ref Direction2, Math.Cos(-a2), Math.Sin(-a2));
                                 direction2 = direction2.Rotated(-(float)a2);
                             }
                             else if (routeData.Blocks[i + 1].CurrentTrackState.CurveRadius != 0.0)
@@ -6500,7 +6494,6 @@ public static class CsvRwRouteParser
                                 double b2 = d2 / Math.Abs(r2);
                                 c2 = Math.Sqrt(2.0 * r2 * r2 * (1.0 - Math.Cos(b2)));
                                 a2 = 0.5 * (double)Math.Sign(r2) * b2;
-                                //World.Rotate(ref Direction2, Math.Cos(-a2), Math.Sin(-a2));
                                 direction2 = direction2.Rotated(-(float)a2);
                             }
                             else if (routeData.Blocks[i + 1].Pitch != 0.0)
@@ -7671,16 +7664,342 @@ public static class CsvRwRouteParser
         //}
 
         // cant
-        //if (!PreviewOnly)
-        //{
-        //    ComputeCantTangents();
-        //    int subdivisions = (int)Math.Floor(Data.BlockInterval / 5.0);
+        // if (!previewOnly)
+        // {
+        // //    ComputeCantTangents();
+        //    int subdivisions = (int)Math.Floor(routeData.BlockInterval / 5.0);
         //    if (subdivisions >= 2)
         //    {
         //        SmoothenOutTurns(subdivisions);
-        //        ComputeCantTangents();
+        //     //    ComputeCantTangents();
         //    }
-        //}
+        // }
+    }
+
+
+
+    private static void SmoothenOutTurns(int subdivisions)
+    {
+        if (subdivisions < 2)
+        {
+            throw new InvalidOperationException();
+        }
+
+        // subdivide track
+        int length = TrackManager.CurrentTrack.Elements.Length;
+        int newLength = (length - 1) * subdivisions + 1;
+        double[] midpointsTrackPositions = new double[newLength];
+        Vector3[] midpointsWorldPositions = new Vector3[newLength];
+        Vector3[] midpointsWorldDirections = new Vector3[newLength];
+        Vector3[] midpointsWorldUps = new Vector3[newLength];
+        Vector3[] midpointsWorldSides = new Vector3[newLength];
+        double[] midpointsCant = new double[newLength];
+        for (int i = 0; i < newLength; i++)
+        {
+            int m = i % subdivisions;
+            if (m != 0)
+            {
+                int q = i / subdivisions;
+                TrackManager.TrackFollower follower = new TrackManager.TrackFollower();
+                double r = (double)m / (double)subdivisions;
+                double p = (1.0 - r) * TrackManager.CurrentTrack.Elements[q].StartingTrackPosition + r * TrackManager.CurrentTrack.Elements[q + 1].StartingTrackPosition;
+                TrackManager.UpdateTrackFollower(ref follower, -1.0, true, false);
+                TrackManager.UpdateTrackFollower(ref follower, p, true, false);
+                midpointsTrackPositions[i] = p;
+                midpointsWorldPositions[i] = follower.WorldPosition;
+                midpointsWorldDirections[i] = follower.WorldDirection;
+                midpointsWorldUps[i] = follower.WorldUp;
+                midpointsWorldSides[i] = follower.WorldSide;
+                midpointsCant[i] = follower.CurveCant;
+            }
+        }
+        Array.Resize<TrackManager.TrackElement>(ref TrackManager.CurrentTrack.Elements, newLength);
+        for (int i = length - 1; i >= 1; i--)
+        {
+            TrackManager.CurrentTrack.Elements[subdivisions * i] = TrackManager.CurrentTrack.Elements[i];
+        }
+        for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length; i++)
+        {
+            int m = i % subdivisions;
+            if (m != 0)
+            {
+                int q = i / subdivisions;
+                int j = q * subdivisions;
+                TrackManager.CurrentTrack.Elements[i] = TrackManager.CurrentTrack.Elements[j];
+                TrackManager.CurrentTrack.Elements[i].Events = new TrackManager.GeneralEvent[] { };
+                TrackManager.CurrentTrack.Elements[i].StartingTrackPosition = midpointsTrackPositions[i];
+                TrackManager.CurrentTrack.Elements[i].WorldPosition = midpointsWorldPositions[i];
+                TrackManager.CurrentTrack.Elements[i].WorldDirection = midpointsWorldDirections[i];
+                TrackManager.CurrentTrack.Elements[i].WorldUp = midpointsWorldUps[i];
+                TrackManager.CurrentTrack.Elements[i].WorldSide = midpointsWorldSides[i];
+                TrackManager.CurrentTrack.Elements[i].CurveCant = midpointsCant[i];
+                TrackManager.CurrentTrack.Elements[i].CurveCantTangent = 0.0;
+            }
+        }
+        // find turns
+        bool[] isTurn = new bool[TrackManager.CurrentTrack.Elements.Length];
+        {
+            TrackManager.TrackFollower follower = new TrackManager.TrackFollower();
+            for (int i = 1; i < TrackManager.CurrentTrack.Elements.Length - 1; i++)
+            {
+                int m = i % subdivisions;
+                if (m == 0)
+                {
+                    double p = 0.00000001 * TrackManager.CurrentTrack.Elements[i - 1].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition;
+                    TrackManager.UpdateTrackFollower(ref follower, p, true, false);
+                    Vector3 d1 = TrackManager.CurrentTrack.Elements[i].WorldDirection;
+                    Vector3 d2 = follower.WorldDirection;
+                    Vector3 d = d1 - d2;
+                    double t = d.x * d.y + d.z * d.z;
+                    const double e = 0.0001;
+                    if (t > e)
+                    {
+                        isTurn[i] = true;
+                    }
+                }
+            }
+        }
+        // replace turns by curves
+        double totalShortage = 0.0;
+        for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length; i++)
+        {
+            if (isTurn[i])
+            {
+                // estimate radius
+                Vector3 AP = TrackManager.CurrentTrack.Elements[i - 1].WorldPosition;
+                Vector3 AS = TrackManager.CurrentTrack.Elements[i - 1].WorldSide;
+                Vector3 BP = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition;
+                Vector3 BS = TrackManager.CurrentTrack.Elements[i + 1].WorldSide;
+                Vector3 S = AS - BS;
+                double rx;
+                if (S.x * S.x > 0.000001)
+                {
+                    rx = (BP.x - AP.x) / S.x;
+                }
+                else
+                {
+                    rx = 0.0;
+                }
+                double rz;
+                if (S.z * S.z > 0.000001)
+                {
+                    rz = (BP.z - AP.z) / S.z;
+                }
+                else
+                {
+                    rz = 0.0;
+                }
+                if (rx != 0.0 | rz != 0.0)
+                {
+                    double r;
+                    if (rx != 0.0 & rz != 0.0)
+                    {
+                        if (Math.Sign(rx) == Math.Sign(rz))
+                        {
+                            double f = rx / rz;
+                            if (f > -1.1 & f < -0.9 | f > 0.9 & f < 1.1)
+                            {
+                                r = Math.Sqrt(Math.Abs(rx * rz)) * Math.Sign(rx);
+                            }
+                            else
+                            {
+                                r = 0.0;
+                            }
+                        }
+                        else
+                        {
+                            r = 0.0;
+                        }
+                    }
+                    else if (rx != 0.0)
+                    {
+                        r = rx;
+                    }
+                    else
+                    {
+                        r = rz;
+                    }
+                    if (r * r > 1.0)
+                    {
+                        // apply radius
+                        TrackManager.TrackFollower follower = new TrackManager.TrackFollower();
+                        TrackManager.CurrentTrack.Elements[i - 1].CurveRadius = r;
+                        double p = 0.00000001 * TrackManager.CurrentTrack.Elements[i - 1].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition;
+                        TrackManager.UpdateTrackFollower(ref follower, p - 1.0, true, false);
+                        TrackManager.UpdateTrackFollower(ref follower, p, true, false);
+                        TrackManager.CurrentTrack.Elements[i].CurveRadius = r;
+                        //TrackManager.CurrentTrack.Elements[i].CurveCant = TrackManager.CurrentTrack.Elements[i].CurveCant;
+                        //TrackManager.CurrentTrack.Elements[i].CurveCantInterpolation = TrackManager.CurrentTrack.Elements[i].CurveCantInterpolation;
+                        TrackManager.CurrentTrack.Elements[i].WorldPosition = follower.WorldPosition;
+                        TrackManager.CurrentTrack.Elements[i].WorldDirection = follower.WorldDirection;
+                        TrackManager.CurrentTrack.Elements[i].WorldUp = follower.WorldUp;
+                        TrackManager.CurrentTrack.Elements[i].WorldSide = follower.WorldSide;
+                        // iterate to shorten track element length
+                        p = 0.00000001 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition;
+                        TrackManager.UpdateTrackFollower(ref follower, p - 1.0, true, false);
+                        TrackManager.UpdateTrackFollower(ref follower, p, true, false);
+                        Vector3 d = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - follower.WorldPosition;
+                        double bestT = d.x * d.x + d.y * d.y + d.z * d.z;
+                        int bestJ = 0;
+                        int n = 1000;
+                        double a = 1.0 / (double)n * (TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition - TrackManager.CurrentTrack.Elements[i].StartingTrackPosition);
+                        for (int j = 1; j < n - 1; j++)
+                        {
+                            TrackManager.UpdateTrackFollower(ref follower, TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition - (double)j * a, true, false);
+                            d = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - follower.WorldPosition;
+                            double t = d.x * d.x + d.y * d.y + d.z * d.z;
+                            if (t < bestT)
+                            {
+                                bestT = t;
+                                bestJ = j;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        double s = (double)bestJ * a;
+                        for (int j = i + 1; j < TrackManager.CurrentTrack.Elements.Length; j++)
+                        {
+                            TrackManager.CurrentTrack.Elements[j].StartingTrackPosition -= s;
+                        }
+                        totalShortage += s;
+                        // introduce turn to compensate for curve
+                        p = 0.00000001 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition;
+                        TrackManager.UpdateTrackFollower(ref follower, p - 1.0, true, false);
+                        TrackManager.UpdateTrackFollower(ref follower, p, true, false);
+                        Vector3 AB = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - follower.WorldPosition;
+                        Vector3 AC = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - TrackManager.CurrentTrack.Elements[i].WorldPosition;
+                        Vector3 BC = follower.WorldPosition - TrackManager.CurrentTrack.Elements[i].WorldPosition;
+                        double sa = Math.Sqrt(BC.x * BC.x + BC.z * BC.z);
+                        double sb = Math.Sqrt(AC.x * AC.x + AC.z * AC.z);
+                        double sc = Math.Sqrt(AB.x * AB.x + AB.z * AB.z);
+                        double denominator = 2.0 * sa * sb;
+                        if (denominator != 0.0)
+                        {
+                            double originalAngle;
+                            {
+                                double value = (sa * sa + sb * sb - sc * sc) / denominator;
+                                if (value < -1.0)
+                                {
+                                    originalAngle = Math.PI;
+                                }
+                                else if (value > 1.0)
+                                {
+                                    originalAngle = 0;
+                                }
+                                else
+                                {
+                                    originalAngle = Math.Acos(value);
+                                }
+                            }
+                            TrackManager.TrackElement originalTrackElement = TrackManager.CurrentTrack.Elements[i];
+                            bestT = double.MaxValue;
+                            bestJ = 0;
+                            for (int j = -1; j <= 1; j++)
+                            {
+                                double g = (double)j * originalAngle;
+                                double cosg = Math.Cos(g);
+                                double sing = Math.Sin(g);
+                                TrackManager.CurrentTrack.Elements[i] = originalTrackElement;
+                                // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldDirection.X, ref TrackManager.CurrentTrack.Elements[i].WorldDirection.Y, ref TrackManager.CurrentTrack.Elements[i].WorldDirection.Z, 0.0, 1.0, 0.0, cosg, sing);
+                                // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldUp.X, ref TrackManager.CurrentTrack.Elements[i].WorldUp.Y, ref TrackManager.CurrentTrack.Elements[i].WorldUp.Z, 0.0, 1.0, 0.0, cosg, sing);
+                                // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldSide.X, ref TrackManager.CurrentTrack.Elements[i].WorldSide.Y, ref TrackManager.CurrentTrack.Elements[i].WorldSide.Z, 0.0, 1.0, 0.0, cosg, sing);
+                                p = 0.00000001 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition;
+                                TrackManager.UpdateTrackFollower(ref follower, p - 1.0, true, false);
+                                TrackManager.UpdateTrackFollower(ref follower, p, true, false);
+                                d = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - follower.WorldPosition;
+                                double t = d.x * d.x + d.y * d.y + d.z * d.z;
+                                if (t < bestT)
+                                {
+                                    bestT = t;
+                                    bestJ = j;
+                                }
+                            }
+                            {
+                                double newAngle = (double)bestJ * originalAngle;
+                                double cosg = Math.Cos(newAngle);
+                                double sing = Math.Sin(newAngle);
+                                TrackManager.CurrentTrack.Elements[i] = originalTrackElement;
+                                // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldDirection.X, ref TrackManager.CurrentTrack.Elements[i].WorldDirection.Y, ref TrackManager.CurrentTrack.Elements[i].WorldDirection.Z, 0.0, 1.0, 0.0, cosg, sing);
+                                // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldUp.X, ref TrackManager.CurrentTrack.Elements[i].WorldUp.Y, ref TrackManager.CurrentTrack.Elements[i].WorldUp.Z, 0.0, 1.0, 0.0, cosg, sing);
+                                // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldSide.X, ref TrackManager.CurrentTrack.Elements[i].WorldSide.Y, ref TrackManager.CurrentTrack.Elements[i].WorldSide.Z, 0.0, 1.0, 0.0, cosg, sing);
+                            }
+                            // iterate again to further shorten track element length
+                            p = 0.00000001 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition;
+                            TrackManager.UpdateTrackFollower(ref follower, p - 1.0, true, false);
+                            TrackManager.UpdateTrackFollower(ref follower, p, true, false);
+                            d = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - follower.WorldPosition;
+                            bestT = d.x * d.x + d.y * d.y + d.z * d.z;
+                            bestJ = 0;
+                            n = 1000;
+                            a = 1.0 / (double)n * (TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition - TrackManager.CurrentTrack.Elements[i].StartingTrackPosition);
+                            for (int j = 1; j < n - 1; j++)
+                            {
+                                TrackManager.UpdateTrackFollower(ref follower, TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition - (double)j * a, true, false);
+                                d = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - follower.WorldPosition;
+                                double t = d.x * d.x + d.y * d.y + d.z * d.z;
+                                if (t < bestT)
+                                {
+                                    bestT = t;
+                                    bestJ = j;
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                            s = (double)bestJ * a;
+                            for (int j = i + 1; j < TrackManager.CurrentTrack.Elements.Length; j++)
+                            {
+                                TrackManager.CurrentTrack.Elements[j].StartingTrackPosition -= s;
+                            }
+                            totalShortage += s;
+                        }
+                        // compensate for height difference
+                        p = 0.00000001 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition;
+                        TrackManager.UpdateTrackFollower(ref follower, p - 1.0, true, false);
+                        TrackManager.UpdateTrackFollower(ref follower, p, true, false);
+                        Vector3 d1 = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - TrackManager.CurrentTrack.Elements[i].WorldPosition;
+                        double a1 = Math.Atan(d1.y / Math.Sqrt(d1.x * d1.x + d1.z * d1.z));
+                        Vector3 d2 = follower.WorldPosition - TrackManager.CurrentTrack.Elements[i].WorldPosition;
+                        double a2 = Math.Atan(d2.y / Math.Sqrt(d2.x * d2.x + d2.z * d2.z));
+                        double b = a2 - a1;
+                        if (b * b > 0.00000001)
+                        {
+                            double cosa = Math.Cos(b);
+                            double sina = Math.Sin(b);
+                            // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldDirection.X, ref TrackManager.CurrentTrack.Elements[i].WorldDirection.Y, ref TrackManager.CurrentTrack.Elements[i].WorldDirection.Z, TrackManager.CurrentTrack.Elements[i].WorldSide.X, TrackManager.CurrentTrack.Elements[i].WorldSide.Y, TrackManager.CurrentTrack.Elements[i].WorldSide.Z, cosa, sina);
+                            // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldUp.X, ref TrackManager.CurrentTrack.Elements[i].WorldUp.Y, ref TrackManager.CurrentTrack.Elements[i].WorldUp.Z, TrackManager.CurrentTrack.Elements[i].WorldSide.X, TrackManager.CurrentTrack.Elements[i].WorldSide.Y, TrackManager.CurrentTrack.Elements[i].WorldSide.Z, cosa, sina);
+                        }
+                    }
+                }
+            }
+        }
+        // correct events
+        // for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length - 1; i++)
+        // {
+        //     double startingTrackPosition = TrackManager.CurrentTrack.Elements[i].StartingTrackPosition;
+        //     double endingTrackPosition = TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition;
+        //     for (int j = 0; j < TrackManager.CurrentTrack.Elements[i].Events.Length; j++)
+        //     {
+        //         double p = startingTrackPosition + TrackManager.CurrentTrack.Elements[i].Events[j].TrackPositionDelta;
+        //         if (p >= endingTrackPosition)
+        //         {
+        //             int len = TrackManager.CurrentTrack.Elements[i + 1].Events.Length;
+        //             Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[i + 1].Events, len + 1);
+        //             TrackManager.CurrentTrack.Elements[i + 1].Events[len] = TrackManager.CurrentTrack.Elements[i].Events[j];
+        //             TrackManager.CurrentTrack.Elements[i + 1].Events[len].TrackPositionDelta += startingTrackPosition - endingTrackPosition;
+        //             for (int k = j; k < TrackManager.CurrentTrack.Elements[i].Events.Length - 1; k++)
+        //             {
+        //                 TrackManager.CurrentTrack.Elements[i].Events[k] = TrackManager.CurrentTrack.Elements[i].Events[k + 1];
+        //             }
+        //             len = TrackManager.CurrentTrack.Elements[i].Events.Length;
+        //             Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[i].Events, len - 1);
+        //             j--;
+        //         }
+        //     }
+        // }
     }
 
     private static void CreateMissingBlocks(ref RouteData routeData, ref int blocksUsed, int toIndex, bool previewOnly)
@@ -7760,7 +8079,7 @@ public static class CsvRwRouteParser
         }
     }
 
-    
+
     public static Material CreateSkyboxMaterial(Texture t)
     {
         // Material result = new Material(Shader.Find("RenderFX/Skybox"));
