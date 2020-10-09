@@ -34,7 +34,7 @@ public class SceneLoader : Node {
 
 		//string routePath = System.IO.Path.Combine(routeFolder, @"C:\Users\danie\Desktop\Test\Route\Taipei Rapid Transit  Zhonghe Line-Down.csv");
 
-		string routePath = System.IO.Path.Combine(routeFolder, @"C:\Users\danie\Desktop\Test\Route\test.csv");
+		string routePath = System.IO.Path.Combine(routeFolder, @"C:\Users\danie\Desktop\Test\Route\test3.csv");
 
 		Node n2 = new Node();
 		n2.Name = "Route Objects";

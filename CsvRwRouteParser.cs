@@ -6004,9 +6004,9 @@ public static class CsvRwRouteParser
 
         // process blocks
         double progressFactor = routeData.Blocks.Length - routeData.FirstUsedBlock == 0 ? 0.5 : 0.5 / (double)(routeData.Blocks.Length - routeData.FirstUsedBlock);
-        for (int i = routeData.FirstUsedBlock; i < routeData.Blocks.Length; i++)
+        for (int blockIdx = routeData.FirstUsedBlock; blockIdx < routeData.Blocks.Length; blockIdx++)
         {
-            double startingDistance = (double)i * routeData.BlockInterval;
+            double startingDistance = (double)blockIdx * routeData.BlockInterval;
             double endingDistance = startingDistance + routeData.BlockInterval;
             
             direction = direction.Normalized();
@@ -6014,20 +6014,20 @@ public static class CsvRwRouteParser
             // track
             if (!previewOnly)
             {
-                if (routeData.Blocks[i].Cycle.Length == 1 && routeData.Blocks[i].Cycle[0] == -1)
+                if (routeData.Blocks[blockIdx].Cycle.Length == 1 && routeData.Blocks[blockIdx].Cycle[0] == -1)
                 {
                      if (routeData.Structure.Cycle.Length == 0 || routeData.Structure.Cycle[0] == null)
                     {
-                        routeData.Blocks[i].Cycle = new int[] { 0 };
+                        routeData.Blocks[blockIdx].Cycle = new int[] { 0 };
                     }
                     else
                     {
-                        routeData.Blocks[i].Cycle = routeData.Structure.Cycle[0];
+                        routeData.Blocks[blockIdx].Cycle = routeData.Structure.Cycle[0];
                     }
                 }
             }
 
-            TrackManager.TrackElement worldTrackElement = routeData.Blocks[i].CurrentTrackState;
+            TrackManager.TrackElement worldTrackElement = routeData.Blocks[blockIdx].CurrentTrackState;
             int n = currentTrackLength;
             if (n >= TrackManager.CurrentTrack.Elements.Length)
             {
@@ -6037,7 +6037,7 @@ public static class CsvRwRouteParser
             currentTrackLength++;
             TrackManager.CurrentTrack.Elements[n] = worldTrackElement;
             TrackManager.CurrentTrack.Elements[n].WorldPosition = position;
-            TrackManager.CurrentTrack.Elements[n].WorldDirection = Calc.GetNormalizedVector3(direction, routeData.Blocks[i].Pitch);
+            TrackManager.CurrentTrack.Elements[n].WorldDirection = Calc.GetNormalizedVector3(direction, routeData.Blocks[blockIdx].Pitch);
             TrackManager.CurrentTrack.Elements[n].WorldSide = new Vector3(direction.y, 0.0f, -direction.x);
             // World.Cross(TrackManager.CurrentTrack.Elements[n].WorldDirection.X, 
             //             TrackManager.CurrentTrack.Elements[n].WorldDirection.Y, 
@@ -6050,8 +6050,8 @@ public static class CsvRwRouteParser
             //             out TrackManager.CurrentTrack.Elements[n].WorldUp.Z);
             TrackManager.CurrentTrack.Elements[n].StartingTrackPosition = startingDistance;
             TrackManager.CurrentTrack.Elements[n].Events = new TrackManager.GeneralEvent[] { };
-            TrackManager.CurrentTrack.Elements[n].AdhesionMultiplier = routeData.Blocks[i].AdhesionMultiplier;
-            TrackManager.CurrentTrack.Elements[n].CsvRwAccuracyLevel = routeData.Blocks[i].Accuracy;
+            TrackManager.CurrentTrack.Elements[n].AdhesionMultiplier = routeData.Blocks[blockIdx].AdhesionMultiplier;
+            TrackManager.CurrentTrack.Elements[n].CsvRwAccuracyLevel = routeData.Blocks[blockIdx].Accuracy;
 
             // background
             //if (!PreviewOnly)
@@ -6313,9 +6313,9 @@ public static class CsvRwRouteParser
             //}
 
             // Turn
-            if (routeData.Blocks[i].Turn != 0.0)
+            if (routeData.Blocks[blockIdx].Turn != 0.0)
             {
-                double ag = -Math.Atan(routeData.Blocks[i].Turn);
+                double ag = -Math.Atan(routeData.Blocks[blockIdx].Turn);
                 direction = direction.Rotated((float)ag);
 
                 // World.RotatePlane(ref TrackManager.CurrentTrack.Elements[n].WorldDirection, cosag, sinag);
@@ -6327,9 +6327,9 @@ public static class CsvRwRouteParser
             }
 
             // Pitch
-            if (routeData.Blocks[i].Pitch != 0.0)
+            if (routeData.Blocks[blockIdx].Pitch != 0.0)
             {
-                TrackManager.CurrentTrack.Elements[n].Pitch = routeData.Blocks[i].Pitch;
+                TrackManager.CurrentTrack.Elements[n].Pitch = routeData.Blocks[blockIdx].Pitch;
             }
             else
             {
@@ -6340,10 +6340,10 @@ public static class CsvRwRouteParser
             double a = 0.0;
             double c = routeData.BlockInterval;
             double h = 0.0;
-            if (worldTrackElement.CurveRadius != 0.0 & routeData.Blocks[i].Pitch != 0.0)
+            if (worldTrackElement.CurveRadius != 0.0 & routeData.Blocks[blockIdx].Pitch != 0.0)
             {
                 double d = routeData.BlockInterval;
-                double p = routeData.Blocks[i].Pitch;
+                double p = routeData.Blocks[blockIdx].Pitch;
                 double r = worldTrackElement.CurveRadius;
                 double s = d / Math.Sqrt(1.0 + p * p);
                 h = s * p;
@@ -6361,16 +6361,16 @@ public static class CsvRwRouteParser
                 a = 0.5 * (double)Math.Sign(r) * b;
                 direction = direction.Rotated((float)-a);
             }
-            else if (routeData.Blocks[i].Pitch != 0.0)
+            else if (routeData.Blocks[blockIdx].Pitch != 0.0)
             {
-                double p = routeData.Blocks[i].Pitch;
+                double p = routeData.Blocks[blockIdx].Pitch;
                 double d = routeData.BlockInterval;
                 c = d / Math.Sqrt(1.0 + p * p);
                 h = c * p;
             }
 
             double trackYaw = Math.Atan2(direction.x, direction.y);
-            double trackPitch = Math.Atan(routeData.Blocks[i].Pitch);
+            double trackPitch = Math.Atan(routeData.Blocks[blockIdx].Pitch);
 
             Transform groundTransformation = new Transform(Basis.Identity,  Vector3.Zero);
             groundTransformation = groundTransformation.Rotated(Vector3.Up, -(float)trackYaw);
@@ -6384,16 +6384,16 @@ public static class CsvRwRouteParser
             // Ground
             if (!previewOnly)
             {
-                int cb = (int)Math.Floor((double)i + 0.001);
-                int ci = (cb % routeData.Blocks[i].Cycle.Length + routeData.Blocks[i].Cycle.Length) % routeData.Blocks[i].Cycle.Length;
-                int gi = routeData.Blocks[i].Cycle[ci];
+                int cb = (int)Math.Floor((double)blockIdx + 0.001);
+                int ci = (cb % routeData.Blocks[blockIdx].Cycle.Length + routeData.Blocks[blockIdx].Cycle.Length) % routeData.Blocks[blockIdx].Cycle.Length;
+                int gi = routeData.Blocks[blockIdx].Cycle[ci];
                 if (gi >= 0 & gi < routeData.Structure.Ground.Length)
                 {
                     if (routeData.Structure.Ground[gi] != null)
                     {
                         //ObjectManager.CreateObject(Data.Structure.Ground[Data.Blocks[i].Cycle[ci]], Position + new Vector3D(0.0, -Data.Blocks[i].Height, 0.0), GroundTransformation, NullTransformation, Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, StartingDistance);
-                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Ground[routeData.Blocks[i].Cycle[ci]],
-                                                                    position + new Vector3(0.0f, (float)-routeData.Blocks[i].Height, 0.0f), 
+                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Ground[routeData.Blocks[blockIdx].Cycle[ci]],
+                                                                    position + new Vector3(0.0f, (float)-routeData.Blocks[blockIdx].Height, 0.0f), 
                                                                     groundTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, 
                                                                     routeData.BlockInterval, startingDistance);
                     }
@@ -6404,22 +6404,22 @@ public static class CsvRwRouteParser
             // ground-aligned free objects
             if (!previewOnly)
             {
-                for (int j = 0; j < routeData.Blocks[i].GroundFreeObj.Length; j++)
+                for (int j = 0; j < routeData.Blocks[blockIdx].GroundFreeObj.Length; j++)
                 {
-                    int sttype = routeData.Blocks[i].GroundFreeObj[j].Type;
-                    double d = routeData.Blocks[i].GroundFreeObj[j].TrackPosition - startingDistance;
-                    double dx = routeData.Blocks[i].GroundFreeObj[j].X;
-                    double dy = routeData.Blocks[i].GroundFreeObj[j].Y;
+                    int sttype = routeData.Blocks[blockIdx].GroundFreeObj[j].Type;
+                    double d = routeData.Blocks[blockIdx].GroundFreeObj[j].TrackPosition - startingDistance;
+                    double dx = routeData.Blocks[blockIdx].GroundFreeObj[j].X;
+                    double dy = routeData.Blocks[blockIdx].GroundFreeObj[j].Y;
                     
                     Vector3 wpos = position + new Vector3(  (float)(direction.x * d + direction.y * dx), 
-                                                            (float)(dy - routeData.Blocks[i].Height), 
+                                                            (float)(dy - routeData.Blocks[blockIdx].Height), 
                                                             (float)(direction.y * d - direction.x * dx));
-                    double tpos = routeData.Blocks[i].GroundFreeObj[j].TrackPosition;
+                    double tpos = routeData.Blocks[blockIdx].GroundFreeObj[j].TrackPosition;
 
                     Transform gafTran = new Transform(Basis.Identity, Vector3.Zero);
-                    gafTran = gafTran.Rotated(Vector3.Up, -(float)routeData.Blocks[i].GroundFreeObj[j].Yaw);
-                    gafTran = gafTran.Rotated(Vector3.Right, (float)routeData.Blocks[i].GroundFreeObj[j].Pitch);
-                    gafTran = gafTran.Rotated(Vector3.Forward, (float)routeData.Blocks[i].GroundFreeObj[j].Roll);
+                    gafTran = gafTran.Rotated(Vector3.Up, -(float)routeData.Blocks[blockIdx].GroundFreeObj[j].Yaw);
+                    gafTran = gafTran.Rotated(Vector3.Right, (float)routeData.Blocks[blockIdx].GroundFreeObj[j].Pitch);
+                    gafTran = gafTran.Rotated(Vector3.Forward, (float)routeData.Blocks[blockIdx].GroundFreeObj[j].Roll);
 
                     ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FreeObj[sttype], wpos, groundTransformation, gafTran, 
                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, tpos);
@@ -6429,15 +6429,15 @@ public static class CsvRwRouteParser
             // Rail-aligned objects
             if (!previewOnly)
             {
-                for (int j = 0; j < routeData.Blocks[i].Rail.Length; j++)
+                for (int railIdx = 0; railIdx < routeData.Blocks[blockIdx].Rail.Length; railIdx++)
                 {
-                    if (j > 0 && !routeData.Blocks[i].Rail[j].RailStart) continue;
+                    if (railIdx > 0 && !routeData.Blocks[blockIdx].Rail[railIdx].RailStart) continue;
 
                     // Rail
                     Vector3 pos;
                     Transform railTransformation = new Transform(Basis.Identity, Vector3.Zero);
                     double planar, updown;
-                    if (j == 0)
+                    if (railIdx == 0)
                     {
                         // rail 0
                         planar = 0.0;
@@ -6450,12 +6450,12 @@ public static class CsvRwRouteParser
                     else
                     {
                         // rails 1-infinity
-                        double x = routeData.Blocks[i].Rail[j].RailStartX;
-                        double y = routeData.Blocks[i].Rail[j].RailStartY;
+                        double x = routeData.Blocks[blockIdx].Rail[railIdx].RailStartX;
+                        double y = routeData.Blocks[blockIdx].Rail[railIdx].RailStartY;
                         Vector3 offset = new Vector3((float)(direction.y * x), (float)y, -(float)(direction.x * x));
                         pos = position + offset;
                         double dh;
-                        if (i < routeData.Blocks.Length - 1 && routeData.Blocks[i + 1].Rail.Length > j)
+                        if (blockIdx < routeData.Blocks.Length - 1 && routeData.Blocks[blockIdx + 1].Rail.Length > railIdx)
                         {
                             // take orientation of upcoming block into account
                             Vector2 direction2 = direction;
@@ -6467,19 +6467,19 @@ public static class CsvRwRouteParser
                             {
                                 direction2 = direction2.Rotated(-(float)a);
                             }
-                            if (routeData.Blocks[i + 1].Turn != 0.0)
+                            if (routeData.Blocks[blockIdx + 1].Turn != 0.0)
                             {
-                                double ag = Math.Atan(routeData.Blocks[i + 1].Turn);
+                                double ag = Math.Atan(routeData.Blocks[blockIdx + 1].Turn);
                                 direction2 = direction2.Rotated(-(float)ag);
                             }
                             double a2 = 0.0;
                             double c2 = routeData.BlockInterval;
                             double h2 = 0.0;
-                            if (routeData.Blocks[i + 1].CurrentTrackState.CurveRadius != 0.0 & routeData.Blocks[i + 1].Pitch != 0.0)
+                            if (routeData.Blocks[blockIdx + 1].CurrentTrackState.CurveRadius != 0.0 & routeData.Blocks[blockIdx + 1].Pitch != 0.0)
                             {
                                 double d2 = routeData.BlockInterval;
-                                double p2 = routeData.Blocks[i + 1].Pitch;
-                                double r2 = routeData.Blocks[i + 1].CurrentTrackState.CurveRadius;
+                                double p2 = routeData.Blocks[blockIdx + 1].Pitch;
+                                double r2 = routeData.Blocks[blockIdx + 1].CurrentTrackState.CurveRadius;
                                 double s2 = d2 / Math.Sqrt(1.0 + p2 * p2);
                                 h2 = s2 * p2;
                                 double b2 = s2 / Math.Abs(r2);
@@ -6487,18 +6487,18 @@ public static class CsvRwRouteParser
                                 a2 = 0.5 * (double)Math.Sign(r2) * b2;
                                 direction2 = direction2.Rotated(-(float)a2);
                             }
-                            else if (routeData.Blocks[i + 1].CurrentTrackState.CurveRadius != 0.0)
+                            else if (routeData.Blocks[blockIdx + 1].CurrentTrackState.CurveRadius != 0.0)
                             {
                                 double d2 = routeData.BlockInterval;
-                                double r2 = routeData.Blocks[i + 1].CurrentTrackState.CurveRadius;
+                                double r2 = routeData.Blocks[blockIdx + 1].CurrentTrackState.CurveRadius;
                                 double b2 = d2 / Math.Abs(r2);
                                 c2 = Math.Sqrt(2.0 * r2 * r2 * (1.0 - Math.Cos(b2)));
                                 a2 = 0.5 * (double)Math.Sign(r2) * b2;
                                 direction2 = direction2.Rotated(-(float)a2);
                             }
-                            else if (routeData.Blocks[i + 1].Pitch != 0.0)
+                            else if (routeData.Blocks[blockIdx + 1].Pitch != 0.0)
                             {
-                                double p2 = routeData.Blocks[i + 1].Pitch;
+                                double p2 = routeData.Blocks[blockIdx + 1].Pitch;
                                 double d2 = routeData.BlockInterval;
                                 c2 = d2 / Math.Sqrt(1.0 + p2 * p2);
                                 h2 = c2 * p2;
@@ -6528,8 +6528,8 @@ public static class CsvRwRouteParser
 
                             // railTransformation.basis.y = railTransformation.basis.z.Cross(railTransformation.basis.x);
                             //railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);
-                            double dx = routeData.Blocks[i + 1].Rail[j].RailEndX - routeData.Blocks[i].Rail[j].RailStartX;
-                            double dy = routeData.Blocks[i + 1].Rail[j].RailEndY - routeData.Blocks[i].Rail[j].RailStartY;
+                            double dx = routeData.Blocks[blockIdx + 1].Rail[railIdx].RailEndX - routeData.Blocks[blockIdx].Rail[railIdx].RailStartX;
+                            double dy = routeData.Blocks[blockIdx + 1].Rail[railIdx].RailEndY - routeData.Blocks[blockIdx].Rail[railIdx].RailStartY;
                             planar = Math.Atan(dx / c);
                             
                             dh = dy / c;
@@ -6547,12 +6547,12 @@ public static class CsvRwRouteParser
                         }
                     }
 
-                    if (routeData.Blocks[i].RailType[j] < routeData.Structure.Rail.Length)
+                    if (routeData.Blocks[blockIdx].RailType[railIdx] < routeData.Structure.Rail.Length)
                     {
-                        if (routeData.Structure.Rail[routeData.Blocks[i].RailType[j]] != null)
+                        if (routeData.Structure.Rail[routeData.Blocks[blockIdx].RailType[railIdx]] != null)
                         {
                             // ObjectManager.CreateObject(routeData.Structure.Rail[routeData.Blocks[i].RailType[j]], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Rail[routeData.Blocks[i].RailType[j]], pos, railTransformation, nullTransformation, 
+                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Rail[routeData.Blocks[blockIdx].RailType[railIdx]], pos, railTransformation, nullTransformation, 
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                     }
@@ -6590,18 +6590,18 @@ public static class CsvRwRouteParser
                     //}
 
                     // poles
-                    if (routeData.Blocks[i].RailPole.Length > j && routeData.Blocks[i].RailPole[j].Exists)
+                    if (routeData.Blocks[blockIdx].RailPole.Length > railIdx && routeData.Blocks[blockIdx].RailPole[railIdx].Exists)
                     {
-                        double dz = startingDistance / routeData.Blocks[i].RailPole[j].Interval;
+                        double dz = startingDistance / routeData.Blocks[blockIdx].RailPole[railIdx].Interval;
                         dz -= Math.Floor(dz + 0.5);
                         if (dz >= -0.01 & dz <= 0.01)
                         {
-                            if (routeData.Blocks[i].RailPole[j].Mode == 0)
+                            if (routeData.Blocks[blockIdx].RailPole[railIdx].Mode == 0)
                             {
-                                if (routeData.Blocks[i].RailPole[j].Location <= 0.0)
+                                if (routeData.Blocks[blockIdx].RailPole[railIdx].Location <= 0.0)
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.Poles[0][routeData.Blocks[i].RailPole[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[0][routeData.Blocks[i].RailPole[j].Type], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[0][routeData.Blocks[blockIdx].RailPole[railIdx].Type], pos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                                 else
@@ -6609,14 +6609,14 @@ public static class CsvRwRouteParser
                                     //TODO mirrored object
                                     //ObjectManager.UnifiedObject Pole = GetMirroredObject(routeData.Structure.Poles[0][Data.Blocks[i].RailPole[j].Type]);
                                     //ObjectManager.CreateObject(Pole, pos, RailTransformation, NullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[0][routeData.Blocks[i].RailPole[j].Type], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[0][routeData.Blocks[blockIdx].RailPole[railIdx].Type], pos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                             }
                             else
                             {
-                                int m = routeData.Blocks[i].RailPole[j].Mode;
-                                double dx = -routeData.Blocks[i].RailPole[j].Location * 3.8;
+                                int m = routeData.Blocks[blockIdx].RailPole[railIdx].Mode;
+                                double dx = -routeData.Blocks[blockIdx].RailPole[railIdx].Location * 3.8;
                                 double wa = Math.Atan2(direction.y, direction.x) - planar;
                                 double wx = Math.Cos(wa);
                                 double wy = Math.Tan(updown);
@@ -6626,7 +6626,7 @@ public static class CsvRwRouteParser
                                 double sy = 0.0;
                                 double sz = -direction.x;
                                 Vector3 wpos = pos + new Vector3((float)(sx * dx + wx * dz), (float)(sy * dx + wy * dz), (float)(sz * dx + wz * dz));
-                                int type = routeData.Blocks[i].RailPole[j].Type;
+                                int type = routeData.Blocks[blockIdx].RailPole[railIdx].Type;
                                 //ObjectManager.CreateObject(routeData.Structure.Poles[m][type], wpos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[m][type], pos, railTransformation, nullTransformation, 
                                                                             routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
@@ -6635,35 +6635,35 @@ public static class CsvRwRouteParser
                     }
 
                     // walls
-                    if (routeData.Blocks[i].RailWall.Length > j && routeData.Blocks[i].RailWall[j].Exists)
+                    if (routeData.Blocks[blockIdx].RailWall.Length > railIdx && routeData.Blocks[blockIdx].RailWall[railIdx].Exists)
                     {
-                        if (routeData.Blocks[i].RailWall[j].Direction <= 0)
+                        if (routeData.Blocks[blockIdx].RailWall[railIdx].Direction <= 0)
                         {                
                             //ObjectManager.CreateObject(routeData.Structure.WallL[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.WallL[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, 
+                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.WallL[routeData.Blocks[blockIdx].RailWall[railIdx].Type], pos, railTransformation, nullTransformation, 
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
-                        if (routeData.Blocks[i].RailWall[j].Direction >= 0)
+                        if (routeData.Blocks[blockIdx].RailWall[railIdx].Direction >= 0)
                         {                            
                             //ObjectManager.CreateObject(routeData.Structure.WallR[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.WallR[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, 
+                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.WallR[routeData.Blocks[blockIdx].RailWall[railIdx].Type], pos, railTransformation, nullTransformation, 
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                     }
 
                     // dikes
-                    if (routeData.Blocks[i].RailDike.Length > j && routeData.Blocks[i].RailDike[j].Exists)
+                    if (routeData.Blocks[blockIdx].RailDike.Length > railIdx && routeData.Blocks[blockIdx].RailDike[railIdx].Exists)
                     {
-                        if (routeData.Blocks[i].RailDike[j].Direction <= 0)
+                        if (routeData.Blocks[blockIdx].RailDike[railIdx].Direction <= 0)
                         {
                             //ObjectManager.CreateObject(routeData.Structure.DikeL[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.blockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.DikeL[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation,
+                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.DikeL[routeData.Blocks[blockIdx].RailDike[railIdx].Type], pos, railTransformation, nullTransformation,
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
-                        if (routeData.Blocks[i].RailDike[j].Direction >= 0)
+                        if (routeData.Blocks[blockIdx].RailDike[railIdx].Direction >= 0)
                         {
                             //ObjectManager.CreateObject(routeData.Structure.DikeR[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.blockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.DikeR[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation,
+                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.DikeR[routeData.Blocks[blockIdx].RailDike[railIdx].Type], pos, railTransformation, nullTransformation,
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                     }
@@ -6698,159 +6698,159 @@ public static class CsvRwRouteParser
                     //}
 
                     // forms
-                    for (int k = 0; k < routeData.Blocks[i].Form.Length; k++)
+                    for (int k = 0; k < routeData.Blocks[blockIdx].Form.Length; k++)
                     {
                         // primary rail
-                        if (routeData.Blocks[i].Form[k].PrimaryRail == j)
+                        if (routeData.Blocks[blockIdx].Form[k].PrimaryRail == railIdx)
                         {
-                            if (routeData.Blocks[i].Form[k].SecondaryRail == Form.SecondaryRailStub)
+                            if (routeData.Blocks[blockIdx].Form[k].SecondaryRail == Form.SecondaryRailStub)
                             {
-                                if (routeData.Blocks[i].Form[k].FormType >= routeData.Structure.FormL.Length || routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType] == null)
+                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormL.Length || routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
                                 {
                                     GD.Print("FormStructureIndex references a FormL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                 }
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    if (routeData.Blocks[i].Form[k].RoofType > 0)
+                                    ObjectManager.Instance.InstantiateObject(rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
+                                    if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
                                     {
-                                        if (routeData.Blocks[i].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType] == null)
+                                        if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
                                         {
                                             GD.Print("RoofStructureIndex references a RoofL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                         }
                                         else
                                         {
                                             //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
                                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                         }
                                     }
                                 }
                             }
-                            else if (routeData.Blocks[i].Form[k].SecondaryRail == Form.SecondaryRailL)
+                            else if (routeData.Blocks[blockIdx].Form[k].SecondaryRail == Form.SecondaryRailL)
                             {
-                                if (routeData.Blocks[i].Form[k].FormType >= routeData.Structure.FormL.Length || routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType] == null)
+                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormL.Length || routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
                                 {
                                     GD.Print("FormStructureIndex references a FormL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                 }
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
-                                if (routeData.Blocks[i].Form[k].FormType >= routeData.Structure.FormCL.Length || routeData.Structure.FormCL[routeData.Blocks[i].Form[k].FormType] == null)
+                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCL.Length || routeData.Structure.FormCL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
                                 {
                                     GD.Print("FormStructureIndex references a FormCL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                 }
                                 else
                                 {
                                     //ObjectManager.CreateStaticObject(routeData.Structure.FormCL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormCL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormCL[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
 
-                                if (routeData.Blocks[i].Form[k].RoofType > 0)
+                                if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
                                 {
-                                    if (routeData.Blocks[i].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType] == null)
+                                    if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
                                     {
                                         GD.Print("RoofStructureIndex references a RoofL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                     }
                                     else
                                     {
                                         //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
-                                    if (routeData.Blocks[i].Form[k].RoofType >= routeData.Structure.RoofCL.Length || routeData.Structure.RoofCL[routeData.Blocks[i].Form[k].RoofType] == null)
+                                    if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCL.Length || routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
                                     {
                                         GD.Print("RoofStructureIndex references a RoofCL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                     }
                                     else
                                     {
                                         //ObjectManager.CreateStaticObject(routeData.Structure.RoofCL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofCL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                 }
                             }
-                            else if (routeData.Blocks[i].Form[k].SecondaryRail == Form.SecondaryRailR)
+                            else if (routeData.Blocks[blockIdx].Form[k].SecondaryRail == Form.SecondaryRailR)
                             {
-                                if (routeData.Blocks[i].Form[k].FormType >= routeData.Structure.FormR.Length || routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType] == null)
+                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormR.Length || routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
                                 {
                                     GD.Print("FormStructureIndex references a FormR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                 }
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
-                                if (routeData.Blocks[i].Form[k].FormType >= routeData.Structure.FormCR.Length || routeData.Structure.FormCR[routeData.Blocks[i].Form[k].FormType] == null)
+                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCR.Length || routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
                                 {
                                     GD.Print("FormStructureIndex references a FormCR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                 }
                                 else
                                 {
                                     //ObjectManager.CreateStaticObject(routeData.Structure.FormCR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormCR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
-                                if (routeData.Blocks[i].Form[k].RoofType > 0)
+                                if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
                                 {
-                                    if (routeData.Blocks[i].Form[k].RoofType >= routeData.Structure.RoofR.Length || routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType] == null)
+                                    if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofR.Length || routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
                                     {
                                         GD.Print("RoofStructureIndex references a RoofR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                     }
                                     else
                                     {
                                         //ObjectManager.CreateObject(routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
-                                    if (routeData.Blocks[i].Form[k].RoofType >= routeData.Structure.RoofCR.Length || routeData.Structure.RoofCR[routeData.Blocks[i].Form[k].RoofType] == null)
+                                    if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCR.Length || routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
                                     {
                                         GD.Print("RoofStructureIndex references a RoofCR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                     }
                                     else
                                     {
                                         //ObjectManager.CreateStaticObject(routeData.Structure.RoofCR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofCR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                 }
                             }
-                            else if (routeData.Blocks[i].Form[k].SecondaryRail > 0)
+                            else if (routeData.Blocks[blockIdx].Form[k].SecondaryRail > 0)
                             {
-                                int p = routeData.Blocks[i].Form[k].PrimaryRail;
-                                double px0 = p > 0 ? routeData.Blocks[i].Rail[p].RailStartX : 0.0;
-                                double px1 = p > 0 ? routeData.Blocks[i + 1].Rail[p].RailEndX : 0.0;
-                                int s = routeData.Blocks[i].Form[k].SecondaryRail;
-                                if (s < 0 || s >= routeData.Blocks[i].Rail.Length || !routeData.Blocks[i].Rail[s].RailStart)
+                                int p = routeData.Blocks[blockIdx].Form[k].PrimaryRail;
+                                double px0 = p > 0 ? routeData.Blocks[blockIdx].Rail[p].RailStartX : 0.0;
+                                double px1 = p > 0 ? routeData.Blocks[blockIdx + 1].Rail[p].RailEndX : 0.0;
+                                int s = routeData.Blocks[blockIdx].Form[k].SecondaryRail;
+                                if (s < 0 || s >= routeData.Blocks[blockIdx].Rail.Length || !routeData.Blocks[blockIdx].Rail[s].RailStart)
                                 {
                                     GD.Print("RailIndex2 is out of range in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName);
                                 }
                                 else
                                 {
-                                    double sx0 = routeData.Blocks[i].Rail[s].RailStartX;
-                                    double sx1 = routeData.Blocks[i + 1].Rail[s].RailEndX;
+                                    double sx0 = routeData.Blocks[blockIdx].Rail[s].RailStartX;
+                                    double sx1 = routeData.Blocks[blockIdx + 1].Rail[s].RailEndX;
                                     double d0 = sx0 - px0;
                                     double d1 = sx1 - px1;
                                     if (d0 < 0.0)
                                     {
-                                        if (routeData.Blocks[i].Form[k].FormType >= routeData.Structure.FormL.Length || routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType] == null)
+                                        if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormL.Length || routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
                                         {
                                             GD.Print("FormStructureIndex references a FormL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                         }
                                         else
                                         {
                                             //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation,
+                                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation,
                                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                         }
 
-                                        if (routeData.Blocks[i].Form[k].FormType >= routeData.Structure.FormCL.Length || routeData.Structure.FormCL[routeData.Blocks[i].Form[k].FormType] == null)
+                                        if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCL.Length || routeData.Structure.FormCL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
                                         {
                                             GD.Print("FormStructureIndex references a FormCL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                         }
@@ -6860,19 +6860,19 @@ public static class CsvRwRouteParser
                                             //ObjectManager.StaticObject FormC = GetTransformedStaticObject(routeData.Structure.FormCL[routeData.Blocks[i].Form[k].FormType], d0, d1);
                                             //ObjectManager.CreateStaticObject(FormC, pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                         }
-                                        if (routeData.Blocks[i].Form[k].RoofType > 0)
+                                        if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
                                         {
-                                            if (routeData.Blocks[i].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType] == null)
+                                            if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
                                             {
                                                 GD.Print("RoofStructureIndex references a RoofL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                             }
                                             else
                                             {
                                                 //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                                ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                                ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
                                                                                             routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                             }
-                                            if (routeData.Blocks[i].Form[k].RoofType >= routeData.Structure.RoofCL.Length || routeData.Structure.RoofCL[routeData.Blocks[i].Form[k].RoofType] == null)
+                                            if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCL.Length || routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
                                             {
                                                 GD.Print("RoofStructureIndex references a RoofCL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                             }
@@ -6886,17 +6886,17 @@ public static class CsvRwRouteParser
                                     }
                                     else if (d0 > 0.0)
                                     {
-                                        if (routeData.Blocks[i].Form[k].FormType >= routeData.Structure.FormR.Length || routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType] == null)
+                                        if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormR.Length || routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
                                         {
                                             GD.Print("FormStructureIndex references a FormR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                         }
                                         else
                                         {
                                             //ObjectManager.CreateObject(routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
                                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                         }
-                                        if (routeData.Blocks[i].Form[k].FormType >= routeData.Structure.FormCR.Length || routeData.Structure.FormCR[routeData.Blocks[i].Form[k].FormType] == null)
+                                        if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCR.Length || routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
                                         {
                                             GD.Print("FormStructureIndex references a FormCR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                         }
@@ -6906,19 +6906,19 @@ public static class CsvRwRouteParser
                                             //ObjectManager.StaticObject FormC = GetTransformedStaticObject(routeData.Structure.FormCR[routeData.Blocks[i].Form[k].FormType], d0, d1);
                                             //ObjectManager.CreateStaticObject(FormC, pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                         }
-                                        if (routeData.Blocks[i].Form[k].RoofType > 0)
+                                        if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
                                         {
-                                            if (routeData.Blocks[i].Form[k].RoofType >= routeData.Structure.RoofR.Length || routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType] == null)
+                                            if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofR.Length || routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
                                             {
                                                 GD.Print("RoofStructureIndex references a RoofR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                             }
                                             else
                                             {
                                                 //ObjectManager.CreateObject(routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                                ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                                ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
                                                                                             routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                             }
-                                            if (routeData.Blocks[i].Form[k].RoofType >= routeData.Structure.RoofCR.Length || routeData.Structure.RoofCR[routeData.Blocks[i].Form[k].RoofType] == null)
+                                            if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCR.Length || routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
                                             {
                                                 GD.Print("RoofStructureIndex references a RoofCR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                             }
@@ -6934,61 +6934,61 @@ public static class CsvRwRouteParser
                         }
 
                         // secondary rail
-                        if (routeData.Blocks[i].Form[k].SecondaryRail == j)
+                        if (routeData.Blocks[blockIdx].Form[k].SecondaryRail == railIdx)
                         {
-                            int p = routeData.Blocks[i].Form[k].PrimaryRail;
-                            double px = p > 0 ? routeData.Blocks[i].Rail[p].RailStartX : 0.0;
-                            int s = routeData.Blocks[i].Form[k].SecondaryRail;
-                            double sx = routeData.Blocks[i].Rail[s].RailStartX;
+                            int p = routeData.Blocks[blockIdx].Form[k].PrimaryRail;
+                            double px = p > 0 ? routeData.Blocks[blockIdx].Rail[p].RailStartX : 0.0;
+                            int s = routeData.Blocks[blockIdx].Form[k].SecondaryRail;
+                            double sx = routeData.Blocks[blockIdx].Rail[s].RailStartX;
                             double d = px - sx;
                             if (d < 0.0)
                             {
-                                if (routeData.Blocks[i].Form[k].FormType >= routeData.Structure.FormL.Length || routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType] == null)
+                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormL.Length || routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
                                 {
                                     GD.Print("FormStructureIndex references a FormL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                 }
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
-                                if (routeData.Blocks[i].Form[k].RoofType > 0)
+                                if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
                                 {
-                                    if (routeData.Blocks[i].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType] == null)
+                                    if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
                                     {
                                         GD.Print("RoofStructureIndex references a RoofL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                     }
                                     else
                                     {
                                         //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                 }
                             }
                             else
                             {
-                                if (routeData.Blocks[i].Form[k].FormType >= routeData.Structure.FormR.Length || routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType] == null)
+                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormR.Length || routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
                                 {
                                     GD.Print("FormStructureIndex references a FormR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                 }
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
-                                if (routeData.Blocks[i].Form[k].RoofType > 0)
+                                if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
                                 {
-                                    if (routeData.Blocks[i].Form[k].RoofType >= routeData.Structure.RoofR.Length || routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType] == null)
+                                    if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofR.Length || routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
                                     {
                                         GD.Print("RoofStructureIndex references a RoofR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                     }
                                     else
                                     {
                                         //ObjectManager.CreateObject(routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                 }
@@ -6997,27 +6997,27 @@ public static class CsvRwRouteParser
                     }
 
                     // cracks
-                    for (int k = 0; k < routeData.Blocks[i].Crack.Length; k++)
+                    for (int k = 0; k < routeData.Blocks[blockIdx].Crack.Length; k++)
                     {
-                        if (routeData.Blocks[i].Crack[k].PrimaryRail == j)
+                        if (routeData.Blocks[blockIdx].Crack[k].PrimaryRail == railIdx)
                         {
-                            int p = routeData.Blocks[i].Crack[k].PrimaryRail;
-                            double px0 = p > 0 ? routeData.Blocks[i].Rail[p].RailStartX : 0.0;
-                            double px1 = p > 0 ? routeData.Blocks[i + 1].Rail[p].RailEndX : 0.0;
-                            int s = routeData.Blocks[i].Crack[k].SecondaryRail;
-                            if (s < 0 || s >= routeData.Blocks[i].Rail.Length || !routeData.Blocks[i].Rail[s].RailStart)
+                            int p = routeData.Blocks[blockIdx].Crack[k].PrimaryRail;
+                            double px0 = p > 0 ? routeData.Blocks[blockIdx].Rail[p].RailStartX : 0.0;
+                            double px1 = p > 0 ? routeData.Blocks[blockIdx + 1].Rail[p].RailEndX : 0.0;
+                            int s = routeData.Blocks[blockIdx].Crack[k].SecondaryRail;
+                            if (s < 0 || s >= routeData.Blocks[blockIdx].Rail.Length || !routeData.Blocks[blockIdx].Rail[s].RailStart)
                             {
                                 GD.Print("RailIndex2 is out of range in Track.Crack at track position " + startingDistance.ToString(Culture) + " in file " + fileName);
                             }
                             else
                             {
-                                double sx0 = routeData.Blocks[i].Rail[s].RailStartX;
-                                double sx1 = routeData.Blocks[i + 1].Rail[s].RailEndX;
+                                double sx0 = routeData.Blocks[blockIdx].Rail[s].RailStartX;
+                                double sx1 = routeData.Blocks[blockIdx + 1].Rail[s].RailEndX;
                                 double d0 = sx0 - px0;
                                 double d1 = sx1 - px1;
                                 if (d0 < 0.0)
                                 {
-                                    if (routeData.Blocks[i].Crack[k].Type >= routeData.Structure.CrackL.Length || routeData.Structure.CrackL[routeData.Blocks[i].Crack[k].Type] == null)
+                                    if (routeData.Blocks[blockIdx].Crack[k].Type >= routeData.Structure.CrackL.Length || routeData.Structure.CrackL[routeData.Blocks[blockIdx].Crack[k].Type] == null)
                                     {
                                         GD.Print("CrackStructureIndex references a CrackL not loaded in Track.Crack at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                     }
@@ -7029,7 +7029,7 @@ public static class CsvRwRouteParser
                                 }
                                 else if (d0 > 0.0)
                                 {
-                                    if (routeData.Blocks[i].Crack[k].Type >= routeData.Structure.CrackR.Length || routeData.Structure.CrackR[routeData.Blocks[i].Crack[k].Type] == null)
+                                    if (routeData.Blocks[blockIdx].Crack[k].Type >= routeData.Structure.CrackR.Length || routeData.Structure.CrackR[routeData.Blocks[blockIdx].Crack[k].Type] == null)
                                     {
                                         GD.Print("CrackStructureIndex references a CrackR not loaded in Track.Crack at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
                                     }
@@ -7044,26 +7044,26 @@ public static class CsvRwRouteParser
                     }
 
                     // free objects
-                    if (routeData.Blocks[i].RailFreeObj.Length > j && routeData.Blocks[i].RailFreeObj[j] != null)
+                    if (routeData.Blocks[blockIdx].RailFreeObj.Length > railIdx && routeData.Blocks[blockIdx].RailFreeObj[railIdx] != null)
                     {
-                        for (int k = 0; k < routeData.Blocks[i].RailFreeObj[j].Length; k++)
+                        for (int k = 0; k < routeData.Blocks[blockIdx].RailFreeObj[railIdx].Length; k++)
                         {
-                            int sttype = routeData.Blocks[i].RailFreeObj[j][k].Type;
-                            double dx = routeData.Blocks[i].RailFreeObj[j][k].X;
-                            double dy = routeData.Blocks[i].RailFreeObj[j][k].Y;
-                            double dz = routeData.Blocks[i].RailFreeObj[j][k].TrackPosition - startingDistance;
+                            int sttype = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Type;
+                            double dx = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].X;
+                            double dy = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Y;
+                            double dz = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].TrackPosition - startingDistance;
                             Vector3 wpos = pos;
                             wpos.x += (float)(dx * railTransformation.basis.x.x + dy * railTransformation.basis.y.x + dz * railTransformation.basis.z.x);
                             wpos.y += (float)(dx * railTransformation.basis.x.y + dy * railTransformation.basis.y.y + dz * railTransformation.basis.z.y);
                             wpos.z += (float)(dx * railTransformation.basis.x.z + dy * railTransformation.basis.y.z + dz * railTransformation.basis.z.z);
-                            double tpos = routeData.Blocks[i].RailFreeObj[j][k].TrackPosition;
+                            double tpos = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].TrackPosition;
                             //ObjectManager.CreateObject(Data.Structure.FreeObj[sttype], wpos, RailTransformation, new World.Transformation(Data.Blocks[i].RailFreeObj[j][k].Yaw, Data.Blocks[i].RailFreeObj[j][k].Pitch, Data.Blocks[i].RailFreeObj[j][k].Roll), -1, Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, tpos, 1.0, false);
                             
                             // new Transformation((float)routeData.Blocks[i].RailFreeObj[j][k].Yaw, (float)routeData.Blocks[i].RailFreeObj[j][k].Pitch, (float)routeData.Blocks[i].RailFreeObj[j][k].Roll)
                             Transform foTran = new Transform(Basis.Identity, new Vector3(0, 0, 0));
-                            foTran = foTran.Rotated(Vector3.Up, -(float)routeData.Blocks[i].RailFreeObj[j][k].Yaw);
-                            foTran = foTran.Rotated(Vector3.Right, (float)routeData.Blocks[i].RailFreeObj[j][k].Pitch);
-                            foTran = foTran.Rotated(Vector3.Forward, (float)routeData.Blocks[i].RailFreeObj[j][k].Roll);
+                            foTran = foTran.Rotated(Vector3.Up, -(float)routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Yaw);
+                            foTran = foTran.Rotated(Vector3.Right, (float)routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Pitch);
+                            foTran = foTran.Rotated(Vector3.Forward, (float)routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Roll);
 
                             ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FreeObj[sttype], wpos, railTransformation, foTran, false, 
                                                                         startingDistance, endingDistance, routeData.BlockInterval, tpos);

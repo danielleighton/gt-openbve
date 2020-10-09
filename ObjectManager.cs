@@ -64,10 +64,14 @@ internal class ObjectManager
   
         Transform finalTrans = baseTransformation * auxTransformation;
 
-        instantiatedObject.GlobalTransform = new Transform(finalTrans.basis, position);
-        //instantiatedObject.Transform = new Transform(finalTrans.basis, position);
+        instantiatedObject.GlobalTransform = new Transform(finalTrans.basis, Vector3.Zero);
+
+        
+        
         
         parent.AddChild(instantiatedObject);
+
+        instantiatedObject.GlobalTranslate( position );
         
         // GameObject instantiatedObject = (GameObject)GameObject.Instantiate(template.gameObject, position, Quaternion.identity);
         // instantiatedObject.SetActive(true);
