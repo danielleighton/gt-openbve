@@ -6369,8 +6369,8 @@ public static class CsvRwRouteParser
                 h = c * p;
             }
 
-            double trackYaw = Math.Atan2(playerRailDir.x, playerRailDir.y);
-            double trackPitch = Math.Atan(routeData.Blocks[blockIdx].Pitch);
+            float trackYaw = Mathf.Atan2(playerRailDir.x, playerRailDir.y);
+            float trackPitch = Mathf.Atan((float)routeData.Blocks[blockIdx].Pitch);
 
             Transform groundTransformation = new Transform(Basis.Identity,  Vector3.Zero);
             groundTransformation = groundTransformation.Rotated(Vector3.Up, -(float)trackYaw);
@@ -6454,7 +6454,7 @@ public static class CsvRwRouteParser
                         // Rails 1-infinity (auxiliary rails)
                         double x = routeData.Blocks[blockIdx].Rail[railIdx].RailStartX;
                         double y = routeData.Blocks[blockIdx].Rail[railIdx].RailStartY;
-                        Vector3 offset = new Vector3((float)(playerRailDir.y * x), (float)y, -(float)(playerRailDir.x * x));
+                        Vector3 offset = new Vector3((float)(playerRailDir.y * x), (float)y, (float)(playerRailDir.x * x));
                         auxRailPos = playerRailPos + offset;
                         double dh;
                         if (blockIdx < routeData.Blocks.Length - 1 && routeData.Blocks[blockIdx + 1].Rail.Length > railIdx)
