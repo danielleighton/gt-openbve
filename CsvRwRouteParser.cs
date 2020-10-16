@@ -5987,8 +5987,8 @@ public static class CsvRwRouteParser
      
 
         // create objects and track
-        Vector3 position = new Vector3(0.0f, 0.0f, 0.0f);
-        Vector2 direction = new Vector2(0.0f, 1.0f);
+        Vector3 playerRailPos = new Vector3(0.0f, 0.0f, 0.0f);
+        Vector2 playerRailDir = new Vector2(0.0f, 1.0f);
         TrackManager.CurrentTrack = new TrackManager.Track();
         TrackManager.CurrentTrack.Elements = new TrackManager.TrackElement[] { };
         double currentSpeedLimit = double.PositiveInfinity;
@@ -6009,7 +6009,7 @@ public static class CsvRwRouteParser
             double startingDistance = (double)blockIdx * routeData.BlockInterval;
             double endingDistance = startingDistance + routeData.BlockInterval;
             
-            direction = direction.Normalized();
+            playerRailDir = playerRailDir.Normalized();
 
             // track
             if (!previewOnly)
@@ -6036,9 +6036,9 @@ public static class CsvRwRouteParser
 
             currentTrackLength++;
             TrackManager.CurrentTrack.Elements[n] = worldTrackElement;
-            TrackManager.CurrentTrack.Elements[n].WorldPosition = position;
-            TrackManager.CurrentTrack.Elements[n].WorldDirection = Calc.GetNormalizedVector3(direction, routeData.Blocks[blockIdx].Pitch);
-            TrackManager.CurrentTrack.Elements[n].WorldSide = new Vector3(direction.y, 0.0f, -direction.x);
+            TrackManager.CurrentTrack.Elements[n].WorldPosition = playerRailPos;
+            TrackManager.CurrentTrack.Elements[n].WorldDirection = Calc.GetNormalizedVector3(playerRailDir, routeData.Blocks[blockIdx].Pitch);
+            TrackManager.CurrentTrack.Elements[n].WorldSide = new Vector3(playerRailDir.y, 0.0f, -playerRailDir.x);
             // World.Cross(TrackManager.CurrentTrack.Elements[n].WorldDirection.X, 
             //             TrackManager.CurrentTrack.Elements[n].WorldDirection.Y, 
             //             TrackManager.CurrentTrack.Elements[n].WorldDirection.Z, 
@@ -6316,7 +6316,7 @@ public static class CsvRwRouteParser
             if (routeData.Blocks[blockIdx].Turn != 0.0)
             {
                 double ag = -Math.Atan(routeData.Blocks[blockIdx].Turn);
-                direction = direction.Rotated((float)ag);
+                playerRailDir = playerRailDir.Rotated((float)ag);
 
                 // World.RotatePlane(ref TrackManager.CurrentTrack.Elements[n].WorldDirection, cosag, sinag);
 				// World.RotatePlane(ref TrackManager.CurrentTrack.Elements[n].WorldSide, cosag, sinag);
@@ -6350,7 +6350,7 @@ public static class CsvRwRouteParser
                 double b = s / Math.Abs(r);
                 c = Math.Sqrt(2.0 * r * r * (1.0 - Math.Cos(b)));
                 a = 0.5 * (double)Math.Sign(r) * b;
-                direction = direction.Rotated((float)-a);
+                playerRailDir = playerRailDir.Rotated((float)-a);
             }
             else if (worldTrackElement.CurveRadius != 0.0)
             {
@@ -6359,7 +6359,7 @@ public static class CsvRwRouteParser
                 double b = d / Math.Abs(r);
                 c = Math.Sqrt(2.0 * r * r * (1.0 - Math.Cos(b)));
                 a = 0.5 * (double)Math.Sign(r) * b;
-                direction = direction.Rotated((float)-a);
+                playerRailDir = playerRailDir.Rotated((float)-a);
             }
             else if (routeData.Blocks[blockIdx].Pitch != 0.0)
             {
@@ -6369,7 +6369,7 @@ public static class CsvRwRouteParser
                 h = c * p;
             }
 
-            double trackYaw = Math.Atan2(direction.x, direction.y);
+            double trackYaw = Math.Atan2(playerRailDir.x, playerRailDir.y);
             double trackPitch = Math.Atan(routeData.Blocks[blockIdx].Pitch);
 
             Transform groundTransformation = new Transform(Basis.Identity,  Vector3.Zero);
@@ -6393,7 +6393,7 @@ public static class CsvRwRouteParser
                     {
                         //ObjectManager.CreateObject(Data.Structure.Ground[Data.Blocks[i].Cycle[ci]], Position + new Vector3D(0.0, -Data.Blocks[i].Height, 0.0), GroundTransformation, NullTransformation, Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, StartingDistance);
                         ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Ground[routeData.Blocks[blockIdx].Cycle[ci]],
-                                                                    position + new Vector3(0.0f, (float)-routeData.Blocks[blockIdx].Height, 0.0f), 
+                                                                    playerRailPos + new Vector3(0.0f, (float)-routeData.Blocks[blockIdx].Height, 0.0f), 
                                                                     groundTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, 
                                                                     routeData.BlockInterval, startingDistance);
                     }
@@ -6411,9 +6411,9 @@ public static class CsvRwRouteParser
                     double dx = routeData.Blocks[blockIdx].GroundFreeObj[j].X;
                     double dy = routeData.Blocks[blockIdx].GroundFreeObj[j].Y;
                     
-                    Vector3 wpos = position + new Vector3(  (float)(direction.x * d + direction.y * dx), 
-                                                            (float)(dy - routeData.Blocks[blockIdx].Height), 
-                                                            (float)(direction.y * d - direction.x * dx));
+                    Vector3 wpos = playerRailPos + new Vector3( (float)(playerRailDir.x * d + playerRailDir.y * dx), 
+                                                                (float)(dy - routeData.Blocks[blockIdx].Height), 
+                                                                (float)(playerRailDir.y * d - playerRailDir.x * dx));
                     double tpos = routeData.Blocks[blockIdx].GroundFreeObj[j].TrackPosition;
 
                     Transform gafTran = new Transform(Basis.Identity, Vector3.Zero);
@@ -6434,35 +6434,37 @@ public static class CsvRwRouteParser
                     if (railIdx > 0 && !routeData.Blocks[blockIdx].Rail[railIdx].RailStart) continue;
 
                     // Rail
-                    Vector3 pos;
+                    // RailIdx = 0 - player rail
+                    // RailIdx > 0 - auxiliary rails
+                    Vector3 auxRailPos;
                     Transform railTransformation = new Transform(Basis.Identity, Vector3.Zero);
                     double planar, updown;
                     if (railIdx == 0)
                     {
-                        // rail 0
+                        // Rail 0 (player rail)
                         planar = 0.0;
                         updown = 0.0;
                         railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);
                         railTransformation = railTransformation.Rotated(Vector3.Up, -(float)planar);
                         railTransformation = railTransformation.Rotated(Vector3.Right, (float)updown);
-                        pos = position;
+                        auxRailPos = playerRailPos;
                     }
                     else
                     {
-                        // rails 1-infinity
+                        // Rails 1-infinity (auxiliary rails)
                         double x = routeData.Blocks[blockIdx].Rail[railIdx].RailStartX;
                         double y = routeData.Blocks[blockIdx].Rail[railIdx].RailStartY;
-                        Vector3 offset = new Vector3((float)(direction.y * x), (float)y, -(float)(direction.x * x));
-                        pos = position + offset;
+                        Vector3 offset = new Vector3((float)(playerRailDir.y * x), (float)y, -(float)(playerRailDir.x * x));
+                        auxRailPos = playerRailPos + offset;
                         double dh;
                         if (blockIdx < routeData.Blocks.Length - 1 && routeData.Blocks[blockIdx + 1].Rail.Length > railIdx)
                         {
                             // take orientation of upcoming block into account
-                            Vector2 direction2 = direction;
-                            Vector3 position2 = position;
-                            position2.x += (float)(direction.x * c);
+                            Vector2 direction2 = playerRailDir;
+                            Vector3 position2 = playerRailPos;
+                            position2.x += playerRailDir.x * (float)c;
                             position2.y += (float)h;
-                            position2.z += (float)(direction.y * c);
+                            position2.z += playerRailDir.y * (float)c;
                             if (a != 0.0)
                             {
                                 direction2 = direction2.Rotated(-(float)a);
@@ -6530,8 +6532,8 @@ public static class CsvRwRouteParser
                             //railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);
                             double dx = routeData.Blocks[blockIdx + 1].Rail[railIdx].RailEndX - routeData.Blocks[blockIdx].Rail[railIdx].RailStartX;
                             double dy = routeData.Blocks[blockIdx + 1].Rail[railIdx].RailEndY - routeData.Blocks[blockIdx].Rail[railIdx].RailStartY;
-                            planar = Math.Atan(dx / c);
                             
+                            planar = Math.Atan(dx / c);
                             dh = dy / c;
                             updown = Math.Atan(dh);
 
@@ -6552,7 +6554,7 @@ public static class CsvRwRouteParser
                         if (routeData.Structure.Rail[routeData.Blocks[blockIdx].RailType[railIdx]] != null)
                         {
                             // ObjectManager.CreateObject(routeData.Structure.Rail[routeData.Blocks[i].RailType[j]], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Rail[routeData.Blocks[blockIdx].RailType[railIdx]], pos, railTransformation, nullTransformation, 
+                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Rail[routeData.Blocks[blockIdx].RailType[railIdx]], auxRailPos, railTransformation, nullTransformation, 
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                     }
@@ -6601,7 +6603,7 @@ public static class CsvRwRouteParser
                                 if (routeData.Blocks[blockIdx].RailPole[railIdx].Location <= 0.0)
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.Poles[0][routeData.Blocks[i].RailPole[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[0][routeData.Blocks[blockIdx].RailPole[railIdx].Type], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[0][routeData.Blocks[blockIdx].RailPole[railIdx].Type], auxRailPos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                                 else
@@ -6609,7 +6611,7 @@ public static class CsvRwRouteParser
                                     //TODO mirrored object
                                     //ObjectManager.UnifiedObject Pole = GetMirroredObject(routeData.Structure.Poles[0][Data.Blocks[i].RailPole[j].Type]);
                                     //ObjectManager.CreateObject(Pole, pos, RailTransformation, NullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[0][routeData.Blocks[blockIdx].RailPole[railIdx].Type], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[0][routeData.Blocks[blockIdx].RailPole[railIdx].Type], auxRailPos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                             }
@@ -6617,18 +6619,18 @@ public static class CsvRwRouteParser
                             {
                                 int m = routeData.Blocks[blockIdx].RailPole[railIdx].Mode;
                                 double dx = -routeData.Blocks[blockIdx].RailPole[railIdx].Location * 3.8;
-                                double wa = Math.Atan2(direction.y, direction.x) - planar;
+                                double wa = Math.Atan2(playerRailDir.y, playerRailDir.x) - planar;
                                 double wx = Math.Cos(wa);
                                 double wy = Math.Tan(updown);
                                 double wz = Math.Sin(wa);
                                 Calc.Normalize(ref wx, ref wy, ref wz);
-                                double sx = direction.y;
+                                double sx = playerRailDir.y;
                                 double sy = 0.0;
-                                double sz = -direction.x;
-                                Vector3 wpos = pos + new Vector3((float)(sx * dx + wx * dz), (float)(sy * dx + wy * dz), (float)(sz * dx + wz * dz));
+                                double sz = -playerRailDir.x;
+                                Vector3 wpos = auxRailPos + new Vector3((float)(sx * dx + wx * dz), (float)(sy * dx + wy * dz), (float)(sz * dx + wz * dz));
                                 int type = routeData.Blocks[blockIdx].RailPole[railIdx].Type;
                                 //ObjectManager.CreateObject(routeData.Structure.Poles[m][type], wpos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[m][type], pos, railTransformation, nullTransformation, 
+                                ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[m][type], auxRailPos, railTransformation, nullTransformation, 
                                                                             routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                             }
                         }
@@ -6640,13 +6642,13 @@ public static class CsvRwRouteParser
                         if (routeData.Blocks[blockIdx].RailWall[railIdx].Direction <= 0)
                         {                
                             //ObjectManager.CreateObject(routeData.Structure.WallL[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.WallL[routeData.Blocks[blockIdx].RailWall[railIdx].Type], pos, railTransformation, nullTransformation, 
+                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.WallL[routeData.Blocks[blockIdx].RailWall[railIdx].Type], auxRailPos, railTransformation, nullTransformation, 
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                         if (routeData.Blocks[blockIdx].RailWall[railIdx].Direction >= 0)
                         {                            
                             //ObjectManager.CreateObject(routeData.Structure.WallR[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.WallR[routeData.Blocks[blockIdx].RailWall[railIdx].Type], pos, railTransformation, nullTransformation, 
+                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.WallR[routeData.Blocks[blockIdx].RailWall[railIdx].Type], auxRailPos, railTransformation, nullTransformation, 
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                     }
@@ -6657,13 +6659,13 @@ public static class CsvRwRouteParser
                         if (routeData.Blocks[blockIdx].RailDike[railIdx].Direction <= 0)
                         {
                             //ObjectManager.CreateObject(routeData.Structure.DikeL[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.blockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.DikeL[routeData.Blocks[blockIdx].RailDike[railIdx].Type], pos, railTransformation, nullTransformation,
+                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.DikeL[routeData.Blocks[blockIdx].RailDike[railIdx].Type], auxRailPos, railTransformation, nullTransformation,
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                         if (routeData.Blocks[blockIdx].RailDike[railIdx].Direction >= 0)
                         {
                             //ObjectManager.CreateObject(routeData.Structure.DikeR[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.blockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.DikeR[routeData.Blocks[blockIdx].RailDike[railIdx].Type], pos, railTransformation, nullTransformation,
+                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.DikeR[routeData.Blocks[blockIdx].RailDike[railIdx].Type], auxRailPos, railTransformation, nullTransformation,
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                     }
@@ -6712,7 +6714,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
+                                    ObjectManager.Instance.InstantiateObject(rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], auxRailPos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
                                     {
                                         if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
@@ -6722,7 +6724,7 @@ public static class CsvRwRouteParser
                                         else
                                         {
                                             //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], auxRailPos, railTransformation, nullTransformation, 
                                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                         }
                                     }
@@ -6737,7 +6739,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], auxRailPos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                                 if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCL.Length || routeData.Structure.FormCL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
@@ -6747,7 +6749,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateStaticObject(routeData.Structure.FormCL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormCL[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormCL[routeData.Blocks[blockIdx].Form[k].FormType], auxRailPos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
 
@@ -6760,7 +6762,7 @@ public static class CsvRwRouteParser
                                     else
                                     {
                                         //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], auxRailPos, railTransformation, nullTransformation, 
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                     if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCL.Length || routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
@@ -6770,7 +6772,7 @@ public static class CsvRwRouteParser
                                     else
                                     {
                                         //ObjectManager.CreateStaticObject(routeData.Structure.RoofCL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType], auxRailPos, railTransformation, nullTransformation, 
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                 }
@@ -6784,7 +6786,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], auxRailPos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                                 if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCR.Length || routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
@@ -6794,7 +6796,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateStaticObject(routeData.Structure.FormCR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType], auxRailPos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                                 if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
@@ -6806,7 +6808,7 @@ public static class CsvRwRouteParser
                                     else
                                     {
                                         //ObjectManager.CreateObject(routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], auxRailPos, railTransformation, nullTransformation, 
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                     if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCR.Length || routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
@@ -6816,7 +6818,7 @@ public static class CsvRwRouteParser
                                     else
                                     {
                                         //ObjectManager.CreateStaticObject(routeData.Structure.RoofCR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType], auxRailPos, railTransformation, nullTransformation, 
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                 }
@@ -6846,7 +6848,7 @@ public static class CsvRwRouteParser
                                         else
                                         {
                                             //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation,
+                                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], auxRailPos, railTransformation, nullTransformation,
                                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                         }
 
@@ -6869,7 +6871,7 @@ public static class CsvRwRouteParser
                                             else
                                             {
                                                 //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                                ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                                ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], auxRailPos, railTransformation, nullTransformation, 
                                                                                             routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                             }
                                             if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCL.Length || routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
@@ -6893,7 +6895,7 @@ public static class CsvRwRouteParser
                                         else
                                         {
                                             //ObjectManager.CreateObject(routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                            ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], auxRailPos, railTransformation, nullTransformation, 
                                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                         }
                                         if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCR.Length || routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
@@ -6915,7 +6917,7 @@ public static class CsvRwRouteParser
                                             else
                                             {
                                                 //ObjectManager.CreateObject(routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                                ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                                ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], auxRailPos, railTransformation, nullTransformation, 
                                                                                             routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                             }
                                             if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCR.Length || routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
@@ -6950,7 +6952,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], auxRailPos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                                 if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
@@ -6962,7 +6964,7 @@ public static class CsvRwRouteParser
                                     else
                                     {
                                         //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], auxRailPos, railTransformation, nullTransformation, 
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                 }
@@ -6976,7 +6978,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], pos, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], auxRailPos, railTransformation, nullTransformation, 
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                                 if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
@@ -6988,7 +6990,7 @@ public static class CsvRwRouteParser
                                     else
                                     {
                                         //ObjectManager.CreateObject(routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], pos, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], auxRailPos, railTransformation, nullTransformation, 
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                 }
@@ -7052,7 +7054,7 @@ public static class CsvRwRouteParser
                             double dx = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].X;
                             double dy = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Y;
                             double dz = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].TrackPosition - startingDistance;
-                            Vector3 wpos = pos;
+                            Vector3 wpos = auxRailPos;
                             wpos.x += (float)(dx * railTransformation.basis.x.x + dy * railTransformation.basis.y.x + dz * railTransformation.basis.z.x);
                             wpos.y += (float)(dx * railTransformation.basis.x.y + dy * railTransformation.basis.y.y + dz * railTransformation.basis.z.y);
                             wpos.z += (float)(dx * railTransformation.basis.x.z + dy * railTransformation.basis.y.z + dz * railTransformation.basis.z.z);
@@ -7438,13 +7440,13 @@ public static class CsvRwRouteParser
             }
 
             // finalize block
-            position.x += (float)(direction.x * c);
-            position.y += (float)h;
-            position.z -= (float)(direction.y * c);
+            playerRailPos.x += (float)(playerRailDir.x * c);
+            playerRailPos.y += (float)h;
+            playerRailPos.z -= (float)(playerRailDir.y * c);
             if (a != 0.0)
             {
                 // Calc.Rotate(ref direction, Math.Cos(-a), Math.Sin(-a));
-                direction = direction.Rotated(-(float)a);
+                playerRailDir = playerRailDir.Rotated(-(float)a);
             }
         }
 
