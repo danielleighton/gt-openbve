@@ -6315,14 +6315,14 @@ public static class CsvRwRouteParser
             // Turn
             if (routeData.Blocks[blockIdx].Turn != 0.0)
             {
-                double ag = -Math.Atan(routeData.Blocks[blockIdx].Turn);
-                playerRailDir = playerRailDir.Rotated((float)ag);
+                float ag = (float)Math.Atan(routeData.Blocks[blockIdx].Turn);
+                playerRailDir = playerRailDir.Rotated(-ag);
 
                 // World.RotatePlane(ref TrackManager.CurrentTrack.Elements[n].WorldDirection, cosag, sinag);
 				// World.RotatePlane(ref TrackManager.CurrentTrack.Elements[n].WorldSide, cosag, sinag);
 				// World.Cross(TrackManager.CurrentTrack.Elements[n].WorldDirection.X, TrackManager.CurrentTrack.Elements[n].WorldDirection.Y, TrackManager.CurrentTrack.Elements[n].WorldDirection.Z, TrackManager.CurrentTrack.Elements[n].WorldSide.X, TrackManager.CurrentTrack.Elements[n].WorldSide.Y, TrackManager.CurrentTrack.Elements[n].WorldSide.Z, out TrackManager.CurrentTrack.Elements[n].WorldUp.X, out TrackManager.CurrentTrack.Elements[n].WorldUp.Y, out TrackManager.CurrentTrack.Elements[n].WorldUp.Z);
-                TrackManager.CurrentTrack.Elements[n].WorldDirection = TrackManager.CurrentTrack.Elements[n].WorldDirection.Rotated(Vector3.Left,(float)ag);
-                TrackManager.CurrentTrack.Elements[n].WorldSide = TrackManager.CurrentTrack.Elements[n].WorldSide.Rotated(Vector3.Left,(float)ag);
+                TrackManager.CurrentTrack.Elements[n].WorldDirection = TrackManager.CurrentTrack.Elements[n].WorldDirection.Rotated(Vector3.Left,-ag);
+                TrackManager.CurrentTrack.Elements[n].WorldSide = TrackManager.CurrentTrack.Elements[n].WorldSide.Rotated(Vector3.Left,-ag);
                 TrackManager.CurrentTrack.Elements[n].WorldUp = TrackManager.CurrentTrack.Elements[n].WorldDirection.Cross(TrackManager.CurrentTrack.Elements[n].WorldSide);
             }
 
@@ -6369,8 +6369,8 @@ public static class CsvRwRouteParser
                 h = c * p;
             }
 
-            float trackYaw = Mathf.Atan2(playerRailDir.x, playerRailDir.y);
-            float trackPitch = Mathf.Atan((float)routeData.Blocks[blockIdx].Pitch);
+            float trackYaw = (float)Math.Atan2(playerRailDir.x, playerRailDir.y);
+            float trackPitch = (float)Math.Atan(routeData.Blocks[blockIdx].Pitch);
 
             Transform groundTransformation = new Transform(Basis.Identity,  Vector3.Zero);
             groundTransformation = groundTransformation.Rotated(Vector3.Up, -(float)trackYaw);
@@ -6379,7 +6379,7 @@ public static class CsvRwRouteParser
             trackTransformation = trackTransformation.Rotated(Vector3.Up, -(float)trackYaw);
             trackTransformation = trackTransformation.Rotated(Vector3.Right, (float)trackPitch);
 
-            Transform nullTransformation = new Transform(Basis.Identity,  Vector3.Zero);
+            Transform nullTransformation = new Transform(Basis.Identity, Vector3.Zero);
 
             // Ground
             if (!previewOnly)
@@ -6437,7 +6437,7 @@ public static class CsvRwRouteParser
                     // RailIdx = 0 - player rail
                     // RailIdx > 0 - auxiliary rails
                     Vector3 auxRailPos;
-                    Transform railTransformation = new Transform(Basis.Identity, Vector3.Zero);
+                    Transform railTransformation;// = new Transform(Basis.Identity, Vector3.Zero);
                     double planar, updown;
                     if (railIdx == 0)
                     {
@@ -6446,7 +6446,7 @@ public static class CsvRwRouteParser
                         updown = 0.0;
                         railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);
                         railTransformation = railTransformation.Rotated(Vector3.Up, -(float)planar);
-                        railTransformation = railTransformation.Rotated(Vector3.Right, (float)updown);
+                        railTransformation = railTransformation.Rotated(Vector3.Right, -(float)updown);
                         auxRailPos = playerRailPos;
                     }
                     else
@@ -6464,7 +6464,7 @@ public static class CsvRwRouteParser
                             Vector3 position2 = playerRailPos;
                             position2.x += playerRailDir.x * (float)c;
                             position2.y += (float)h;
-                            position2.z += playerRailDir.y * (float)c;
+                            position2.z -= playerRailDir.y * (float)c;
                             if (a != 0.0)
                             {
                                 direction2 = direction2.Rotated(-(float)a);
@@ -7666,18 +7666,52 @@ public static class CsvRwRouteParser
         //}
 
         // cant
-        // if (!previewOnly)
-        // {
-        // //    ComputeCantTangents();
-        //    int subdivisions = (int)Math.Floor(routeData.BlockInterval / 5.0);
-        //    if (subdivisions >= 2)
-        //    {
-        //        SmoothenOutTurns(subdivisions);
-        //     //    ComputeCantTangents();
-        //    }
-        // }
+        if (!previewOnly)
+        {
+           ComputeCantTangents();
+           int subdivisions = (int)Math.Floor(routeData.BlockInterval / 5.0);
+           if (subdivisions >= 2)
+           {
+               SmoothenOutTurns(subdivisions);
+               ComputeCantTangents();
+           }
+        }
     }
 
+
+		private static void ComputeCantTangents() {
+			if (TrackManager.CurrentTrack.Elements.Length == 1) {
+				TrackManager.CurrentTrack.Elements[0].CurveCantTangent = 0.0;
+			} else if (TrackManager.CurrentTrack.Elements.Length != 0) {
+				double[] deltas = new double[TrackManager.CurrentTrack.Elements.Length - 1];
+				for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length - 1; i++) {
+					deltas[i] = TrackManager.CurrentTrack.Elements[i + 1].CurveCant - TrackManager.CurrentTrack.Elements[i].CurveCant;
+				}
+				double[] tangents = new double[TrackManager.CurrentTrack.Elements.Length];
+				tangents[0] = deltas[0];
+				tangents[TrackManager.CurrentTrack.Elements.Length - 1] = deltas[TrackManager.CurrentTrack.Elements.Length - 2];
+				for (int i = 1; i < TrackManager.CurrentTrack.Elements.Length - 1; i++) {
+					tangents[i] = 0.5 * (deltas[i - 1] + deltas[i]);
+				}
+				for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length - 1; i++) {
+					if (deltas[i] == 0.0) {
+						tangents[i] = 0.0;
+						tangents[i + 1] = 0.0;
+					} else {
+						double a = tangents[i] / deltas[i];
+						double b = tangents[i + 1] / deltas[i];
+						if (a * a + b * b > 9.0) {
+							double t = 3.0 / Math.Sqrt(a * a + b * b);
+							tangents[i] = t * a * deltas[i];
+							tangents[i + 1] = t * b * deltas[i];
+						}
+					}
+				}
+				for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length; i++) {
+					TrackManager.CurrentTrack.Elements[i].CurveCantTangent = tangents[i];
+				}
+			}
+		}
 
 
     private static void SmoothenOutTurns(int subdivisions)
