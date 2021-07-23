@@ -23,7 +23,7 @@ public class Camera : Godot.Camera
     float _vel_multiplier = 4;
 
 
-// # Mouse state
+    // # Mouse state
     Vector2 _mouse_position = new Vector2(0.0f, 0.0f);
     float _total_pitch = 0.0f;
 
@@ -58,9 +58,7 @@ public class Camera : Godot.Camera
                     break;
                 default:
                     break;
-
             }
-
         }
 
         if (e.GetType() == typeof(InputEventKey))
@@ -90,8 +88,6 @@ public class Camera : Godot.Camera
             RotateY(Mathf.Deg2Rad(-yaw));
             RotateObjectLocal(new Vector3(1,0,0), Mathf.Deg2Rad(-pitch));
         }
-
-      
     }
 
     // Called every frame. 'delta' is the elapsed time since the previous frame.

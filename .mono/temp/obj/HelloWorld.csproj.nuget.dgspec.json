@@ -1,32 +1,32 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\danie\\source\\repos\\HelloWorldGodot\\HelloWorld.csproj": {}
+    "D:\\Development\\Repos\\gt-openbve\\HelloWorld.csproj": {}
   },
   "projects": {
-    "C:\\Users\\danie\\source\\repos\\HelloWorldGodot\\HelloWorld.csproj": {
+    "D:\\Development\\Repos\\gt-openbve\\HelloWorld.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\danie\\source\\repos\\HelloWorldGodot\\HelloWorld.csproj",
+        "projectUniqueName": "D:\\Development\\Repos\\gt-openbve\\HelloWorld.csproj",
         "projectName": "HelloWorld",
-        "projectPath": "C:\\Users\\danie\\source\\repos\\HelloWorldGodot\\HelloWorld.csproj",
+        "projectPath": "D:\\Development\\Repos\\gt-openbve\\HelloWorld.csproj",
         "packagesPath": "C:\\Users\\danie\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\danie\\source\\repos\\HelloWorldGodot\\.mono\\temp\\obj\\",
+        "outputPath": "D:\\Development\\Repos\\gt-openbve\\.mono\\temp\\obj\\",
         "projectStyle": "PackageReference",
-        "fallbackFolders": [
-          "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"
-        ],
         "configFilePaths": [
-          "C:\\Users\\danie\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\danie\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net472"
         ],
         "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
           "net472": {
+            "targetAlias": "net472",
             "projectReferences": {}
           }
         },
@@ -38,14 +38,8 @@
       },
       "frameworks": {
         "net472": {
-          "dependencies": {
-            "Microsoft.NETFramework.ReferenceAssemblies": {
-              "target": "Package",
-              "version": "[1.0.0, )",
-              "autoReferenced": true
-            }
-          },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\3.1.401\\RuntimeIdentifierGraph.json"
+          "targetAlias": "net472",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\5.0.302\\RuntimeIdentifierGraph.json"
         }
       }
     }

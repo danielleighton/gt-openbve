@@ -3,7 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-public class repo : MeshInstance
+public class TestGodotObject : MeshInstance
 {
     // Declare member variables here. Examples:
     // private int a = 2;

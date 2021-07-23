@@ -2,22 +2,23 @@
 
 [ext_resource path="res://Camera.cs" type="Script" id=1]
 [ext_resource path="res://SceneLoader.cs" type="Script" id=2]
-[ext_resource path="res://Label.gd" type="Script" id=3]
+[ext_resource path="res://lblInformation.cs" type="Script" id=4]
 
 [node name="Scene1" type="Spatial"]
 transform = Transform( 0.997672, 0.0376771, -0.0568468, -0.0438844, 0.992713, -0.112226, 0.0522042, 0.114459, 0.992055, -0.106289, -0.032312, 0.0369281 )
 script = ExtResource( 2 )
 
 [node name="Camera" type="Camera" parent="."]
-transform = Transform( 0.999998, -0.00147536, -0.00100566, 0.00150111, 0.999658, 0.0261157, 0.000966843, -0.0261168, 0.999659, 0.217219, 0.190275, 1.59817 )
 far = 1047.3
 script = ExtResource( 1 )
 
-[node name="Label" type="Label" parent="."]
-margin_right = 40.0
-margin_bottom = 14.0
-text = "hello!!!"
-script = ExtResource( 3 )
+[node name="lblInformation" type="Label" parent="."]
+margin_left = 3.0
+margin_top = 3.0
+margin_right = 78.0
+margin_bottom = 17.0
+text = "Information"
+script = ExtResource( 4 )
 __meta__ = {
 "_edit_use_anchors_": false
 }

@@ -16,7 +16,7 @@ public static class CsvRwRouteParser
         internal double trackPositionOffset;
     }
 
-    #region OpenBVE route structs 
+    #region OpenBVE CsvRwRouteParser.RouteData.cs (class) 
 
     private struct RouteData
     {
@@ -37,6 +37,10 @@ public static class CsvRwRouteParser
         internal Marker[] Markers;
         internal int FirstUsedBlock;
     }
+
+    #endregion
+
+    #region OpenBVE - other route structs 
 
     private struct Rail
     {
@@ -125,6 +129,7 @@ public static class CsvRwRouteParser
         internal int Direction;
         internal int Cource;
     }
+
     private struct Stop
     {
         internal double TrackPosition;
@@ -134,6 +139,7 @@ public static class CsvRwRouteParser
         internal double BackwardTolerance;
         internal int Cars;
     }
+
     private struct Brightness
     {
         internal double TrackPosition;
@@ -146,6 +152,7 @@ public static class CsvRwRouteParser
         internal double EndingPosition;
         //internal Textures.Texture Texture;
     }
+
     private enum SoundType { World, TrainStatic, TrainDynamic }
 
     private struct Sound
@@ -246,6 +253,7 @@ public static class CsvRwRouteParser
         internal int[] Run;
         internal int[] Flange;
     }
+
     private abstract class SignalData { }
 
     private class Bve4SignalData : SignalData
@@ -272,6 +280,19 @@ public static class CsvRwRouteParser
 
     #endregion
 
+
+    #region Preprocessing (CsvRwRouteParser.Preprocess.cs)
+
+    /// <summary>
+    ///
+    /// </summary>
+    /// <param name="fileName"></param>
+    /// <param name="fileEncoding"></param>
+    /// <param name="isRW"></param>
+    /// <param name="lines"></param>
+    /// <param name="allowRwRouteDescription"></param>
+    /// <param name="trackPositionOffset"></param>
+    /// <returns></returns>
     private static List<Expression> PreprocessSplitIntoExpressions(string fileName, Encoding fileEncoding, bool isRW, string[] lines, bool allowRwRouteDescription, double trackPositionOffset)
     {
         List<Expression> expressionList = new List<Expression>();
@@ -1169,7 +1190,10 @@ public static class CsvRwRouteParser
         }
     }
 
-    // parse route
+    #endregion
+
+    #region Parsing (CsvRwRouteParser.cs)
+
     internal static void ParseRoute(Node root, string fileName, Encoding fileEncoding, bool isRW, string trainPath, string objectPath, string soundPath, bool previewOnly)
     {
         // initialize data
@@ -1261,7 +1285,7 @@ public static class CsvRwRouteParser
             signalParent.Name = "Signals";
 
             // signals
-            string signalFolder = System.IO.Path.Combine(compatibilityFolder, "Signals");
+            string signalFolder = System.IO.Path.Combine(compatibilityFolder, @"Signals\Japanese"); //TODO path
             routeData.SignalData = new SignalData[7];
             routeData.SignalData[3] = new CompatibilitySignalData(new int[] { 0, 2, 4 }, new UnifiedObject[] {
                                                                      ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_3_0.csv"), fileEncoding, false, false, false),
@@ -1354,7 +1378,6 @@ public static class CsvRwRouteParser
             routeData.SignalSpeeds = new double[] { 0.0, 6.94444444444444, 15.2777777777778, 20.8333333333333, double.PositiveInfinity, double.PositiveInfinity };
         }
 
-        // >> Start OpenBVE ParseRoute
         // >> Start OpenBVE ParseRouteForData()
         string[] lines = System.IO.File.ReadAllLines(fileName, fileEncoding);
         List<Expression> expressions = PreprocessSplitIntoExpressions(fileName, fileEncoding, isRW, lines, true, 0.0);
@@ -1364,6 +1387,7 @@ public static class CsvRwRouteParser
         double[] unitOfLength = new double[] { 1.0 };
         routeData.UnitOfSpeed = 0.277777777777778;
 
+        /// CswRwRouterParser.Preprocess.cs 
         //PreprocessOptions(fileName, isRW, Encoding, expressions, ref Data, ref UnitOfLength);
         //PreprocessSortByTrackPosition(fileName, isRW, UnitOfLength, ref expressions);
         ParseRouteDetails(fileName, fileEncoding, isRW, expressionArray, trainPath, objectPath, soundPath, unitOfLength, ref routeData, previewOnly);
@@ -1375,8 +1399,7 @@ public static class CsvRwRouteParser
 
 
     }
-
-    // parse route for data
+        
     private static void ParseRouteDetails(string fileName, Encoding fileEncoding, bool isRW, Expression[] expressions, string trainPath, string objectPath, string soundPath, double[] unitOfLength, ref RouteData routeData, bool previewOnly)
     {
         System.Globalization.CultureInfo culture = System.Globalization.CultureInfo.InvariantCulture;
@@ -5878,6 +5901,9 @@ public static class CsvRwRouteParser
         }
     }
 
+    #endregion
+
+    #region Apply Route Data (CsvRwRouteParser.RouteData.cs)
 
     private static void ApplyRouteData(Node rootForRouteObjects, string fileName, string compatibilityFolder, Encoding fileEncoding, ref RouteData routeData, bool previewOnly)
     {
@@ -5892,7 +5918,7 @@ public static class CsvRwRouteParser
             Node rootForCompatObjects = new Node();//("Compatibility");
             rootForCompatObjects.Name = "Compatibility";
 
-            signalPath = System.IO.Path.Combine(compatibilityFolder, "Signals");
+            signalPath = System.IO.Path.Combine(compatibilityFolder, @"Signals\Japanese");
             signalPost = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(signalPath, "signal_post.csv"), fileEncoding, false, false, false);
             limitPath = System.IO.Path.Combine(compatibilityFolder, "Limits");
             limitGraphicsPath = System.IO.Path.Combine(limitPath, "Graphics");
@@ -7680,8 +7706,9 @@ public static class CsvRwRouteParser
         }
     }
 
+    #endregion
 
-		private static void ComputeCantTangents() {
+    private static void ComputeCantTangents() {
 			if (TrackManager.CurrentTrack.Elements.Length == 1) {
 				TrackManager.CurrentTrack.Elements[0].CurveCantTangent = 0.0;
 			} else if (TrackManager.CurrentTrack.Elements.Length != 0) {
@@ -7714,7 +7741,6 @@ public static class CsvRwRouteParser
 				}
 			}
 		}
-
 
     private static void SmoothenOutTurns(int subdivisions)
     {
@@ -8116,7 +8142,6 @@ public static class CsvRwRouteParser
             blocksUsed = toIndex + 1;
         }
     }
-
 
     public static Material CreateSkyboxMaterial(Texture t)
     {

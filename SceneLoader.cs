@@ -12,9 +12,9 @@ public class SceneLoader : Node {
 		AddChild(n1);
 
 		// // Original test object 
-		// MeshInstance mi = CsvB3dObjectParser.LoadFromFile(@"C:\Users\danie\Desktop\Test\Object\gaku\fumikiri1.csv", System.Text.Encoding.ASCII,true, true);
-		// mi.Name = "kitatono";
-		// n1.AddChild(mi);
+		 MeshInstance mi = CsvB3dObjectParser.LoadFromFile(@"D:\LegacyContent\Railway\Object\ground1.b3d", System.Text.Encoding.ASCII,true, true);
+		 mi.Name = "kitatono";
+		 n1.AddChild(mi);
 
 		// Duplicated test object with rotation
 		// MeshInstance mi_dupe = (MeshInstance)mi.Duplicate( (int)DuplicateFlags.UseInstancing);
@@ -26,21 +26,30 @@ public class SceneLoader : Node {
 		// mi_dupe.Translate(new Vector3(10f,10f,10f));
 		
 				
-		string rootResourcesPath = @"C:\users\danie\desktop\test";
-        string routeFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Route"));
-        string objectFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Object"));
-        string trainFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Train"));
-        string soundFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Sound"));
+		string rootResourcesPath = @"D:\LegacyContent\Railway";
+		string routeFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Route"));
+		string objectFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Object"));
+		string trainFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Train"));
+		string soundFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Sound"));
 
 		//string routePath = System.IO.Path.Combine(routeFolder, @"C:\Users\danie\Desktop\Test\Route\Taipei Rapid Transit  Zhonghe Line-Down.csv");
 
-		string routePath = System.IO.Path.Combine(routeFolder, @"C:\Users\danie\Desktop\Test\Route\test4.csv");
+		string routePath = System.IO.Path.Combine(routeFolder, @"Animated Object Demonstration Route.csv");
+
+		string[] args = OS.GetCmdlineArgs();
+		if (args.Length > 0)
+		{
+			routePath = args[0];
+		}
+
+
+		GetNode<Label>("/root/Scene1/lblInformation").SetText(routePath);
 
 		Node n2 = new Node();
 		n2.Name = "Route Objects";
 		AddChild(n2);
 
-        CsvRwRouteParser.ParseRoute(n2, routePath, Encoding.Default, false, trainFolder, objectFolder, "", false);
+   //     CsvRwRouteParser.ParseRoute(n2, routePath, Encoding.Default, false, trainFolder, objectFolder, "", false);
    
 	}
 

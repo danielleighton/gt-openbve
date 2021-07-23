@@ -1,11 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "qUoitFvpmqCNDHLYhqexuad33y+qpMtnrNOgF9HKo3Pi49ZU/c+2n025tby3/bbXLyaUynmRqEVKPU6xdf+hzw==",
+  "dgSpecHash": "yBC2SHkiGGR0upABv9dYx8eLZILzwR3KmEq3342xWxvl9JjRoFHA+NDyUgpoWDecrU68/jkF39UadN5zCfMJQw==",
   "success": true,
-  "projectFilePath": "C:\\Users\\danie\\source\\repos\\HelloWorldGodot\\HelloWorld.csproj",
-  "expectedPackageFiles": [
-    "C:\\Users\\danie\\.nuget\\packages\\microsoft.netframework.referenceassemblies\\1.0.0\\microsoft.netframework.referenceassemblies.1.0.0.nupkg.sha512",
-    "C:\\Users\\danie\\.nuget\\packages\\microsoft.netframework.referenceassemblies.net472\\1.0.0\\microsoft.netframework.referenceassemblies.net472.1.0.0.nupkg.sha512"
-  ],
+  "projectFilePath": "D:\\Development\\Repos\\gt-openbve\\HelloWorld.csproj",
+  "expectedPackageFiles": [],
   "logs": []
 }

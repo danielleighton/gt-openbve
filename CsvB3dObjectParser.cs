@@ -259,9 +259,15 @@ public class CsvB3dObjectParser
                             //https://godotengine.org/qa/43789/texture-fragment-shader-is-different-from-original-texture
                   
                             // Determine appropriate shader based on two-sidedness, transparency, etc
-                            matTexture.Shader = ResourceLoader.Load<Shader>(String.Format("res://{0}{1}.shader", 
-                                                                     (face.flags & MeshFace.FACE_2_MASK) == MeshFace.FACE_2_MASK ? "tex_2_side" : "tex_1_side",
-                                                                     mat.transparentColorUsed ? "_trans" : String.Empty));
+                            // string shaderName = String.Format("res://{0}{1}.shader", 
+                            //                                          (face.flags & MeshFace.FACE_2_MASK) == MeshFace.FACE_2_MASK ? "tex_2_side" : "tex_1_side",
+                            //                                          mat.transparentColorUsed ? "_trans" : String.Empty);
+
+                            string shaderName = String.Format("res://{0}{1}.shader", 
+                                                                      (face.flags & MeshFace.FACE_2_MASK) == MeshFace.FACE_2_MASK ? "tex_2_side" : "tex_1_side",
+                                                                      mat.transparentColorUsed ? "_trans" : String.Empty);
+
+                            matTexture.Shader = ResourceLoader.Load<Shader>(shaderName);
 
                             // TODO night texture
                             matTexture.SetShaderParam("day_texture", tex);
