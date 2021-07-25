@@ -11,7 +11,7 @@ public class SceneLoader : Node {
 		AddChild(n1);
 
 		// Test object 
-		// MeshInstance mi = CsvB3dObjectParser.LoadFromFile(@"D:\LegacyContent\Railway\Object\ground1.b3d", System.Text.Encoding.ASCII, true, true);
+		// MeshInstance mi = CsvB3dObjectParser.LoadFromFile(@"D:\LegacyContent\Railway\Object\Compatibility\Poles\pole_1.csv", System.Text.Encoding.ASCII, true, true);
 		// mi.Name = "kitatono";
 		// n1.AddChild(mi);
 

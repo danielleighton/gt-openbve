@@ -245,39 +245,44 @@ public class CsvB3dObjectParser
                         if (!string.IsNullOrEmpty(mat.dayTexture) && System.IO.File.Exists(mat.dayTexture))
                         {
                             // Textured face
-                            ShaderMaterial matTexture = new ShaderMaterial();
-
-                            // TODO don't know if these have to be unloaded somehow later
-                            string extn = System.IO.Path.GetExtension(mat.dayTexture).ToLower();
-
+                            
                             // TODO be safer about checking the file type / extension / validity etc
                             //if (extn == ".bmp" || extn == ".png")
                             ImageTexture tex = new ImageTexture();
-                            Error e = tex.Load(mat.dayTexture);
+                            Image img = new Image();
+                            img.Load(mat.dayTexture);
+                            tex.CreateFromImage(img,(uint)Godot.Texture.FlagsEnum.Default);
 
-                            //https://godotforums.org/discussion/19348/new-detail-texture-shader 
-                            //https://godotengine.org/qa/43789/texture-fragment-shader-is-different-from-original-texture
-                  
-                            // Determine appropriate shader based on two-sidedness, transparency, etc
-                            // string shaderName = String.Format("res://{0}{1}.shader", 
-                            //                                          (face.flags & MeshFace.FACE_2_MASK) == MeshFace.FACE_2_MASK ? "tex_2_side" : "tex_1_side",
-                            //                                          mat.transparentColorUsed ? "_trans" : String.Empty);
-
-                            string shaderName = String.Format("res://{0}{1}.shader", 
+                            if (mat.transparentColorUsed) 
+                            {
+                                // Basic transparency is used (e.g. compatability trees - blue mask)... use shader method
+                                ShaderMaterial matTexture = new ShaderMaterial();
+                                string shaderName = String.Format("res://{0}{1}.shader", 
                                                                       (face.flags & MeshFace.FACE_2_MASK) == MeshFace.FACE_2_MASK ? "tex_2_side" : "tex_1_side",
                                                                       mat.transparentColorUsed ? "_trans" : String.Empty);
 
-                            matTexture.Shader = ResourceLoader.Load<Shader>(shaderName);
+                                matTexture.Shader = ResourceLoader.Load<Shader>(shaderName);
 
-                            // TODO night texture
-                            matTexture.SetShaderParam("day_texture", tex);
+                                // TODO night texture
+                                matTexture.SetShaderParam("day_texture", tex);
 
-                            // Send transparency color (where used) to shader
-                            if (mat.transparentColorUsed) matTexture.SetShaderParam("trans_color", mat.transparentColor);
+                                // Send transparency color (where used) to shader
+                                if (mat.transparentColorUsed) matTexture.SetShaderParam("trans_color", mat.transparentColor);
+                            
+                                gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, matTexture);
+                            }
+                            else 
+                            {
+                                // Use built in Godot spatial material; transparency may be present if alpha channel is used e.g. inside png
+                                SpatialMaterial matTexture = new SpatialMaterial();
+                                matTexture.AlbedoTexture = tex; // TODO, night texture 
+                                matTexture.FlagsTransparent = tex.HasAlpha();   // Use transparent pipeline if alpha channel is present
 
-                            // Set submesh to use to textured shader/material
-                            gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, matTexture);
+                                matTexture.ParamsCullMode = (face.flags & MeshFace.FACE_2_MASK) == MeshFace.FACE_2_MASK ? SpatialMaterial.CullMode.Disabled : SpatialMaterial.CullMode.Back;
 
+                                // Set submesh to use to textured shader / material
+                                gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, matTexture);
+                            }
                         }
                         else
                         {
