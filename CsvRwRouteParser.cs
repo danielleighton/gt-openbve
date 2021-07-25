@@ -6628,20 +6628,10 @@ public static class CsvRwRouteParser
                         {
                             if (routeData.Blocks[blockIdx].RailPole[railIdx].Mode == 0)
                             {
-                                if (routeData.Blocks[blockIdx].RailPole[railIdx].Location <= 0.0)
-                                {
-                                    //ObjectManager.CreateObject(routeData.Structure.Poles[0][routeData.Blocks[i].RailPole[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[0][routeData.Blocks[blockIdx].RailPole[railIdx].Type], railPosition, railTransformation, nullTransformation, 
-                                                                                routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                }
-                                else
-                                {
-                                    //TODO mirrored object
-                                    //ObjectManager.UnifiedObject Pole = GetMirroredObject(routeData.Structure.Poles[0][Data.Blocks[i].RailPole[j].Type]);
-                                    //ObjectManager.CreateObject(Pole, pos, RailTransformation, NullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[0][routeData.Blocks[blockIdx].RailPole[railIdx].Type], railPosition, railTransformation, nullTransformation, 
-                                                                                routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                }
+                                UnifiedObject poleObj = ObjectManager.Instance.InstantiateObject(   rootForRouteObjects, routeData.Structure.Poles[0][routeData.Blocks[blockIdx].RailPole[railIdx].Type], railPosition, railTransformation, nullTransformation, 
+                                                                                                    routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
+                                if (routeData.Blocks[blockIdx].RailPole[railIdx].Location > 0)
+                                    poleObj.Mirror();
                             }
                             else
                             {
@@ -7707,6 +7697,7 @@ public static class CsvRwRouteParser
     }
 
     #endregion
+  
 
     private static void ComputeCantTangents() {
 			if (TrackManager.CurrentTrack.Elements.Length == 1) {

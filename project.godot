@@ -20,7 +20,7 @@ config/icon="res://icon.png"
 
 [editor]
 
-main_run_args="\"C:\\Users\\danie\\AppData\\Roaming\\openBVE\\LegacyContent\\Railway\\Route\\Animated Object Demonstration Route.csv\""
+main_run_args="\"D:\\LegacyContent\\Railway\\Route\\Animated Object Demonstration Route.csv\""
 
 [mono]
 

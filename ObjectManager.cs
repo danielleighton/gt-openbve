@@ -57,18 +57,49 @@ internal class ObjectManager
         return LoadStaticObject(parent, fileName, fileEncoding, preserveVertices, forceTextureRepeatX, forceTextureRepeatY);
     }
 
-    //UnifiedObject Prototype, Vector3D Position, World.Transformation BaseTransformation, World.Transformation AuxTransformation, bool AccurateObjectDisposal, double StartingDistance, double EndingDistance, double BlockLength, double TrackPosition) {
-    public UnifiedObject InstantiateObject(Node parent, UnifiedObject template, Vector3 position, Transform baseTransformation, Transform auxTransformation, bool accurateObjectDisposal, double startingDistance, double endingDistance, double blockLength, double trackPosition)
+
+    public UnifiedObject InstantiateObject(Node parent, UnifiedObject templateObject, Vector3 position, Transform baseTransformation, Transform auxTransformation, bool accurateObjectDisposal, double startingDistance, double endingDistance, double blockLength, double trackPosition)
     {
-        MeshInstance instantiatedObject = (MeshInstance)((MeshInstance)(((StaticObject)template).Mesh)).Duplicate((int)Node.DuplicateFlags.UseInstancing);
+        StaticObject instantiatedObject = (StaticObject)templateObject.Clone();
+
+        MeshInstance instantiatedMesh = instantiatedObject.ObjectMeshInstance;
+
+        Transform finalTrans = baseTransformation * auxTransformation;
+
+        instantiatedMesh.GlobalTransform = new Transform(finalTrans.basis, Vector3.Zero);
+
+        parent.AddChild(instantiatedMesh);
+
+        instantiatedMesh.GlobalTranslate(position);
+
+        return instantiatedObject;
+
+        // UnifiedObject retObject = null;
+        // if (templateObject is StaticObject)
+        // {
+        //     retObject = new StaticObject();
+        //     retObject.gameObject = instantiatedMesh;
+        // }
+        // else if (templateObject is AnimatedObjectCollection)
+        // {
+        // }
+
+        // return retObject;
+    }
+
+
+
+    //UnifiedObject Prototype, Vector3D Position, World.Transformation BaseTransformation, World.Transformation AuxTransformation, bool AccurateObjectDisposal, double StartingDistance, double EndingDistance, double BlockLength, double TrackPosition) {
+    private UnifiedObject OldInstantiateObject(Node parent, UnifiedObject templateObject, Vector3 position, Transform baseTransformation, Transform auxTransformation, bool accurateObjectDisposal, double startingDistance, double endingDistance, double blockLength, double trackPosition)
+    {
+         MeshInstance instantiatedObject = (MeshInstance)((MeshInstance)(((StaticObject)templateObject).ObjectMeshInstance)).Duplicate((int)Node.DuplicateFlags.UseInstancing);
+  
+        //MeshInstance instantiatedObject = (MeshInstance)((MeshInstance)((StaticObject)template).ObjectMeshInstance).Duplicate(0);
   
         Transform finalTrans = baseTransformation * auxTransformation;
 
         instantiatedObject.GlobalTransform = new Transform(finalTrans.basis, Vector3.Zero);
 
-        
-        
-        
         parent.AddChild(instantiatedObject);
 
         instantiatedObject.GlobalTranslate( position );
@@ -126,16 +157,14 @@ internal class ObjectManager
         //World.Rotate(ref Object.Mesh.Vertices[j].Coordinates.X, ref Object.Mesh.Vertices[j].Coordinates.Y, ref Object.Mesh.Vertices[j].Coordinates.Z, BaseTransformation);
 
         UnifiedObject retObject = null;
-        if (template is StaticObject)
+        if (templateObject is StaticObject)
         {
             //StaticObject s = (StaticObject)template;
             //CreateStaticObject(s, Position, BaseTransformation, AuxTransformation, AccurateObjectDisposal, 0.0, StartingDistance, EndingDistance, BlockLength, TrackPosition, Brightness, DuplicateMaterials);
             retObject = new StaticObject();
             retObject.gameObject = instantiatedObject;
-       
-            
         }
-        else if (template is AnimatedObjectCollection)
+        else if (templateObject is AnimatedObjectCollection)
         {
             //AnimatedObjectCollection a = (AnimatedObjectCollection)template;
             //CreateAnimatedWorldObjects(a.Objects, Position, BaseTransformation, AuxTransformation, SectionIndex, AccurateObjectDisposal, StartingDistance, EndingDistance, BlockLength, TrackPosition, Brightness, DuplicateMaterials);
@@ -144,7 +173,6 @@ internal class ObjectManager
         }
 
         return retObject;
-
     }
 
     public StaticObject LoadStaticObject(Node parent, string fileName, Encoding fileEncoding, bool preserveVertices, bool forceTextureRepeatX, bool forceTextureRepeatY) 
@@ -170,7 +198,7 @@ internal class ObjectManager
         {
             case ".csv":
             case ".b3d":
-                loadedObject.Mesh = CsvB3dObjectParser.LoadFromFile(fileName, fileEncoding, forceTextureRepeatX, forceTextureRepeatY);
+                loadedObject.ObjectMeshInstance = CsvB3dObjectParser.LoadFromFile(fileName, fileEncoding, forceTextureRepeatX, forceTextureRepeatY);
 
                 break;
             case ".x":

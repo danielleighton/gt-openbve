@@ -1080,7 +1080,6 @@ public class CsvB3dObjectParser
             no[i] = verts[i].Normalized();
         }
 
-
         Godot.Collections.Array mesh_arrays = new Godot.Collections.Array();
         mesh_arrays.Resize((int)Mesh.ArrayType.Max);
         mesh_arrays[(int)ArrayMesh.ArrayType.Vertex] = verts;

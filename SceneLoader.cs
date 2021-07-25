@@ -4,17 +4,16 @@ using System.Text;
 public class SceneLoader : Node {
 
 	public override void _Ready() {
-	
-		 		
+		
 		// Parent of test objects
 		Node n1 = new Node();
 		n1.Name = "Test Objects";
 		AddChild(n1);
 
-		// // Original test object 
-		 MeshInstance mi = CsvB3dObjectParser.LoadFromFile(@"D:\LegacyContent\Railway\Object\ground1.b3d", System.Text.Encoding.ASCII,true, true);
-		 mi.Name = "kitatono";
-		 n1.AddChild(mi);
+		// Test object 
+		// MeshInstance mi = CsvB3dObjectParser.LoadFromFile(@"D:\LegacyContent\Railway\Object\ground1.b3d", System.Text.Encoding.ASCII, true, true);
+		// mi.Name = "kitatono";
+		// n1.AddChild(mi);
 
 		// Duplicated test object with rotation
 		// MeshInstance mi_dupe = (MeshInstance)mi.Duplicate( (int)DuplicateFlags.UseInstancing);
@@ -42,14 +41,13 @@ public class SceneLoader : Node {
 			routePath = args[0];
 		}
 
-
 		GetNode<Label>("/root/Scene1/lblInformation").SetText(routePath);
 
 		Node n2 = new Node();
 		n2.Name = "Route Objects";
 		AddChild(n2);
 
-   //     CsvRwRouteParser.ParseRoute(n2, routePath, Encoding.Default, false, trainFolder, objectFolder, "", false);
+		CsvRwRouteParser.ParseRoute(n2, routePath, Encoding.Default, false, trainFolder, objectFolder, "", false);
    
 	}
 

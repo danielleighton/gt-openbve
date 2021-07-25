@@ -111,6 +111,12 @@ internal class AnimatedObject
 internal class AnimatedObjectCollection : UnifiedObject
 {
     internal AnimatedObject[] Objects;
+
+    // todo
+    public override UnifiedObject Clone() { return null; }
+
+    // todo
+    public override void Mirror() {  }
 }
 
 // animated objects
