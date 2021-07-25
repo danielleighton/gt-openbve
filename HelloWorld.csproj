@@ -25,9 +25,9 @@
     <Compile Include="Conversions.cs" />
     <Compile Include="Calc.cs" />
     <Compile Include="TestGodotObject.cs" />
-    <Compile Include="ObjectManager.cs" />
+    <Compile Include="RouteObject\ObjectManager.cs" />
     <Compile Include="SceneLoader.cs" />
-    <Compile Include="StaticObject.cs" />
+    <Compile Include="RouteObject\StaticObject.cs" />
     <Compile Include="TrackManager.cs" />
   </ItemGroup>
 </Project>

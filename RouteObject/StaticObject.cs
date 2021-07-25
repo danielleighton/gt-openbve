@@ -26,8 +26,7 @@ public class StaticObject : UnifiedObject
 
     private MeshInstance m_meshInstance;
 
-    public MeshInstance ObjectMeshInstance { get { return m_meshInstance; } set {m_meshInstance = value;} }
-
+    public MeshInstance ObjectMeshInstance { get { return m_meshInstance; } set { m_meshInstance = value; } }
 
     /// <summary>The index to the Renderer.Object array, plus 1. The value of zero represents that the object is not currently shown by the renderer.</summary>
     internal int RendererIndex;
@@ -57,17 +56,13 @@ public class StaticObject : UnifiedObject
         return clone;
     }
 
-    /// <summary>Creates a mirrored clone of this object</summary>
+    /// <summary>Modifies this object mesh to be mirror image of itself</summary>
     public override void Mirror()
     {
-        // StaticObject mirroredClone = (StaticObject)this.Clone();
-
-        ArrayMesh originalMesh = (ArrayMesh)m_meshInstance.Mesh;
-
-        ArrayMesh newMesh = new ArrayMesh();
-
+        ArrayMesh originalMesh = (ArrayMesh)this.m_meshInstance.Mesh;
         int originalSurfaceCount = originalMesh.GetSurfaceCount();
 
+        ArrayMesh newMesh = new ArrayMesh();
         for (int i = 0; i < originalSurfaceCount; i++)
         {
             MeshDataTool mdt = new MeshDataTool();
@@ -83,7 +78,5 @@ public class StaticObject : UnifiedObject
         }
 
         this.m_meshInstance.Mesh = newMesh;
-
-        // return mirroredClone;
     }
 }
