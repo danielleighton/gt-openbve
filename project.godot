@@ -14,7 +14,7 @@ _global_script_class_icons={
 
 [application]
 
-config/name="HelloWorld"
+config/name="gt-openbve"
 run/main_scene="res://Scene1.tscn"
 config/icon="res://icon.png"
 

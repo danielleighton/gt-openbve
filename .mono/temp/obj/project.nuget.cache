@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "yBC2SHkiGGR0upABv9dYx8eLZILzwR3KmEq3342xWxvl9JjRoFHA+NDyUgpoWDecrU68/jkF39UadN5zCfMJQw==",
+  "dgSpecHash": "ZlB7wGQ0qFmu1P48J8wkEvFB2uR43acjB3Jr3xAvdSwhWAjQXPLNmmDcE6DCqkfRg9G9hIC0549ikVJo0du7fw==",
   "success": true,
-  "projectFilePath": "D:\\Development\\Repos\\gt-openbve\\HelloWorld.csproj",
+  "projectFilePath": "D:\\Development\\Repos\\gt-openbve\\gt-openbve.csproj",
   "expectedPackageFiles": [],
   "logs": []
 }

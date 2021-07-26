@@ -14,16 +14,6 @@ public class SceneLoader : Node {
 		// MeshInstance mi = CsvB3dObjectParser.LoadFromFile(@"D:\LegacyContent\Railway\Object\Compatibility\Poles\pole_1.csv", System.Text.Encoding.ASCII, true, true);
 		// mi.Name = "kitatono";
 		// n1.AddChild(mi);
-
-		// Duplicated test object with rotation
-		// MeshInstance mi_dupe = (MeshInstance)mi.Duplicate( (int)DuplicateFlags.UseInstancing);
-		// mi_dupe.Name = "kitatono dupe";
-		// n1.AddChild(mi_dupe);
-		// Transform t = new Transform(Basis.Identity, new Vector3(0,0,0));
-		// t = t.Rotated(Vector3.Up, 0.9996877f);		// yaw by 57 degrees
-		// mi_dupe.Transform = t;
-		// mi_dupe.Translate(new Vector3(10f,10f,10f));
-		
 				
 		string rootResourcesPath = @"D:\LegacyContent\Railway";
 		string routeFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Route"));
@@ -31,15 +21,15 @@ public class SceneLoader : Node {
 		string trainFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Train"));
 		string soundFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Sound"));
 
-		//string routePath = System.IO.Path.Combine(routeFolder, @"C:\Users\danie\Desktop\Test\Route\Taipei Rapid Transit  Zhonghe Line-Down.csv");
+		//string routePath = System.IO.Path.Combine(routeFolder, @"Birmingham_Cross-City_South_BVE4\LowDetail\Day\LowDetail_158_Spring_2005_1200_Dry_Overcast.csv");
 
 		string routePath = System.IO.Path.Combine(routeFolder, @"Animated Object Demonstration Route.csv");
 
-		string[] args = OS.GetCmdlineArgs();
-		if (args.Length > 0)
-		{
-			routePath = args[0];
-		}
+		// string[] args = OS.GetCmdlineArgs();
+		// if (args.Length > 0)
+		// {
+		// 	routePath = args[0];
+		// }
 
 		GetNode<Label>("/root/Scene1/lblInformation").SetText(routePath);
 
@@ -48,7 +38,8 @@ public class SceneLoader : Node {
 		AddChild(n2);
 
 		CsvRwRouteParser.ParseRoute(n2, routePath, Encoding.Default, false, trainFolder, objectFolder, "", false);
-   
+
+		
 	}
 
 
