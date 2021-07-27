@@ -1,21 +1,36 @@
 using Godot;
 using System;
 
-public class Block : Node
+public class Block
 {
-    // Declare member variables here. Examples:
-    // private int a = 2;
-    // private string b = "text";
+    internal int Background;
+    internal Brightness[] Brightness;
+    //internal Game.Fog Fog;
+    internal bool FogDefined;
+    internal int[] Cycle;
+    internal double Height;
+    internal Rail[] Rail;
+    internal int[] RailType;
+    internal WallDike[] RailWall;
+    internal WallDike[] RailDike;
+    internal Pole[] RailPole;
+    internal FreeObj[][] RailFreeObj;
+    internal FreeObj[] GroundFreeObj;
+    internal Form[] Form;
+    internal Crack[] Crack;
+    internal Signal[] Signal;
+    internal Section[] Section;
+    internal Limit[] Limit;
+    internal Stop[] Stop;
+    internal Sound[] Sound;
+    internal Transponder[] Transponder;
+    internal PointOfInterest[] PointsOfInterest;
+    internal TrackManager.TrackElement CurrentTrackState;
 
-    // Called when the node enters the scene tree for the first time.
-    public override void _Ready()
-    {
-        
-    }
-
-//  // Called every frame. 'delta' is the elapsed time since the previous frame.
-//  public override void _Process(float delta)
-//  {
-//      
-//  }
+    internal double Pitch;
+    internal double Turn;
+    internal int Station;
+    internal bool StationPassAlarm;
+    internal double Accuracy;
+    internal double AdhesionMultiplier;
 }
