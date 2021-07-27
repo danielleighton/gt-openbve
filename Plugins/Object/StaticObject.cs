@@ -1,31 +1,34 @@
 using System;
-using System.IO;
 using Godot;
-
-
-// unified objects
 
 // static objects
 public class StaticObject : UnifiedObject
 {
     private string m_sourceFile;
-
     public String SourceFile { get { return m_sourceFile; } set { m_sourceFile = value; } }
 
     private MeshInstance m_meshInstance;
-
     public MeshInstance ObjectMeshInstance { get { return m_meshInstance; } set { m_meshInstance = value; } }
 
     /// <summary>The index to the Renderer.Object array, plus 1. The value of zero represents that the object is not currently shown by the renderer.</summary>
-    internal int RendererIndex;
+    private int m_rendererIndex;
+    public int RendererIndex { get { return m_rendererIndex; } set { m_rendererIndex = value; } }
+
     /// <summary>The starting track position, for static objects only.</summary>
-    internal float StartingDistance;
+    private float m_startingDistance;
+    public float StartingDistance { get { return m_startingDistance; } set { m_startingDistance = value; } }
+    
     /// <summary>The ending track position, for static objects only.</summary>
-    internal float EndingDistance;
+    private float m_endingDistance { get { return m_endingDistance; } set { m_endingDistance = value; } }
+    public float EndingDistance;
+
     /// <summary>The block mod group, for static objects only.</summary>
-    internal short GroupIndex;
+    private short GroupIndex;
+
     /// <summary>Whether the object is dynamic, i.e. not static.</summary>
-    public bool Dynamic;
+    private bool m_isDynamic;
+
+    public bool Dynamic { get { return m_isDynamic; } set { m_isDynamic = value; } }
 
     /// <summary>Creates a clone of this object.</summary>
     public override UnifiedObject Clone()
