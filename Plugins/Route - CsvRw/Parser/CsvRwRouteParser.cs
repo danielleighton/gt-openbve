@@ -1,6 +1,5 @@
 using Godot;
 using System;
-using System.IO;
 using System.Globalization;
 using System.Collections.Generic;
 using System.Text;
@@ -8,177 +7,6 @@ using System.Text;
 public static class CsvRwRouteParser
 {
     #region Preprocessing (CsvRwRouteParser.Preprocess.cs)
-
-    /// <summary>
-    ///
-    /// </summary>
-    /// <param name="fileName"></param>
-    /// <param name="fileEncoding"></param>
-    /// <param name="isRW"></param>
-    /// <param name="lines"></param>
-    /// <param name="allowRwRouteDescription"></param>
-    /// <param name="trackPositionOffset"></param>
-    /// <returns></returns>
-    private static List<Expression> PreprocessSplitIntoExpressions(string fileName, Encoding fileEncoding, bool isRW, string[] lines, bool allowRwRouteDescription, double trackPositionOffset)
-    {
-        List<Expression> expressionList = new List<Expression>();
-
-        int e = 0;
-        // full-line rw comments
-        if (isRW)
-        {
-            for (int i = 0; i < lines.Length; i++)
-            {
-                int Level = 0;
-                for (int j = 0; j < lines[i].Length; j++)
-                {
-                    switch (lines[i][j])
-                    {
-                        case '(':
-                            Level++;
-                            break;
-                        case ')':
-                            Level--;
-                            break;
-                        case ';':
-                            if (Level == 0)
-                            {
-                                lines[i] = lines[i].Substring(0, j).TrimEnd();
-                                j = lines[i].Length;
-                            }
-                            break;
-                        case '=':
-                            if (Level == 0)
-                            {
-                                j = lines[i].Length;
-                            }
-                            break;
-                    }
-                }
-            }
-        }
-        // parse
-        for (int i = 0; i < lines.Length; i++)
-        {
-            if (isRW & allowRwRouteDescription)
-            {
-                // ignore rw route description
-                if (
-                    lines[i].StartsWith("[", StringComparison.Ordinal) & lines[i].IndexOf("]", StringComparison.Ordinal) > 0 |
-                    lines[i].StartsWith("$")
-                )
-                {
-                    allowRwRouteDescription = false;
-                    //Game.RouteComment = Game.RouteComment.Trim();
-                }
-                else
-                {
-                    //if (Game.RouteComment.Length != 0)
-                    //{
-                    //    Game.RouteComment += "\n";
-                    //}
-                    //Game.RouteComment += lines[i];
-                    continue;
-                }
-            }
-            {
-                // count expressions
-                int n = 0;
-                int level = 0;
-                for (int j = 0; j < lines[i].Length; j++)
-                {
-                    switch (lines[i][j])
-                    {
-                        case '(':
-                            level++;
-                            break;
-                        case ')':
-                            level--;
-                            break;
-                        case ',':
-                            if (!isRW & level == 0) n++;
-                            break;
-                        case '@':
-                            if (isRW & level == 0) n++;
-                            break;
-                    }
-                }
-
-                // create expressions
-                level = 0;
-                int a = 0, c = 0;
-                for (int j = 0; j < lines[i].Length; j++)
-                {
-                    switch (lines[i][j])
-                    {
-                        case '(':
-                            level++;
-                            break;
-                        case ')':
-                            level--;
-                            break;
-                        case ',':
-                            if (level == 0 & !isRW)
-                            {
-                                string t = lines[i].Substring(a, j - a).Trim();
-                                if (t.Length > 0 && !t.StartsWith(";"))
-                                {
-                                    Expression exp = new Expression();
-
-                                    exp.file = fileName;
-                                    exp.text = t;
-                                    exp.line = i + 1;
-                                    exp.column = c + 1;
-                                    exp.trackPositionOffset = trackPositionOffset;
-                                    expressionList.Add(exp);
-                                    e++;
-
-                                }
-                                a = j + 1;
-                                c++;
-                            }
-                            break;
-                        case '@':
-                            if (level == 0 & isRW)
-                            {
-                                string t = lines[i].Substring(a, j - a).Trim();
-                                if (t.Length > 0 && !t.StartsWith(";"))
-                                {
-                                    Expression exp = new Expression();
-                                    exp.file = fileName;
-                                    exp.text = t;
-                                    exp.line = i + 1;
-                                    exp.column = c + 1;
-                                    exp.trackPositionOffset = trackPositionOffset;
-                                    expressionList.Add(exp);
-                                    e++;
-                                }
-                                a = j + 1;
-                                c++;
-                            }
-                            break;
-                    }
-                }
-                if (lines[i].Length - a > 0)
-                {
-                    string t = lines[i].Substring(a).Trim();
-                    if (t.Length > 0 && !t.StartsWith(";"))
-                    {
-                        Expression exp = new Expression();
-                        exp.file = fileName;
-                        exp.text = t;
-                        exp.line = i + 1;
-                        exp.column = c + 1;
-                        exp.trackPositionOffset = trackPositionOffset;
-                        expressionList.Add(exp);
-                        e++;
-                    }
-                }
-            }
-        }
-
-        return expressionList;
-    }
 
     // preprocess chrrndsub
     private static void PreprocessChrRndSub(string fileName, Encoding fileEncoding, bool isRW, ref Expression[] expressions)
@@ -189,32 +17,32 @@ public static class CsvRwRouteParser
         int openIfs = 0;
         for (int i = 0; i < expressions.Length; i++)
         {
-            string Epilog = " at line " + expressions[i].line.ToString(Culture) + ", column " + expressions[i].column.ToString(Culture) + " in file " + expressions[i].file;
+            string Epilog = " at line " + expressions[i].Line.ToString(Culture) + ", column " + expressions[i].Column.ToString(Culture) + " in file " + expressions[i].File;
             bool continueWithNextExpression = false;
-            for (int j = expressions[i].text.Length - 1; j >= 0; j--)
+            for (int j = expressions[i].Text.Length - 1; j >= 0; j--)
             {
-                if (expressions[i].text[j] == '$')
+                if (expressions[i].Text[j] == '$')
                 {
                     int k;
-                    for (k = j + 1; k < expressions[i].text.Length; k++)
+                    for (k = j + 1; k < expressions[i].Text.Length; k++)
                     {
-                        if (expressions[i].text[k] == '(')
+                        if (expressions[i].Text[k] == '(')
                         {
                             break;
                         }
-                        else if (expressions[i].text[k] == '/' | expressions[i].text[k] == '\\')
+                        else if (expressions[i].Text[k] == '/' | expressions[i].Text[k] == '\\')
                         {
-                            k = expressions[i].text.Length + 1;
+                            k = expressions[i].Text.Length + 1;
                             break;
                         }
                     }
-                    if (k <= expressions[i].text.Length)
+                    if (k <= expressions[i].Text.Length)
                     {
-                        string t = expressions[i].text.Substring(j, k - j).TrimEnd();
+                        string t = expressions[i].Text.Substring(j, k - j).TrimEnd();
                         int l = 1, h;
-                        for (h = k + 1; h < expressions[i].text.Length; h++)
+                        for (h = k + 1; h < expressions[i].Text.Length; h++)
                         {
-                            switch (expressions[i].text[h])
+                            switch (expressions[i].Text[h])
                             {
                                 case '(':
                                     l++;
@@ -243,7 +71,7 @@ public static class CsvRwRouteParser
                             continueWithNextExpression = true;
                             break;
                         }
-                        string s = expressions[i].text.Substring(k + 1, h - k - 1).Trim();
+                        string s = expressions[i].Text.Substring(k + 1, h - k - 1).Trim();
                         switch (t.ToLowerInvariant())
                         {
                             case "$if":
@@ -257,7 +85,7 @@ public static class CsvRwRouteParser
                                     if (double.TryParse(s, System.Globalization.NumberStyles.Float, Culture, out num))
                                     {
                                         openIfs++;
-                                        expressions[i].text = string.Empty;
+                                        expressions[i].Text = string.Empty;
                                         if (num == 0.0)
                                         {
                                             // Blank every expression until the matching $Else or $EndIf
@@ -265,23 +93,23 @@ public static class CsvRwRouteParser
                                             int level = 1;
                                             while (i < expressions.Length)
                                             {
-                                                if (expressions[i].text.StartsWith("$if", StringComparison.OrdinalIgnoreCase))
+                                                if (expressions[i].Text.StartsWith("$if", StringComparison.OrdinalIgnoreCase))
                                                 {
-                                                    expressions[i].text = string.Empty;
+                                                    expressions[i].Text = string.Empty;
                                                     level++;
                                                 }
-                                                else if (expressions[i].text.StartsWith("$else", StringComparison.OrdinalIgnoreCase))
+                                                else if (expressions[i].Text.StartsWith("$else", StringComparison.OrdinalIgnoreCase))
                                                 {
-                                                    expressions[i].text = string.Empty;
+                                                    expressions[i].Text = string.Empty;
                                                     if (level == 1)
                                                     {
                                                         level--;
                                                         break;
                                                     }
                                                 }
-                                                else if (expressions[i].text.StartsWith("$endif", StringComparison.OrdinalIgnoreCase))
+                                                else if (expressions[i].Text.StartsWith("$endif", StringComparison.OrdinalIgnoreCase))
                                                 {
-                                                    expressions[i].text = string.Empty;
+                                                    expressions[i].Text = string.Empty;
                                                     level--;
                                                     if (level == 0)
                                                     {
@@ -291,7 +119,7 @@ public static class CsvRwRouteParser
                                                 }
                                                 else
                                                 {
-                                                    expressions[i].text = string.Empty;
+                                                    expressions[i].Text = string.Empty;
                                                 }
                                                 i++;
                                             }
@@ -314,29 +142,29 @@ public static class CsvRwRouteParser
 
                                 // Blank every expression until the matching $EndIf
 
-                                expressions[i].text = string.Empty;
+                                expressions[i].Text = string.Empty;
                                 if (openIfs != 0)
                                 {
                                     i++;
                                     int level = 1;
                                     while (i < expressions.Length)
                                     {
-                                        if (expressions[i].text.StartsWith("$if", StringComparison.OrdinalIgnoreCase))
+                                        if (expressions[i].Text.StartsWith("$if", StringComparison.OrdinalIgnoreCase))
                                         {
-                                            expressions[i].text = string.Empty;
+                                            expressions[i].Text = string.Empty;
                                             level++;
                                         }
-                                        else if (expressions[i].text.StartsWith("$else", StringComparison.OrdinalIgnoreCase))
+                                        else if (expressions[i].Text.StartsWith("$else", StringComparison.OrdinalIgnoreCase))
                                         {
-                                            expressions[i].text = string.Empty;
+                                            expressions[i].Text = string.Empty;
                                             if (level == 1)
                                             {
                                                 GD.Print("Duplicate $Else encountered" + Epilog);
                                             }
                                         }
-                                        else if (expressions[i].text.StartsWith("$endif", StringComparison.OrdinalIgnoreCase))
+                                        else if (expressions[i].Text.StartsWith("$endif", StringComparison.OrdinalIgnoreCase))
                                         {
-                                            expressions[i].text = string.Empty;
+                                            expressions[i].Text = string.Empty;
                                             level--;
                                             if (level == 0)
                                             {
@@ -346,7 +174,7 @@ public static class CsvRwRouteParser
                                         }
                                         else
                                         {
-                                            expressions[i].text = string.Empty;
+                                            expressions[i].Text = string.Empty;
                                         }
                                         i++;
                                     }
@@ -362,7 +190,7 @@ public static class CsvRwRouteParser
                                 continueWithNextExpression = true;
                                 break;
                             case "$endif":
-                                expressions[i].text = string.Empty;
+                                expressions[i].Text = string.Empty;
                                 if (openIfs != 0)
                                 {
                                     openIfs--;
@@ -473,7 +301,7 @@ public static class CsvRwRouteParser
                                         string[] lines = System.IO.File.ReadAllLines(files[chosenIndex], Encoding);
 
 
-                                        Expression[] expr = PreprocessSplitIntoExpressions(files[chosenIndex], fileEncoding, isRW, lines, false, offsets[chosenIndex] + expressions[i].trackPositionOffset).ToArray();
+                                        Expression[] expr = Expression.PreprocessSplitIntoExpressions(files[chosenIndex], fileEncoding, isRW, lines, false, offsets[chosenIndex] + expressions[i].TrackPositionOffset).ToArray();
 
                                         int length = expressions.Length;
                                         if (expr.Length == 0)
@@ -508,7 +336,7 @@ public static class CsvRwRouteParser
                                     {
                                         if (x > 0 & x < 128)
                                         {
-                                            expressions[i].text = expressions[i].text.Substring(0, j) + new string(Encoding.GetChars(new byte[] { (byte)x })) + expressions[i].text.Substring(h + 1);
+                                            expressions[i].Text = expressions[i].Text.Substring(0, j) + new string(Encoding.GetChars(new byte[] { (byte)x })) + expressions[i].Text.Substring(h + 1);
                                         }
                                         else
                                         {
@@ -535,7 +363,7 @@ public static class CsvRwRouteParser
                                             int y; if (Conversions.TryParseIntVb6(s2, out y))
                                             {
                                                 int z = x + (int)Math.Floor(GD.Randf() * (double)(y - x + 1));
-                                                expressions[i].text = expressions[i].text.Substring(0, j) + z.ToString(Culture) + expressions[i].text.Substring(h + 1);
+                                                expressions[i].Text = expressions[i].Text.Substring(0, j) + z.ToString(Culture) + expressions[i].Text.Substring(h + 1);
                                             }
                                             else
                                             {
@@ -561,9 +389,9 @@ public static class CsvRwRouteParser
                                     l = 0;
                                     bool f = false;
                                     int m;
-                                    for (m = h + 1; m < expressions[i].text.Length; m++)
+                                    for (m = h + 1; m < expressions[i].Text.Length; m++)
                                     {
-                                        switch (expressions[i].text[m])
+                                        switch (expressions[i].Text[m])
                                         {
                                             case '(': l++; break;
                                             case ')': l--; break;
@@ -574,7 +402,7 @@ public static class CsvRwRouteParser
                                                 }
                                                 break;
                                             default:
-                                                if (!char.IsWhiteSpace(expressions[i].text[m])) l = -1;
+                                                if (!char.IsWhiteSpace(expressions[i].Text[m])) l = -1;
                                                 break;
                                         }
                                         if (f | l < 0) break;
@@ -583,9 +411,9 @@ public static class CsvRwRouteParser
                                     {
                                         l = 0;
                                         int n;
-                                        for (n = m + 1; n < expressions[i].text.Length; n++)
+                                        for (n = m + 1; n < expressions[i].Text.Length; n++)
                                         {
-                                            switch (expressions[i].text[n])
+                                            switch (expressions[i].Text[n])
                                             {
                                                 case '(': l++; break;
                                                 case ')': l--; break;
@@ -601,8 +429,8 @@ public static class CsvRwRouteParser
                                                 {
                                                     Array.Resize<string>(ref Subs, Subs.Length << 1);
                                                 }
-                                                Subs[x] = expressions[i].text.Substring(m + 1, n - m - 1).Trim();
-                                                expressions[i].text = expressions[i].text.Substring(0, j) + expressions[i].text.Substring(n);
+                                                Subs[x] = expressions[i].Text.Substring(m + 1, n - m - 1).Trim();
+                                                expressions[i].Text = expressions[i].Text.Substring(0, j) + expressions[i].Text.Substring(n);
                                             }
                                             else
                                             {
@@ -623,7 +451,7 @@ public static class CsvRwRouteParser
                                         {
                                             if (x >= 0 & x < Subs.Length && Subs[x] != null)
                                             {
-                                                expressions[i].text = expressions[i].text.Substring(0, j) + Subs[x] + expressions[i].text.Substring(h + 1);
+                                                expressions[i].Text = expressions[i].Text.Substring(0, j) + Subs[x] + expressions[i].Text.Substring(h + 1);
                                             }
                                             else
                                             {
@@ -654,10 +482,10 @@ public static class CsvRwRouteParser
             int length = expressions.Length;
             for (int i = 0; i < length; i++)
             {
-                expressions[i].text = expressions[i].text.Trim();
-                if (expressions[i].text.Length != 0)
+                expressions[i].Text = expressions[i].Text.Trim();
+                if (expressions[i].Text.Length != 0)
                 {
-                    if (expressions[i].text[0] == ';')
+                    if (expressions[i].Text[0] == ';')
                     {
                         for (int j = i; j < length - 1; j++)
                         {
@@ -685,236 +513,7 @@ public static class CsvRwRouteParser
     }
 
     // separate commands and arguments
-    private static void SeparateCommandsAndArguments(Expression expression, out string command, out string argumentSequence, System.Globalization.CultureInfo culture, string FileName, int LineNumber, bool raiseErrors)
-    {
-        bool openingerror = false, closingerror = false;
-        int i;
-        for (i = 0; i < expression.text.Length; i++)
-        {
-            if (expression.text[i] == '(')
-            {
-                bool found = false;
-                i++;
-                while (i < expression.text.Length)
-                {
-                    if (expression.text[i] == '(')
-                    {
-                        if (raiseErrors & !openingerror)
-                        {
-                            GD.Print("Invalid opening parenthesis encountered at line " + expression.line.ToString(culture) + ", column " + expression.column.ToString(culture) + " in file " + expression.file);
-                            openingerror = true;
-                        }
-                    }
-                    else if (expression.text[i] == ')')
-                    {
-                        found = true;
-                        break;
-                    }
-                    i++;
-                }
-                if (!found)
-                {
-                    if (raiseErrors & !closingerror)
-                    {
-                        GD.Print("Missing closing parenthesis encountered at line " + expression.line.ToString(culture) + ", column " + expression.column.ToString(culture) + " in file " + expression.file);
-                        closingerror = true;
-                    }
-                    expression.text += ")";
-                }
-            }
-            else if (expression.text[i] == ')')
-            {
-                if (raiseErrors & !closingerror)
-                {
-                    GD.Print("Invalid closing parenthesis encountered at line " + expression.line.ToString(culture) + ", column " + expression.column.ToString(culture) + " in file " + expression.file);
-                    closingerror = true;
-                }
-            }
-            else if (char.IsWhiteSpace(expression.text[i]))
-            {
-                if (i >= expression.text.Length - 1 || !char.IsWhiteSpace(expression.text[i + 1]))
-                {
-                    break;
-                }
-            }
-        }
-        if (i < expression.text.Length)
-        {
-            // white space was found outside of parentheses
-            string a = expression.text.Substring(0, i);
-            if (a.IndexOf('(') >= 0 & a.IndexOf(')') >= 0)
-            {
-                // indices found not separated from the command by spaces
-                command = expression.text.Substring(0, i).TrimEnd();
-                argumentSequence = expression.text.Substring(i + 1).TrimStart();
-                if (argumentSequence.StartsWith("(") & argumentSequence.EndsWith(")"))
-                {
-                    // arguments are enclosed by parentheses
-                    argumentSequence = argumentSequence.Substring(1, argumentSequence.Length - 2).Trim();
-                }
-                else if (argumentSequence.StartsWith("("))
-                {
-                    // only opening parenthesis found
-                    if (raiseErrors & !closingerror)
-                    {
-                        GD.Print("Missing closing parenthesis encountered at line " + expression.line.ToString(culture) + ", column " + expression.column.ToString(culture) + " in file " + expression.file);
-                    }
-                    argumentSequence = argumentSequence.Substring(1).TrimStart();
-                }
-            }
-            else
-            {
-                // no indices found before the space
-                if (i < expression.text.Length - 1 && expression.text[i + 1] == '(')
-                {
-                    // opening parenthesis follows the space
-                    int j = expression.text.IndexOf(')', i + 1);
-                    if (j > i + 1)
-                    {
-                        // closing parenthesis found
-                        if (j == expression.text.Length - 1)
-                        {
-                            // only closing parenthesis found at the end of the expression
-                            command = expression.text.Substring(0, i).TrimEnd();
-                            argumentSequence = expression.text.Substring(i + 2, j - i - 2).Trim();
-                        }
-                        else
-                        {
-                            // detect border between indices and arguments
-                            bool found = false;
-                            command = null; argumentSequence = null;
-                            for (int k = j + 1; k < expression.text.Length; k++)
-                            {
-                                if (char.IsWhiteSpace(expression.text[k]))
-                                {
-                                    command = expression.text.Substring(0, k).TrimEnd();
-                                    argumentSequence = expression.text.Substring(k + 1).TrimStart();
-                                    found = true; break;
-                                }
-                                else if (expression.text[k] == '(')
-                                {
-                                    command = expression.text.Substring(0, k).TrimEnd();
-                                    argumentSequence = expression.text.Substring(k).TrimStart();
-                                    found = true; break;
-                                }
-                            }
-                            if (!found)
-                            {
-                                if (raiseErrors & !openingerror & !closingerror)
-                                {
-                                    GD.Print("Invalid syntax encountered at line " + expression.line.ToString(culture) + ", column " + expression.column.ToString(culture) + " in file " + expression.file);
-                                    openingerror = true;
-                                    closingerror = true;
-                                }
-                                command = expression.text;
-                                argumentSequence = "";
-                            }
-                            if (argumentSequence.StartsWith("(") & argumentSequence.EndsWith(")"))
-                            {
-                                // arguments are enclosed by parentheses
-                                argumentSequence = argumentSequence.Substring(1, argumentSequence.Length - 2).Trim();
-                            }
-                            else if (argumentSequence.StartsWith("("))
-                            {
-                                // only opening parenthesis found
-                                if (raiseErrors & !closingerror)
-                                {
-                                    GD.Print("Missing closing parenthesis encountered at line " + expression.line.ToString(culture) + ", column " + expression.column.ToString(culture) + " in file " + expression.file);
-                                }
-                                argumentSequence = argumentSequence.Substring(1).TrimStart();
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // no closing parenthesis found
-                        if (raiseErrors & !closingerror)
-                        {
-                            GD.Print("Missing closing parenthesis encountered at line " + expression.line.ToString(culture) + ", column " + expression.column.ToString(culture) + " in file " + expression.file);
-                        }
-                        command = expression.text.Substring(0, i).TrimEnd();
-                        argumentSequence = expression.text.Substring(i + 2).TrimStart();
-                    }
-                }
-                else
-                {
-                    // no index possible
-                    command = expression.text.Substring(0, i).TrimEnd();
-                    argumentSequence = expression.text.Substring(i + 1).TrimStart();
-                    if (argumentSequence.StartsWith("(") & argumentSequence.EndsWith(")"))
-                    {
-                        // arguments are enclosed by parentheses
-                        argumentSequence = argumentSequence.Substring(1, argumentSequence.Length - 2).Trim();
-                    }
-                    else if (argumentSequence.StartsWith("("))
-                    {
-                        // only opening parenthesis found
-                        if (raiseErrors & !closingerror)
-                        {
-                            GD.Print("Missing closing parenthesis encountered at line " + expression.line.ToString(culture) + ", column " + expression.column.ToString(culture) + " in file " + expression.file);
-                        }
-                        argumentSequence = argumentSequence.Substring(1).TrimStart();
-                    }
-                }
-            }
-        }
-        else
-        {
-            // no single space found
-            if (expression.text.EndsWith(")"))
-            {
-                i = expression.text.LastIndexOf('(');
-                if (i >= 0)
-                {
-                    command = expression.text.Substring(0, i).TrimEnd();
-                    argumentSequence = expression.text.Substring(i + 1, expression.text.Length - i - 2).Trim();
-                }
-                else
-                {
-                    command = expression.text;
-                    argumentSequence = "";
-                }
-            }
-            else
-            {
-                i = expression.text.IndexOf('(');
-                if (i >= 0)
-                {
-                    if (raiseErrors & !closingerror)
-                    {
-                        GD.Print("Missing closing parenthesis encountered at line " + expression.line.ToString(culture) + ", column " + expression.column.ToString(culture) + " in file " + expression.file);
-                    }
-                    command = expression.text.Substring(0, i).TrimEnd();
-                    argumentSequence = expression.text.Substring(i + 1).TrimStart();
-                }
-                else
-                {
-                    if (raiseErrors)
-                    {
-                        i = expression.text.IndexOf(')');
-                        if (i >= 0 & !closingerror)
-                        {
-                            GD.Print("Invalid closing parenthesis encountered at line " + expression.line.ToString(culture) + ", column " + expression.column.ToString(culture) + " in file " + expression.file);
-                        }
-                    }
-                    command = expression.text;
-                    argumentSequence = "";
-                }
-            }
-        }
-        // invalid trailing characters
-        if (command.EndsWith(";"))
-        {
-            if (raiseErrors)
-            {
-                GD.Print("Invalid trailing semicolon encountered in " + command + " at line " + expression.line.ToString(culture) + ", column " + expression.column.ToString(culture) + " in file " + expression.file);
-            }
-            while (command.EndsWith(";"))
-            {
-                command = command.Substring(0, command.Length - 1);
-            }
-        }
-    }
+    
 
     #endregion
 
@@ -1106,7 +705,7 @@ public static class CsvRwRouteParser
 
         // >> Start OpenBVE ParseRouteForData()
         string[] lines = System.IO.File.ReadAllLines(fileName, fileEncoding);
-        List<Expression> expressions = PreprocessSplitIntoExpressions(fileName, fileEncoding, isRW, lines, true, 0.0);
+        List<Expression> expressions = Expression.PreprocessSplitIntoExpressions(fileName, fileEncoding, isRW, lines, true, 0.0);
         Expression[] expressionArray = expressions.ToArray();
         PreprocessChrRndSub(fileName, fileEncoding, isRW, ref expressionArray);
 
@@ -1152,9 +751,9 @@ public static class CsvRwRouteParser
                 //System.Threading.Thread.Sleep(1);
                 //if (Loading.Cancel) return;
             }
-            if (expressions[j].text.StartsWith("[") & expressions[j].text.EndsWith("]"))
+            if (expressions[j].Text.StartsWith("[") & expressions[j].Text.EndsWith("]"))
             {
-                Section = expressions[j].text.Substring(1, expressions[j].text.Length - 2).Trim();
+                Section = expressions[j].Text.Substring(1, expressions[j].Text.Length - 2).Trim();
                 if (string.Compare(Section, "object", StringComparison.OrdinalIgnoreCase) == 0)
                 {
                     Section = "Structure";
@@ -1168,11 +767,11 @@ public static class CsvRwRouteParser
             else
             {
                 // find equals
-                int equals = expressions[j].text.IndexOf('=');
+                int equals = expressions[j].Text.IndexOf('=');
                 if (equals >= 0)
                 {
                     // handle RW cycle syntax
-                    string t = expressions[j].text.Substring(0, equals);
+                    string t = expressions[j].Text.Substring(0, equals);
                     if (Section.ToLowerInvariant() == "cycle" & sectionAlwaysPrefix)
                     {
                         double b; if (Conversions.TryParseDoubleVb6(t, out b))
@@ -1188,11 +787,11 @@ public static class CsvRwRouteParser
                         }
                     }
                     // convert RW style into CSV style
-                    expressions[j].text = t + " " + expressions[j].text.Substring(equals + 1);
+                    expressions[j].Text = t + " " + expressions[j].Text.Substring(equals + 1);
                 }
                 // separate command and arguments
                 string command, argumentSequence;
-                SeparateCommandsAndArguments(expressions[j], out command, out argumentSequence, culture, expressions[j].file, j, false);
+                Expression.SeparateCommandsAndArguments(expressions[j], out command, out argumentSequence, culture, expressions[j].File, j, false);
 
                 // process command
                 double number;
@@ -1344,12 +943,12 @@ public static class CsvRwRouteParser
                                     string b = Indices.Substring(h + 1).TrimStart();
                                     if (a.Length > 0 && !Conversions.TryParseIntVb6(a, out commandIndex1))
                                     {
-                                        GD.Print("Invalid first index appeared at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file + ".");
+                                        GD.Print("Invalid first index appeared at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File + ".");
                                         command = null; break;
                                     }
                                     else if (b.Length > 0 && !Conversions.TryParseIntVb6(b, out commandIndex2))
                                     {
-                                        GD.Print("Invalid second index appeared at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file + ".");
+                                        GD.Print("Invalid second index appeared at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File + ".");
                                         command = null; break;
                                     }
                                 }
@@ -1357,7 +956,7 @@ public static class CsvRwRouteParser
                                 {
                                     if (Indices.Length > 0 && !Conversions.TryParseIntVb6(Indices, out commandIndex1))
                                     {
-                                        GD.Print("Invalid index appeared at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file + ".");
+                                        GD.Print("Invalid index appeared at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File + ".");
                                         command = null; break;
                                     }
                                 }
@@ -1376,7 +975,7 @@ public static class CsvRwRouteParser
                                     double length = 25.0;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], unitOfLength, out length))
                                     {
-                                        GD.Print("Length is invalid in Options.BlockLength at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Length is invalid in Options.BlockLength at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         length = 25.0;
                                     }
                                     routeData.BlockInterval = length;
@@ -1389,18 +988,18 @@ public static class CsvRwRouteParser
                             case "options.sectionbehavior":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                 }
                                 else
                                 {
                                     int a;
                                     if (!Conversions.TryParseIntVb6(arguments[0], out a))
                                     {
-                                        GD.Print("Mode is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Mode is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (a != 0 & a != 1)
                                     {
-                                        GD.Print("Mode is expected to be either 0 or 1 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Mode is expected to be either 0 or 1 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
@@ -1411,18 +1010,18 @@ public static class CsvRwRouteParser
                             case "options.cantbehavior":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                 }
                                 else
                                 {
                                     int a;
                                     if (!Conversions.TryParseIntVb6(arguments[0], out a))
                                     {
-                                        GD.Print("Mode is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Mode is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (a != 0 & a != 1)
                                     {
-                                        GD.Print("Mode is expected to be either 0 or 1 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Mode is expected to be either 0 or 1 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
@@ -1433,18 +1032,18 @@ public static class CsvRwRouteParser
                             case "options.fogbehavior":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                 }
                                 else
                                 {
                                     int a;
                                     if (!Conversions.TryParseIntVb6(arguments[0], out a))
                                     {
-                                        GD.Print("Mode is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Mode is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (a != 0 & a != 1)
                                     {
-                                        GD.Print("Mode is expected to be either 0 or 1 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Mode is expected to be either 0 or 1 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
@@ -1456,7 +1055,7 @@ public static class CsvRwRouteParser
                             case "route.comment":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                 }
                                 else
                                 {
@@ -1466,14 +1065,14 @@ public static class CsvRwRouteParser
                             case "route.image":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                 }
                                 else
                                 {
                                     string f = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(fileName), arguments[0]);
                                     if (!System.IO.File.Exists(f))
                                     {
-                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
@@ -1486,7 +1085,7 @@ public static class CsvRwRouteParser
                                 {
                                     if (arguments.Length < 1)
                                     {
-                                        GD.Print("" + command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("" + command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
@@ -1500,12 +1099,12 @@ public static class CsvRwRouteParser
                                     int change = 0;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out change))
                                     {
-                                        GD.Print("Mode is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Mode is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         change = 0;
                                     }
                                     else if (change < -1 | change > 1)
                                     {
-                                        GD.Print("Mode is expected to be -1, 0 or 1 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Mode is expected to be -1, 0 or 1 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         change = 0;
                                     }
                                     //Game.TrainStart = (Game.TrainStartMode)change;
@@ -1515,18 +1114,18 @@ public static class CsvRwRouteParser
                             case "train.gauge":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                 }
                                 else
                                 {
                                     double a;
                                     if (!Conversions.TryParseDoubleVb6(arguments[0], out a))
                                     {
-                                        GD.Print("ValueInMillimeters is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("ValueInMillimeters is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (a <= 0.0)
                                     {
-                                        GD.Print("ValueInMillimeters is expected to be positive in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("ValueInMillimeters is expected to be positive in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
@@ -1539,24 +1138,24 @@ public static class CsvRwRouteParser
                                 {
                                     if (arguments.Length < 1)
                                     {
-                                        GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
                                         double a;
                                         if (!Conversions.TryParseDoubleVb6(arguments[0], out a))
                                         {
-                                            GD.Print("Speed is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Speed is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (commandIndex1 < 0)
                                             {
-                                                GD.Print("AspectIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("AspectIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (a < 0.0)
                                             {
-                                                GD.Print("Speed is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Speed is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -1585,7 +1184,7 @@ public static class CsvRwRouteParser
                                         {
                                             if (!Conversions.TryParseDoubleVb6(arguments[k], out intervals[k]))
                                             {
-                                                GD.Print("Interval" + k.ToString(culture) + " is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Interval" + k.ToString(culture) + " is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                         }
                                         Array.Sort<double>(intervals);
@@ -1600,7 +1199,7 @@ public static class CsvRwRouteParser
                                         double limit = 0.0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out limit))
                                         {
-                                            GD.Print("Speed is invalid in Train.Velocity at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Speed is invalid in Train.Velocity at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             limit = 0.0;
                                         }
                                         //Game.PrecedingTrainSpeedLimit = limit <= 0.0 ? double.PositiveInfinity : data.UnitOfSpeed * limit;
@@ -1610,18 +1209,18 @@ public static class CsvRwRouteParser
                             case "route.accelerationduetogravity":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                 }
                                 else
                                 {
                                     double a;
                                     if (!Conversions.TryParseDoubleVb6(arguments[0], out a))
                                     {
-                                        GD.Print("Value is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Value is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (a <= 0.0)
                                     {
-                                        GD.Print("Value is expected to be positive in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Value is expected to be positive in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
@@ -1632,14 +1231,14 @@ public static class CsvRwRouteParser
                             case "route.elevation":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                 }
                                 else
                                 {
                                     double a;
                                     if (!Conversions.TryParseDoubleVb6(arguments[0], unitOfLength, out a))
                                     {
-                                        GD.Print("Height is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Height is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
@@ -1650,18 +1249,18 @@ public static class CsvRwRouteParser
                             case "route.temperature":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                 }
                                 else
                                 {
                                     double a;
                                     if (!Conversions.TryParseDoubleVb6(arguments[0], out a))
                                     {
-                                        GD.Print("ValueInCelsius is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("ValueInCelsius is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (a <= -273.15)
                                     {
-                                        GD.Print("ValueInCelsius is expected to be greater than to -273.15 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("ValueInCelsius is expected to be greater than to -273.15 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
@@ -1672,18 +1271,18 @@ public static class CsvRwRouteParser
                             case "route.pressure":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                 }
                                 else
                                 {
                                     double a;
                                     if (!Conversions.TryParseDoubleVb6(arguments[0], out a))
                                     {
-                                        GD.Print("ValueInKPa is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("ValueInKPa is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (a <= 0.0)
                                     {
-                                        GD.Print("ValueInKPa is expected to be positive in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("ValueInKPa is expected to be positive in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
@@ -1696,29 +1295,29 @@ public static class CsvRwRouteParser
                                     int r = 255, g = 255, b = 255;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out r))
                                     {
-                                        GD.Print("RedValue is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("RedValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (r < 0 | r > 255)
                                     {
-                                        GD.Print("RedValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("RedValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         r = r < 0 ? 0 : 255;
                                     }
                                     if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out g))
                                     {
-                                        GD.Print("GreenValue is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("GreenValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (g < 0 | g > 255)
                                     {
-                                        GD.Print("GreenValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("GreenValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         g = g < 0 ? 0 : 255;
                                     }
                                     if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out b))
                                     {
-                                        GD.Print("BlueValue is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("BlueValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (b < 0 | b > 255)
                                     {
-                                        GD.Print("BlueValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("BlueValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         b = b < 0 ? 0 : 255;
                                     }
                                     //Renderer.OptionAmbientColor = new Color24((byte)r, (byte)g, (byte)b);
@@ -1729,29 +1328,29 @@ public static class CsvRwRouteParser
                                     int r = 255, g = 255, b = 255;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out r))
                                     {
-                                        GD.Print("RedValue is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("RedValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (r < 0 | r > 255)
                                     {
-                                        GD.Print("RedValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("RedValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         r = r < 0 ? 0 : 255;
                                     }
                                     if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out g))
                                     {
-                                        GD.Print("GreenValue is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("GreenValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (g < 0 | g > 255)
                                     {
-                                        GD.Print("GreenValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("GreenValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         g = g < 0 ? 0 : 255;
                                     }
                                     if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out b))
                                     {
-                                        GD.Print("BlueValue is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("BlueValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else if (b < 0 | b > 255)
                                     {
-                                        GD.Print("BlueValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("BlueValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         b = b < 0 ? 0 : 255;
                                     }
                                     //Renderer.OptionDiffuseColor = new Color24((byte)r, (byte)g, (byte)b);
@@ -1762,11 +1361,11 @@ public static class CsvRwRouteParser
                                     double theta = 60.0, phi = -26.565051177078;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out theta))
                                     {
-                                        GD.Print("Theta is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Theta is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out phi))
                                     {
-                                        GD.Print("Phi is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Phi is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     theta *= 0.0174532925199433;
                                     phi *= 0.0174532925199433;
@@ -1784,13 +1383,13 @@ public static class CsvRwRouteParser
                                     {
                                         if (arguments.Length < 1)
                                         {
-                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FolderName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FolderName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -1807,19 +1406,19 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RailTypeIndex is out of range in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailTypeIndex is out of range in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             int val = 0;
                                             if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out val))
                                             {
-                                                GD.Print("RunSoundIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RunSoundIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 val = 0;
                                             }
                                             if (val < 0)
                                             {
-                                                GD.Print("RunSoundIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RunSoundIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 val = 0;
                                             }
                                             if (commandIndex1 >= routeData.Structure.Run.Length)
@@ -1837,19 +1436,19 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RailTypeIndex is out of range in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailTypeIndex is out of range in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             int val = 0;
                                             if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out val))
                                             {
-                                                GD.Print("FlangeSoundIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FlangeSoundIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 val = 0;
                                             }
                                             if (val < 0)
                                             {
-                                                GD.Print("FlangeSoundIndex expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FlangeSoundIndex expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 val = 0;
                                             }
                                             if (commandIndex1 >= routeData.Structure.Flange.Length)
@@ -1867,17 +1466,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("TimetableIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("TimetableIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else if (arguments.Length < 1)
                                         {
-                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -1910,17 +1509,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("TimetableIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("TimetableIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else if (arguments.Length < 1)
                                         {
-                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -1955,17 +1554,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RailStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -1976,7 +1575,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -1993,17 +1592,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("BeaconStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("BeaconStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2014,7 +1613,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2031,21 +1630,21 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("AdditionalRailsCovered is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("AdditionalRailsCovered is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else if (commandIndex2 < 0)
                                         {
-                                            GD.Print("PoleStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("PoleStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2064,7 +1663,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2081,17 +1680,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("GroundStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("GroundStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2102,7 +1701,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2119,17 +1718,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("WallStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("WallStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2140,7 +1739,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2157,17 +1756,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("WallStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("WallStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2178,7 +1777,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2195,17 +1794,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("DikeStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("DikeStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2216,7 +1815,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2233,17 +1832,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("DikeStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("DikeStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2254,7 +1853,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2271,17 +1870,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("FormStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("FormStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2292,7 +1891,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2309,17 +1908,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("FormStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("FormStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2330,7 +1929,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2347,17 +1946,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("FormStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("FormStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2368,7 +1967,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2385,17 +1984,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("FormStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("FormStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2406,7 +2005,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2423,28 +2022,28 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
                                                 if (commandIndex1 == 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     commandIndex1 = 1;
                                                 }
                                                 if (commandIndex1 < 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2455,7 +2054,7 @@ public static class CsvRwRouteParser
                                                     string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                     if (!System.IO.File.Exists(f))
                                                     {
-                                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     }
                                                     else
                                                     {
@@ -2473,28 +2072,28 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
                                                 if (commandIndex1 == 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     commandIndex1 = 1;
                                                 }
                                                 if (commandIndex1 < 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2505,7 +2104,7 @@ public static class CsvRwRouteParser
                                                     string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                     if (!System.IO.File.Exists(f))
                                                     {
-                                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     }
                                                     else
                                                     {
@@ -2523,28 +2122,28 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
                                                 if (commandIndex1 == 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     commandIndex1 = 1;
                                                 }
                                                 if (commandIndex1 < 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2555,7 +2154,7 @@ public static class CsvRwRouteParser
                                                     string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                     if (!System.IO.File.Exists(f))
                                                     {
-                                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     }
                                                     else
                                                     {
@@ -2573,28 +2172,28 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
                                                 if (commandIndex1 == 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     commandIndex1 = 1;
                                                 }
                                                 if (commandIndex1 < 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2605,7 +2204,7 @@ public static class CsvRwRouteParser
                                                     string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                     if (!System.IO.File.Exists(f))
                                                     {
-                                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     }
                                                     else
                                                     {
@@ -2623,17 +2222,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("CrackStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("CrackStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2644,7 +2243,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2661,17 +2260,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("CrackStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("CrackStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2682,7 +2281,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2699,17 +2298,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("FreeObjStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("FreeObjStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2720,7 +2319,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " could not be found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " could not be found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2739,7 +2338,7 @@ public static class CsvRwRouteParser
                                     {
                                         if (arguments.Length < 1)
                                         {
-                                            GD.Print(command + " is expected to have between 1 and 2 arguments at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print(command + " is expected to have between 1 and 2 arguments at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
@@ -2751,18 +2350,18 @@ public static class CsvRwRouteParser
                                             {
                                                 if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                                 {
-                                                    GD.Print("AnimatedObjectFile contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("AnimatedObjectFile contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
                                                     if (arguments.Length > 1)
                                                     {
-                                                        GD.Print(command + " is expected to have exactly 1 argument when using animated objects at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                        GD.Print(command + " is expected to have exactly 1 argument when using animated objects at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     }
                                                     string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                     if (!System.IO.File.Exists(f))
                                                     {
-                                                        GD.Print("SignalFileWithoutExtension " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                        GD.Print("SignalFileWithoutExtension " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     }
                                                     else
                                                     {
@@ -2843,17 +2442,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("BackgroundTextureIndex is expected to be non-negative at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("BackgroundTextureIndex is expected to be non-negative at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else if (arguments.Length < 1)
                                         {
-                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -2869,7 +2468,7 @@ public static class CsvRwRouteParser
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName" + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName" + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
@@ -2897,11 +2496,11 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("BackgroundTextureIndex is expected to be non-negative at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("BackgroundTextureIndex is expected to be non-negative at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else if (arguments.Length < 1)
                                         {
-                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
@@ -2938,11 +2537,11 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("BackgroundTextureIndex is expected to be non-negative at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("BackgroundTextureIndex is expected to be non-negative at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else if (arguments.Length < 1)
                                         {
-                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
@@ -2986,12 +2585,12 @@ public static class CsvRwRouteParser
                                         int ix = 0;
                                         if (arguments[k].Length > 0 && !Conversions.TryParseIntVb6(arguments[k], out ix))
                                         {
-                                            GD.Print("GroundStructureIndex" + (k + 1).ToString(culture) + " is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("GroundStructureIndex" + (k + 1).ToString(culture) + " is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             ix = 0;
                                         }
                                         if (ix < 0 | ix >= routeData.Structure.Ground.Length)
                                         {
-                                            GD.Print("GroundStructureIndex" + (k + 1).ToString(culture) + " is out of range in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("GroundStructureIndex" + (k + 1).ToString(culture) + " is out of range in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             ix = 0;
                                         }
                                         routeData.Structure.Cycle[commandIndex1][k] = ix;
@@ -3013,9 +2612,9 @@ public static class CsvRwRouteParser
                 //System.Threading.Thread.Sleep(1);
                 //if (Loading.Cancel) return;
             }
-            if (expressions[j].text.StartsWith("[") & expressions[j].text.EndsWith("]"))
+            if (expressions[j].Text.StartsWith("[") & expressions[j].Text.EndsWith("]"))
             {
-                Section = expressions[j].text.Substring(1, expressions[j].text.Length - 2).Trim();
+                Section = expressions[j].Text.Substring(1, expressions[j].Text.Length - 2).Trim();
                 if (string.Compare(Section, "object", StringComparison.OrdinalIgnoreCase) == 0)
                 {
                     Section = "Structure";
@@ -3029,11 +2628,11 @@ public static class CsvRwRouteParser
             else
             {
                 // find equals
-                int equals = expressions[j].text.IndexOf('=');
+                int equals = expressions[j].Text.IndexOf('=');
                 if (equals >= 0)
                 {
                     // handle RW cycle syntax
-                    string t = expressions[j].text.Substring(0, equals);
+                    string t = expressions[j].Text.Substring(0, equals);
                     if (Section.ToLowerInvariant() == "cycle" & sectionAlwaysPrefix)
                     {
                         double b; if (Conversions.TryParseDoubleVb6(t, out b))
@@ -3049,11 +2648,12 @@ public static class CsvRwRouteParser
                         }
                     }
                     // convert RW style into CSV style
-                    expressions[j].text = t + " " + expressions[j].text.Substring(equals + 1);
+                    expressions[j].Text = t + " " + expressions[j].Text.Substring(equals + 1);
                 }
                 // separate command and arguments
                 string command, argumentSequence;
-                SeparateCommandsAndArguments(expressions[j], out command, out argumentSequence, culture, expressions[j].file, j, false);
+                Expression.SeparateCommandsAndArguments(expressions[j], out command, out argumentSequence, culture, expressions[j].File, j, false);
+                
                 // process command
                 double number;
                 bool numberCheck = !isRW || string.Compare(Section, "track", StringComparison.OrdinalIgnoreCase) == 0;
@@ -3062,11 +2662,11 @@ public static class CsvRwRouteParser
                     // track position
                     if (argumentSequence.Length != 0)
                     {
-                        GD.Print("A track position must not contain any arguments at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                        GD.Print("A track position must not contain any arguments at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                     }
                     else if (number < 0.0)
                     {
-                        GD.Print("Negative track position encountered at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                        GD.Print("Negative track position encountered at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                     }
                     else
                     {
@@ -3219,12 +2819,12 @@ public static class CsvRwRouteParser
                                     string b = Indices.Substring(h + 1).TrimStart();
                                     if (a.Length > 0 && !Conversions.TryParseIntVb6(a, out CommandIndex1))
                                     {
-                                        GD.Print("Invalid first index appeared at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file + ".");
+                                        GD.Print("Invalid first index appeared at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File + ".");
                                         command = null; break;
                                     }
                                     else if (b.Length > 0 && !Conversions.TryParseIntVb6(b, out CommandIndex2))
                                     {
-                                        GD.Print("Invalid second index appeared at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file + ".");
+                                        GD.Print("Invalid second index appeared at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File + ".");
                                         command = null; break;
                                     }
                                 }
@@ -3232,7 +2832,7 @@ public static class CsvRwRouteParser
                                 {
                                     if (Indices.Length > 0 && !Conversions.TryParseIntVb6(Indices, out CommandIndex1))
                                     {
-                                        GD.Print("Invalid index appeared at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file + ".");
+                                        GD.Print("Invalid index appeared at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File + ".");
                                         command = null; break;
                                     }
                                 }
@@ -3317,12 +2917,12 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx < 1)
                                         {
-                                            GD.Print("RailIndex is expected to be positive in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is expected to be positive in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
@@ -3330,7 +2930,7 @@ public static class CsvRwRouteParser
                                             {
                                                 if (idx < routeData.Blocks[blockIndex].Rail.Length && routeData.Blocks[blockIndex].Rail[idx].RailStart)
                                                 {
-                                                    GD.Print("RailIndex is required to reference a non-existing rail in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RailIndex is required to reference a non-existing rail in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                             }
                                             if (routeData.Blocks[blockIndex].Rail.Length <= idx)
@@ -3351,7 +2951,7 @@ public static class CsvRwRouteParser
                                                         double x;
                                                         if (!Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out x))
                                                         {
-                                                            GD.Print("X is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                            GD.Print("X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                             x = 0.0;
                                                         }
                                                         routeData.Blocks[blockIndex].Rail[idx].RailStartX = x;
@@ -3368,7 +2968,7 @@ public static class CsvRwRouteParser
                                                         double y;
                                                         if (!Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out y))
                                                         {
-                                                            GD.Print("Y is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                            GD.Print("Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                             y = 0.0;
                                                         }
                                                         routeData.Blocks[blockIndex].Rail[idx].RailStartY = y;
@@ -3387,16 +2987,16 @@ public static class CsvRwRouteParser
                                                     int sttype;
                                                     if (!Conversions.TryParseIntVb6(arguments[3], out sttype))
                                                     {
-                                                        GD.Print("RailStructureIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                        GD.Print("RailStructureIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                         sttype = 0;
                                                     }
                                                     if (sttype < 0)
                                                     {
-                                                        GD.Print("RailStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                        GD.Print("RailStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     }
                                                     else if (sttype >= routeData.Structure.Rail.Length || routeData.Structure.Rail[sttype] == null)
                                                     {
-                                                        GD.Print("RailStructureIndex references an object not loaded in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                        GD.Print("RailStructureIndex references an object not loaded in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     }
                                                     else
                                                     {
@@ -3415,12 +3015,12 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx < 0 || idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart)
                                         {
-                                            GD.Print("RailIndex references a non-existing rail in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex references a non-existing rail in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
@@ -3436,7 +3036,7 @@ public static class CsvRwRouteParser
                                                 double x;
                                                 if (!Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out x))
                                                 {
-                                                    GD.Print("X is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     x = 0.0;
                                                 }
                                                 routeData.Blocks[blockIndex].Rail[idx].RailEndX = x;
@@ -3446,7 +3046,7 @@ public static class CsvRwRouteParser
                                                 double y;
                                                 if (!Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out y))
                                                 {
-                                                    GD.Print("Y is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     y = 0.0;
                                                 }
                                                 routeData.Blocks[blockIndex].Rail[idx].RailEndY = y;
@@ -3462,32 +3062,32 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         int sttype = 0;
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out sttype))
                                         {
-                                            GD.Print("RailStructureIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailStructureIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             sttype = 0;
                                         }
                                         if (idx < 0)
                                         {
-                                            GD.Print("RailIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart)
                                             {
-                                                GD.Print("RailIndex could be out of range in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex could be out of range in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             if (sttype < 0)
                                             {
-                                                GD.Print("RailStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (sttype >= routeData.Structure.Rail.Length || routeData.Structure.Rail[sttype] == null)
                                             {
-                                                GD.Print("RailStructureIndex references an object not loaded in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailStructureIndex references an object not loaded in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -3506,7 +3106,7 @@ public static class CsvRwRouteParser
                                     double r = 2.0;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out r))
                                     {
-                                        GD.Print("Value is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Value is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         r = 2.0;
                                     }
                                     if (r < 0.0)
@@ -3525,7 +3125,7 @@ public static class CsvRwRouteParser
                                     double p = 0.0;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out p))
                                     {
-                                        GD.Print("ValueInPermille is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("ValueInPermille is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         p = 0.0;
                                     }
                                     routeData.Blocks[blockIndex].Pitch = 0.001 * p;
@@ -3536,13 +3136,13 @@ public static class CsvRwRouteParser
                                     double radius = 0.0;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], unitOfLength, out radius))
                                     {
-                                        GD.Print("Radius is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Radius is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         radius = 0.0;
                                     }
                                     double cant = 0.0;
                                     if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out cant))
                                     {
-                                        GD.Print("CantInMillimeters is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("CantInMillimeters is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         cant = 0.0;
                                     }
                                     else
@@ -3570,7 +3170,7 @@ public static class CsvRwRouteParser
                                     double s = 0.0;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out s))
                                     {
-                                        GD.Print("Ratio is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Ratio is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         s = 0.0;
                                     }
                                     routeData.Blocks[blockIndex].Turn = s;
@@ -3581,12 +3181,12 @@ public static class CsvRwRouteParser
                                     double a = 100.0;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out a))
                                     {
-                                        GD.Print("Value is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Value is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         a = 100.0;
                                     }
                                     if (a < 0.0)
                                     {
-                                        GD.Print("Value is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Value is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         a = 100.0;
                                     }
                                     routeData.Blocks[blockIndex].AdhesionMultiplier = 0.01 * a;
@@ -3599,7 +3199,7 @@ public static class CsvRwRouteParser
                                         float value = 255.0f;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], out value))
                                         {
-                                            GD.Print("Value is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Value is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             value = 255.0f;
                                         }
                                         value /= 255.0f;
@@ -3620,42 +3220,42 @@ public static class CsvRwRouteParser
                                         int r = 128, g = 128, b = 128;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out start))
                                         {
-                                            GD.Print("StartingDistance is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("StartingDistance is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             start = 0.0;
                                         }
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out end))
                                         {
-                                            GD.Print("EndingDistance is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("EndingDistance is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             end = 0.0;
                                         }
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out r))
                                         {
-                                            GD.Print("RedValue is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RedValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             r = 128;
                                         }
                                         else if (r < 0 | r > 255)
                                         {
-                                            GD.Print("RedValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RedValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             r = r < 0 ? 0 : 255;
                                         }
                                         if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out g))
                                         {
-                                            GD.Print("GreenValue is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("GreenValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             g = 128;
                                         }
                                         else if (g < 0 | g > 255)
                                         {
-                                            GD.Print("GreenValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("GreenValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             g = g < 0 ? 0 : 255;
                                         }
                                         if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseIntVb6(arguments[4], out b))
                                         {
-                                            GD.Print("BlueValue is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("BlueValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             b = 128;
                                         }
                                         else if (b < 0 | b > 255)
                                         {
-                                            GD.Print("BlueValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("BlueValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             b = b < 0 ? 0 : 255;
                                         }
                                         //if (start < end)
@@ -3680,7 +3280,7 @@ public static class CsvRwRouteParser
                                     {
                                         if (arguments.Length == 0)
                                         {
-                                            GD.Print("At least one argument is required in " + command + "at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("At least one argument is required in " + command + "at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
@@ -3689,12 +3289,12 @@ public static class CsvRwRouteParser
                                             {
                                                 if (!Conversions.TryParseIntVb6(arguments[i], out aspects[i]))
                                                 {
-                                                    GD.Print("Aspect" + i.ToString(culture) + " is invalid in " + command + "at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("Aspect" + i.ToString(culture) + " is invalid in " + command + "at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     aspects[i] = -1;
                                                 }
                                                 else if (aspects[i] < 0)
                                                 {
-                                                    GD.Print("Aspect" + i.ToString(culture) + " is expected to be non-negative in " + command + "at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("Aspect" + i.ToString(culture) + " is expected to be non-negative in " + command + "at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     aspects[i] = -1;
                                                 }
                                             }
@@ -3729,7 +3329,7 @@ public static class CsvRwRouteParser
                                         int objidx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out objidx))
                                         {
-                                            GD.Print("SignalIndex is invalid in Track.SigF at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("SignalIndex is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             objidx = 0;
                                         }
                                         if (objidx >= 0 & objidx < routeData.SignalData.Length && routeData.SignalData[objidx] != null)
@@ -3737,34 +3337,34 @@ public static class CsvRwRouteParser
                                             int section = 0;
                                             if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out section))
                                             {
-                                                GD.Print("Section is invalid in Track.SigF at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Section is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 section = 0;
                                             }
                                             double x = 0.0, y = 0.0;
                                             if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out x))
                                             {
-                                                GD.Print("X is invalid in Track.SigF at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("X is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 x = 0.0;
                                             }
                                             if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], unitOfLength, out y))
                                             {
-                                                GD.Print("Y is invalid in Track.SigF at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Y is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 y = 0.0;
                                             }
                                             double yaw = 0.0, pitch = 0.0, roll = 0.0;
                                             if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out yaw))
                                             {
-                                                GD.Print("Yaw is invalid in Track.SigF at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Yaw is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 yaw = 0.0;
                                             }
                                             if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out pitch))
                                             {
-                                                GD.Print("Pitch is invalid in Track.SigF at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Pitch is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 pitch = 0.0;
                                             }
                                             if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[6], out roll))
                                             {
-                                                GD.Print("Roll is invalid in Track.SigF at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Roll is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 roll = 0.0;
                                             }
                                             int n = routeData.Blocks[blockIndex].Signal.Length;
@@ -3784,7 +3384,7 @@ public static class CsvRwRouteParser
                                         }
                                         else
                                         {
-                                            GD.Print("SignalIndex references a signal object not loaded in Track.SigF at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("SignalIndex references a signal object not loaded in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                     }
                                 }
@@ -3797,39 +3397,39 @@ public static class CsvRwRouteParser
                                         int num = -2;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out num))
                                         {
-                                            GD.Print("Aspects is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Aspects is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             num = -2;
                                         }
                                         if (num != -2 & num != 2 & num != 3 & num != -4 & num != 4 & num != -5 & num != 5 & num != 6)
                                         {
-                                            GD.Print("Aspects has an unsupported value in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Aspects has an unsupported value in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             num = num == -3 | num == -6 ? -num : -4;
                                         }
                                         double x = 0.0, y = 0.0;
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out x))
                                         {
-                                            GD.Print("X is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             x = 0.0;
                                         }
                                         if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], unitOfLength, out y))
                                         {
-                                            GD.Print("Y is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             y = 0.0;
                                         }
                                         double yaw = 0.0, pitch = 0.0, roll = 0.0;
                                         if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out yaw))
                                         {
-                                            GD.Print("Yaw is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Yaw is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             yaw = 0.0;
                                         }
                                         if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out pitch))
                                         {
-                                            GD.Print("Pitch is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Pitch is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             pitch = 0.0;
                                         }
                                         if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[6], out roll))
                                         {
-                                            GD.Print("Roll is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Roll is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             roll = 0.0;
                                         }
                                         int[] aspects; int comp;
@@ -3885,28 +3485,28 @@ public static class CsvRwRouteParser
                                         double x = 0.0, y = 0.0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], unitOfLength, out x))
                                         {
-                                            GD.Print("X is invalid in Track.Relay at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("X is invalid in Track.Relay at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             x = 0.0;
                                         }
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out y))
                                         {
-                                            GD.Print("Y is invalid in Track.Relay at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Y is invalid in Track.Relay at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             y = 0.0;
                                         }
                                         double yaw = 0.0, pitch = 0.0, roll = 0.0;
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out yaw))
                                         {
-                                            GD.Print("Yaw is invalid in Track.Relay at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Yaw is invalid in Track.Relay at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             yaw = 0.0;
                                         }
                                         if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], out pitch))
                                         {
-                                            GD.Print("Pitch is invalid in Track.Relay at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Pitch is invalid in Track.Relay at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             pitch = 0.0;
                                         }
                                         if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out roll))
                                         {
-                                            GD.Print("Roll is invalid in Track.Relay at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Roll is invalid in Track.Relay at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             roll = 0.0;
                                         }
                                         int n = routeData.Blocks[blockIndex].Signal.Length;
@@ -3932,39 +3532,39 @@ public static class CsvRwRouteParser
                                         int type = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out type))
                                         {
-                                            GD.Print("Type is invalid in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Type is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             type = 0;
                                         }
                                         if (type < 0)
                                         {
-                                            GD.Print("Type is expected to be non-positive in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Type is expected to be non-positive in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             int structure = 0, section = 0, optional = 0;
                                             if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out structure))
                                             {
-                                                GD.Print("BeaconStructureIndex is invalid in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("BeaconStructureIndex is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 structure = 0;
                                             }
                                             if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out section))
                                             {
-                                                GD.Print("Section is invalid in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Section is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 section = 0;
                                             }
                                             if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out optional))
                                             {
-                                                GD.Print("Data is invalid in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Data is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 optional = 0;
                                             }
                                             if (structure < -1)
                                             {
-                                                GD.Print("BeaconStructureIndex is expected to be non-negative or -1 in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("BeaconStructureIndex is expected to be non-negative or -1 in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 structure = -1;
                                             }
                                             else if (structure >= 0 && (structure >= routeData.Structure.Beacon.Length || routeData.Structure.Beacon[structure] == null))
                                             {
-                                                GD.Print("BeaconStructureIndex references an object not loaded in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("BeaconStructureIndex references an object not loaded in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 structure = -1;
                                             }
                                             if (section == -1)
@@ -3973,7 +3573,7 @@ public static class CsvRwRouteParser
                                             }
                                             else if (section < 0)
                                             {
-                                                GD.Print("Section is expected to be non-negative or -1 in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Section is expected to be non-negative or -1 in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 section = currentSection + 1;
                                             }
                                             else
@@ -3984,27 +3584,27 @@ public static class CsvRwRouteParser
                                             double yaw = 0.0, pitch = 0.0, roll = 0.0;
                                             if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], unitOfLength, out x))
                                             {
-                                                GD.Print("X is invalid in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("X is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 x = 0.0;
                                             }
                                             if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], unitOfLength, out y))
                                             {
-                                                GD.Print("Y is invalid in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Y is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 y = 0.0;
                                             }
                                             if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[6], out yaw))
                                             {
-                                                GD.Print("Yaw is invalid in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Yaw is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 yaw = 0.0;
                                             }
                                             if (arguments.Length >= 8 && arguments[7].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[7], out pitch))
                                             {
-                                                GD.Print("Pitch is invalid in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Pitch is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 pitch = 0.0;
                                             }
                                             if (arguments.Length >= 9 && arguments[8].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[8], out roll))
                                             {
-                                                GD.Print("Roll is invalid in Track.Beacon at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Roll is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 roll = 0.0;
                                             }
                                             int n = routeData.Blocks[blockIndex].Transponder.Length;
@@ -4032,49 +3632,49 @@ public static class CsvRwRouteParser
                                         int type = 0, oversig = 0, work = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out type))
                                         {
-                                            GD.Print("Type is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Type is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             type = 0;
                                         }
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out oversig))
                                         {
-                                            GD.Print("Signals is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Signals is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             oversig = 0;
                                         }
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out work))
                                         {
-                                            GD.Print("SwitchSystems is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("SwitchSystems is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             work = 0;
                                         }
                                         if (oversig < 0)
                                         {
-                                            GD.Print("Signals is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Signals is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             oversig = 0;
                                         }
                                         double x = 0.0, y = 0.0;
                                         if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], unitOfLength, out x))
                                         {
-                                            GD.Print("X is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             x = 0.0;
                                         }
                                         if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], unitOfLength, out y))
                                         {
-                                            GD.Print("Y is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             y = 0.0;
                                         }
                                         double yaw = 0.0, pitch = 0.0, roll = 0.0;
                                         if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out yaw))
                                         {
-                                            GD.Print("Yaw is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Yaw is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             yaw = 0.0;
                                         }
                                         if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[6], out pitch))
                                         {
-                                            GD.Print("Pitch is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Pitch is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             pitch = 0.0;
                                         }
                                         if (arguments.Length >= 8 && arguments[7].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[7], out roll))
                                         {
-                                            GD.Print("Roll is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Roll is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             roll = 0.0;
                                         }
                                         int n = routeData.Blocks[blockIndex].Transponder.Length;
@@ -4133,13 +3733,13 @@ public static class CsvRwRouteParser
                                         int type = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out type))
                                         {
-                                            GD.Print("Type is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Type is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             type = 0;
                                         }
                                         double speed = 0.0;
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out speed))
                                         {
-                                            GD.Print("Speed is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Speed is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             speed = 0.0;
                                         }
                                         int n = routeData.Blocks[blockIndex].Transponder.Length;
@@ -4186,17 +3786,17 @@ public static class CsvRwRouteParser
                                     int direction = 0, cource = 0;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out limit))
                                     {
-                                        GD.Print("Speed is invalid in Track.Limit at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Speed is invalid in Track.Limit at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         limit = 0.0;
                                     }
                                     if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out direction))
                                     {
-                                        GD.Print("Direction is invalid in Track.Limit at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Direction is invalid in Track.Limit at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         direction = 0;
                                     }
                                     if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out cource))
                                     {
-                                        GD.Print("Cource is invalid in Track.Limit at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Cource is invalid in Track.Limit at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         cource = 0;
                                     }
                                     int n = routeData.Blocks[blockIndex].Limit.Length;
@@ -4210,41 +3810,41 @@ public static class CsvRwRouteParser
                             case "track.stop":
                                 if (currentStation == -1)
                                 {
-                                    GD.Print("A stop without a station is invalid in Track.Stop at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    GD.Print("A stop without a station is invalid in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                 }
                                 else
                                 {
                                     int dir = 0;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out dir))
                                     {
-                                        GD.Print("Direction is invalid in Track.Stop at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Direction is invalid in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         dir = 0;
                                     }
                                     double backw = 5.0, forw = 5.0;
                                     if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out backw))
                                     {
-                                        GD.Print("BackwardTolerance is invalid in Track.Stop at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("BackwardTolerance is invalid in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         backw = 5.0;
                                     }
                                     else if (backw <= 0.0)
                                     {
-                                        GD.Print("BackwardTolerance is expected to be positive in Track.Stop at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("BackwardTolerance is expected to be positive in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         backw = 5.0;
                                     }
                                     if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out forw))
                                     {
-                                        GD.Print("ForwardTolerance is invalid in Track.Stop at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("ForwardTolerance is invalid in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         forw = 5.0;
                                     }
                                     else if (forw <= 0.0)
                                     {
-                                        GD.Print("ForwardTolerance is expected to be positive in Track.Stop at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("ForwardTolerance is expected to be positive in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         forw = 5.0;
                                     }
                                     int cars = 0;
                                     if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out cars))
                                     {
-                                        GD.Print("Cars is invalid in Track.Stop at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                        GD.Print("Cars is invalid in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         cars = 0;
                                     }
                                     int n = routeData.Blocks[blockIndex].Stop.Length;
@@ -4726,7 +4326,7 @@ public static class CsvRwRouteParser
                                         int idx1 = 0, idx2 = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx1))
                                         {
-                                            GD.Print("RailIndex1 is invalid in Track.Form at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex1 is invalid in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx1 = 0;
                                         }
                                         if (arguments.Length >= 2 && arguments[1].Length > 0)
@@ -4745,7 +4345,7 @@ public static class CsvRwRouteParser
                                             }
                                             else if (!Conversions.TryParseIntVb6(arguments[1], out idx2))
                                             {
-                                                GD.Print("RailIndex2 is invalid in Track.Form at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex2 is invalid in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 idx2 = 0;
                                             }
                                         }
@@ -4766,42 +4366,42 @@ public static class CsvRwRouteParser
                                         }
                                         if (idx1 < 0)
                                         {
-                                            GD.Print("RailIndex1 is expected to be non-negative in Track.Form at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex1 is expected to be non-negative in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else if (idx2 < 0 & idx2 != Form.SecondaryRailStub & idx2 != Form.SecondaryRailL & idx2 != Form.SecondaryRailR)
                                         {
-                                            GD.Print("RailIndex2 is expected to be greater or equal to -2 in Track.Form at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex2 is expected to be greater or equal to -2 in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (idx1 >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx1].RailStart)
                                             {
-                                                GD.Print("RailIndex1 could be out of range in Track.Form at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex1 could be out of range in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             if (idx2 != Form.SecondaryRailStub & idx2 != Form.SecondaryRailL & idx2 != Form.SecondaryRailR && (idx2 >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx2].RailStart))
                                             {
-                                                GD.Print("RailIndex2 could be out of range in Track.Form at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex2 could be out of range in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             int roof = 0, pf = 0;
                                             if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out roof))
                                             {
-                                                GD.Print("RoofStructureIndex is invalid in Track.Form at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RoofStructureIndex is invalid in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 roof = 0;
                                             }
                                             if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out pf))
                                             {
-                                                GD.Print("FormStructureIndex is invalid in Track.Form at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FormStructureIndex is invalid in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 pf = 0;
                                             }
                                             if (roof != 0 & (roof < 0 || (roof >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[roof] == null) || (roof >= routeData.Structure.RoofR.Length || routeData.Structure.RoofR[roof] == null)))
                                             {
-                                                GD.Print("RoofStructureIndex references an object not loaded in Track.Form at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RoofStructureIndex references an object not loaded in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
                                                 if (pf < 0 | (pf >= routeData.Structure.FormL.Length || routeData.Structure.FormL[pf] == null) & (pf >= routeData.Structure.FormR.Length || routeData.Structure.FormR[pf] == null))
                                                 {
-                                                    GD.Print("FormStructureIndex references an object not loaded in Track.Form at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FormStructureIndex references an object not loaded in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 int n = routeData.Blocks[blockIndex].Form.Length;
                                                 Array.Resize<Form>(ref routeData.Blocks[blockIndex].Form, n + 1);
@@ -4821,18 +4421,18 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.Pole at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is invalid in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx < 0)
                                         {
-                                            GD.Print("RailIndex is expected to be non-negative in Track.Pole at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is expected to be non-negative in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart)
                                             {
-                                                GD.Print("RailIndex could be out of range in Track.Pole at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex could be out of range in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             if (idx >= routeData.Blocks[blockIndex].RailPole.Length)
                                             {
@@ -4848,7 +4448,7 @@ public static class CsvRwRouteParser
                                             {
                                                 if (!Conversions.TryParseIntVb6(arguments[1], out typ))
                                                 {
-                                                    GD.Print("AdditionalRailsCovered is invalid in Track.Pole at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("AdditionalRailsCovered is invalid in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     typ = 0;
                                                 }
                                             }
@@ -4857,7 +4457,7 @@ public static class CsvRwRouteParser
                                                 double loc;
                                                 if (!Conversions.TryParseDoubleVb6(arguments[2], out loc))
                                                 {
-                                                    GD.Print("Location is invalid in Track.Pole at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("Location is invalid in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     loc = 0.0;
                                                 }
                                                 routeData.Blocks[blockIndex].RailPole[idx].Location = loc;
@@ -4867,7 +4467,7 @@ public static class CsvRwRouteParser
                                                 double dist;
                                                 if (!Conversions.TryParseDoubleVb6(arguments[3], unitOfLength, out dist))
                                                 {
-                                                    GD.Print("Interval is invalid in Track.Pole at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("Interval is invalid in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     dist = routeData.BlockInterval;
                                                 }
                                                 routeData.Blocks[blockIndex].RailPole[idx].Interval = dist;
@@ -4876,17 +4476,17 @@ public static class CsvRwRouteParser
                                             {
                                                 if (!Conversions.TryParseIntVb6(arguments[4], out sttype))
                                                 {
-                                                    GD.Print("PoleStructureIndex is invalid in Track.Pole at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("PoleStructureIndex is invalid in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     sttype = 0;
                                                 }
                                             }
                                             if (typ < 0 || typ >= routeData.Structure.Poles.Length || routeData.Structure.Poles[typ] == null)
                                             {
-                                                GD.Print("PoleStructureIndex references an object not loaded in Track.Pole at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("PoleStructureIndex references an object not loaded in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (sttype < 0 || sttype >= routeData.Structure.Poles[typ].Length || routeData.Structure.Poles[typ][sttype] == null)
                                             {
-                                                GD.Print("PoleStructureIndex references an object not loaded in Track.Pole at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("PoleStructureIndex references an object not loaded in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -4905,18 +4505,18 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.PoleEnd at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is invalid in Track.PoleEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx < 0 | idx >= routeData.Blocks[blockIndex].RailPole.Length)
                                         {
-                                            GD.Print("RailIndex does not reference an existing pole in Track.PoleEnd at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex does not reference an existing pole in Track.PoleEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (idx >= routeData.Blocks[blockIndex].Rail.Length || (!routeData.Blocks[blockIndex].Rail[idx].RailStart & !routeData.Blocks[blockIndex].Rail[idx].RailEnd))
                                             {
-                                                GD.Print("RailIndex could be out of range in Track.PoleEnd at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex could be out of range in Track.PoleEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             routeData.Blocks[blockIndex].RailPole[idx].Exists = false;
                                         }
@@ -4930,47 +4530,47 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.Wall at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is invalid in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx < 0)
                                         {
-                                            GD.Print("RailIndex is expected to be a non-negative integer in Track.Wall at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is expected to be a non-negative integer in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         int dir = 0;
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out dir))
                                         {
-                                            GD.Print("Direction is invalid in Track.Wall at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Direction is invalid in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             dir = 0;
                                         }
                                         int sttype = 0;
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out sttype))
                                         {
-                                            GD.Print("WallStructureIndex is invalid in Track.Wall at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("WallStructureIndex is invalid in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             sttype = 0;
                                         }
                                         if (sttype < 0)
                                         {
-                                            GD.Print("WallStructureIndex is expected to be a non-negative integer in Track.Wall at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("WallStructureIndex is expected to be a non-negative integer in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             sttype = 0;
                                         }
                                         if (dir <= 0 && (sttype >= routeData.Structure.WallL.Length || routeData.Structure.WallL[sttype] == null) ||
                                             dir >= 0 && (sttype >= routeData.Structure.WallR.Length || routeData.Structure.WallR[sttype] == null))
                                         {
-                                            GD.Print("WallStructureIndex references an object not loaded in Track.Wall at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("WallStructureIndex references an object not loaded in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (idx < 0)
                                             {
-                                                GD.Print("RailIndex is expected to be non-negative in Track.Wall at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex is expected to be non-negative in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
                                                 if (idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart)
                                                 {
-                                                    GD.Print("RailIndex could be out of range in Track.Wall at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RailIndex could be out of range in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 if (idx >= routeData.Blocks[blockIndex].RailWall.Length)
                                                 {
@@ -4991,18 +4591,18 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.WallEnd at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is invalid in Track.WallEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx < 0 | idx >= routeData.Blocks[blockIndex].RailWall.Length)
                                         {
-                                            GD.Print("RailIndex does not reference an existing wall in Track.WallEnd at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex does not reference an existing wall in Track.WallEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (idx >= routeData.Blocks[blockIndex].Rail.Length || (!routeData.Blocks[blockIndex].Rail[idx].RailStart & !routeData.Blocks[blockIndex].Rail[idx].RailEnd))
                                             {
-                                                GD.Print("RailIndex could be out of range in Track.WallEnd at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex could be out of range in Track.WallEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             routeData.Blocks[blockIndex].RailWall[idx].Exists = false;
                                         }
@@ -5016,47 +4616,47 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.Dike at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is invalid in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx < 0)
                                         {
-                                            GD.Print("RailIndex is expected to be a non-negative integer in Track.Dike at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is expected to be a non-negative integer in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         int dir = 0;
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out dir))
                                         {
-                                            GD.Print("Direction is invalid in Track.Dike at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Direction is invalid in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             dir = 0;
                                         }
                                         int sttype = 0;
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out sttype))
                                         {
-                                            GD.Print("DikeStructureIndex is invalid in Track.Dike at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("DikeStructureIndex is invalid in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             sttype = 0;
                                         }
                                         if (sttype < 0)
                                         {
-                                            GD.Print("DikeStructureIndex is expected to be a non-negative integer in Track.Wall at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("DikeStructureIndex is expected to be a non-negative integer in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             sttype = 0;
                                         }
                                         if (dir <= 0 && (sttype >= routeData.Structure.DikeL.Length || routeData.Structure.DikeL[sttype] == null) ||
                                             dir >= 0 && (sttype >= routeData.Structure.DikeR.Length || routeData.Structure.DikeR[sttype] == null))
                                         {
-                                            GD.Print("DikeStructureIndex references an object not loaded in Track.Dike at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("DikeStructureIndex references an object not loaded in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (idx < 0)
                                             {
-                                                GD.Print("RailIndex is expected to be non-negative in Track.Dike at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex is expected to be non-negative in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
                                                 if (idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart)
                                                 {
-                                                    GD.Print("RailIndex could be out of range in Track.Dike at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RailIndex could be out of range in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 if (idx >= routeData.Blocks[blockIndex].RailDike.Length)
                                                 {
@@ -5077,18 +4677,18 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.DikeEnd at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is invalid in Track.DikeEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx < 0 | idx >= routeData.Blocks[blockIndex].RailDike.Length)
                                         {
-                                            GD.Print("RailIndex does not reference an existing dike in Track.DikeEnd at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex does not reference an existing dike in Track.DikeEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (idx >= routeData.Blocks[blockIndex].Rail.Length || (!routeData.Blocks[blockIndex].Rail[idx].RailStart & !routeData.Blocks[blockIndex].Rail[idx].RailEnd))
                                             {
-                                                GD.Print("RailIndex could be out of range in Track.DikeEnd at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex could be out of range in Track.DikeEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             routeData.Blocks[blockIndex].RailDike[idx].Exists = false;
                                         }
@@ -5101,25 +4701,25 @@ public static class CsvRwRouteParser
                                     {
                                         if (arguments.Length < 1)
                                         {
-                                            GD.Print("Track.Marker is expected to have at least one argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Track.Marker is expected to have at least one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                         {
-                                            GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                             if (!System.IO.File.Exists(f))
                                             {
-                                                GD.Print("FileName " + f + " not found in Track.Marker at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName " + f + " not found in Track.Marker at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
                                                 double dist = routeData.BlockInterval;
                                                 if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out dist))
                                                 {
-                                                    GD.Print("Distance is invalid in Track.Marker at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("Distance is invalid in Track.Marker at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     dist = routeData.BlockInterval;
                                                 }
                                                 double start, end;
@@ -5153,7 +4753,7 @@ public static class CsvRwRouteParser
                                         double h = 0.0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], unitOfLength, out h))
                                         {
-                                            GD.Print("Height is invalid in Track.Height at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Height is invalid in Track.Height at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             h = 0.0;
                                         }
                                         routeData.Blocks[blockIndex].Height = isRW ? h + 0.3 : h;
@@ -5167,7 +4767,7 @@ public static class CsvRwRouteParser
                                         int cytype = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out cytype))
                                         {
-                                            GD.Print("CycleIndex is invalid in Track.Ground at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("CycleIndex is invalid in Track.Ground at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             cytype = 0;
                                         }
                                         if (cytype < routeData.Structure.Cycle.Length && routeData.Structure.Cycle[cytype] != null)
@@ -5178,7 +4778,7 @@ public static class CsvRwRouteParser
                                         {
                                             if (cytype >= routeData.Structure.Ground.Length || routeData.Structure.Ground[cytype] == null)
                                             {
-                                                GD.Print("CycleIndex references an object not loaded in Track.Ground at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("CycleIndex references an object not loaded in Track.Ground at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -5195,47 +4795,47 @@ public static class CsvRwRouteParser
                                         int idx1 = 0, idx2 = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx1))
                                         {
-                                            GD.Print("RailIndex1 is invalid in Track.Crack at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex1 is invalid in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx1 = 0;
                                         }
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out idx2))
                                         {
-                                            GD.Print("RailIndex2 is invalid in Track.Crack at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex2 is invalid in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx2 = 0;
                                         }
                                         int sttype = 0;
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out sttype))
                                         {
-                                            GD.Print("CrackStructureIndex is invalid in Track.Crack at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("CrackStructureIndex is invalid in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             sttype = 0;
                                         }
                                         if (sttype < 0 || (sttype >= routeData.Structure.CrackL.Length || routeData.Structure.CrackL[sttype] == null) || (sttype >= routeData.Structure.CrackR.Length || routeData.Structure.CrackR[sttype] == null))
                                         {
-                                            GD.Print("CrackStructureIndex references an object not loaded in Track.Crack at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("CrackStructureIndex references an object not loaded in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (idx1 < 0)
                                             {
-                                                GD.Print("RailIndex1 is expected to be non-negative in Track.Crack at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex1 is expected to be non-negative in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (idx2 < 0)
                                             {
-                                                GD.Print("RailIndex2 is expected to be non-negative in Track.Crack at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex2 is expected to be non-negative in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else if (idx1 == idx2)
                                             {
-                                                GD.Print("RailIndex1 is expected to be unequal to Index2 in Track.Crack at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex1 is expected to be unequal to Index2 in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
                                                 if (idx1 >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx1].RailStart)
                                                 {
-                                                    GD.Print("RailIndex1 could be out of range in Track.Crack at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RailIndex1 could be out of range in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 if (idx2 >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx2].RailStart)
                                                 {
-                                                    GD.Print("RailIndex2 could be out of range in Track.Crack at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("RailIndex2 could be out of range in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 int n = routeData.Blocks[blockIndex].Crack.Length;
                                                 Array.Resize<Crack>(ref routeData.Blocks[blockIndex].Crack, n + 1);
@@ -5254,31 +4854,31 @@ public static class CsvRwRouteParser
                                         int idx = 0, sttype = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.FreeObj at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out sttype))
                                         {
-                                            GD.Print("FreeObjStructureIndex is invalid in Track.FreeObj at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("FreeObjStructureIndex is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             sttype = 0;
                                         }
                                         if (idx < -1)
                                         {
-                                            GD.Print("RailIndex is expected to be non-negative or -1 in Track.FreeObj at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is expected to be non-negative or -1 in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else if (sttype < 0)
                                         {
-                                            GD.Print("FreeObjStructureIndex is expected to be non-negative in Track.FreeObj at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("FreeObjStructureIndex is expected to be non-negative in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (idx >= 0 && (idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart))
                                             {
-                                                GD.Print("RailIndex could be out of range in Track.FreeObj at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("RailIndex could be out of range in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             if (sttype >= routeData.Structure.FreeObj.Length || routeData.Structure.FreeObj[sttype] == null || routeData.Structure.FreeObj[sttype] == null)
                                             {
-                                                GD.Print("FreeObjStructureIndex references an object not loaded in Track.FreeObj at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FreeObjStructureIndex references an object not loaded in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
@@ -5286,27 +4886,27 @@ public static class CsvRwRouteParser
                                                 double yaw = 0.0, pitch = 0.0, roll = 0.0;
                                                 if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out x))
                                                 {
-                                                    GD.Print("X is invalid in Track.FreeObj at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("X is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     x = 0.0;
                                                 }
                                                 if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], unitOfLength, out y))
                                                 {
-                                                    GD.Print("Y is invalid in Track.FreeObj at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("Y is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     y = 0.0;
                                                 }
                                                 if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out yaw))
                                                 {
-                                                    GD.Print("Yaw is invalid in Track.FreeObj at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("Yaw is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     yaw = 0.0;
                                                 }
                                                 if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out pitch))
                                                 {
-                                                    GD.Print("Pitch is invalid in Track.FreeObj at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("Pitch is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     pitch = 0.0;
                                                 }
                                                 if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[6], out roll))
                                                 {
-                                                    GD.Print("Roll is invalid in Track.FreeObj at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("Roll is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                     roll = 0.0;
                                                 }
                                                 if (idx == -1)
@@ -5359,16 +4959,16 @@ public static class CsvRwRouteParser
                                         int typ = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out typ))
                                         {
-                                            GD.Print("BackgroundTextureIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("BackgroundTextureIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             typ = 0;
                                         }
                                         if (typ < 0 | typ >= routeData.Backgrounds.Length)
                                         {
-                                            GD.Print("BackgroundTextureIndex references a texture not loaded in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("BackgroundTextureIndex references a texture not loaded in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else if (routeData.Backgrounds[typ] == null)
                                         {
-                                            GD.Print("BackgroundTextureIndex has not been loaded via Texture.Background in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("BackgroundTextureIndex has not been loaded via Texture.Background in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
@@ -5383,27 +4983,27 @@ public static class CsvRwRouteParser
                                     {
                                         if (arguments.Length == 0)
                                         {
-                                            GD.Print(command + " is expected to have between 1 and 2 arguments at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print(command + " is expected to have between 1 and 2 arguments at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
                                                 string f = System.IO.Path.Combine(soundPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
                                                     double speed = 0.0;
                                                     if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out speed))
                                                     {
-                                                        GD.Print("Speed is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                        GD.Print("Speed is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                         speed = 0.0;
                                                     }
                                                     int n = routeData.Blocks[blockIndex].Sound.Length;
@@ -5425,32 +5025,32 @@ public static class CsvRwRouteParser
                                     {
                                         if (arguments.Length == 0)
                                         {
-                                            GD.Print(command + " is expected to have between 1 and 3 arguments at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print(command + " is expected to have between 1 and 3 arguments at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             }
                                             else
                                             {
                                                 string f = System.IO.Path.Combine(soundPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 }
                                                 else
                                                 {
                                                     double x = 0.0, y = 0.0;
                                                     if (arguments.Length >= 2 && arguments[1].Length > 0 & !Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out x))
                                                     {
-                                                        GD.Print("X is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                        GD.Print("X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                         x = 0.0;
                                                     }
                                                     if (arguments.Length >= 3 && arguments[2].Length > 0 & !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out y))
                                                     {
-                                                        GD.Print("Y is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                        GD.Print("Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                         y = 0.0;
                                                     }
                                                     int n = routeData.Blocks[blockIndex].Sound.Length;
@@ -5474,14 +5074,14 @@ public static class CsvRwRouteParser
                                     {
                                         if (arguments.Length == 0)
                                         {
-                                            GD.Print(command + " is expected to have exactly 1 argument at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print(command + " is expected to have exactly 1 argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
                                             double time = 0.0;
                                             if (arguments[0].Length > 0 & !Conversions.TryParseTime(arguments[0], out time))
                                             {
-                                                GD.Print("Time is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                                GD.Print("Time is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                                 time = 0.0;
                                             }
                                             //int n = Game.BogusPretrainInstructions.Length;
@@ -5504,43 +5104,43 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx < 0)
                                         {
-                                            GD.Print("RailIndex is expected to be non-negative in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx >= 0 && (idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart))
                                         {
-                                            GD.Print("RailIndex references a non-existing rail in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("RailIndex references a non-existing rail in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         double x = 0.0, y = 0.0;
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out x))
                                         {
-                                            GD.Print("X is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             x = 0.0;
                                         }
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out y))
                                         {
-                                            GD.Print("Y is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             y = 0.0;
                                         }
                                         double yaw = 0.0, pitch = 0.0, roll = 0.0;
                                         if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], out yaw))
                                         {
-                                            GD.Print("Yaw is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Yaw is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             yaw = 0.0;
                                         }
                                         if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out pitch))
                                         {
-                                            GD.Print("Pitch is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Pitch is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             pitch = 0.0;
                                         }
                                         if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out roll))
                                         {
-                                            GD.Print("Roll is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            GD.Print("Roll is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             roll = 0.0;
                                         }
                                         string text = null;
@@ -5562,7 +5162,7 @@ public static class CsvRwRouteParser
                                 }
                                 break;
                             default:
-                                GD.Print("The command " + command + " is not supported at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                GD.Print("The command " + command + " is not supported at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                 break;
                         }
                     }
