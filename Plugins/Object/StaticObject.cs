@@ -4,6 +4,7 @@ using Godot;
 // static objects
 public class StaticObject : UnifiedObject
 {
+    ///
     private string m_sourceFile;
     public String SourceFile { get { return m_sourceFile; } set { m_sourceFile = value; } }
 
