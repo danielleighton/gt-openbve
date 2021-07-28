@@ -21,6 +21,15 @@ public class Expression
     public double m_trackPositionOffset;
     public double TrackPositionOffset { get { return m_trackPositionOffset; } set { m_trackPositionOffset = value; } }
 
+    public Expression(string file, string text, int line, int column, double trackPositionOffset)
+    {
+        m_file = file;
+        m_text = text;
+        m_line = line;
+        m_column = column;
+        m_trackPositionOffset = trackPositionOffset;
+    }
+
     // TODO: Refactor as non-static
     /// <summary>
     /// Parse expressions from input lines
@@ -139,7 +148,7 @@ public class Expression
                                 string t = lines[lineNum].Substring(a, j - a).Trim();
                                 if (t.Length > 0 && !t.StartsWith(";"))
                                 {
-                                    expressionList.Add(CreateExpression(fileName, t, lineNum + 1, c + 1, trackPositionOffset));
+                                    expressionList.Add(new Expression(fileName, t, lineNum + 1, c + 1, trackPositionOffset));
                                     e++;
 
                                 }
@@ -157,7 +166,7 @@ public class Expression
                     string t = lines[lineNum].Substring(a).Trim();
                     if (t.Length > 0 && !t.StartsWith(";"))
                     {
-                        expressionList.Add(CreateExpression(fileName, t, lineNum + 1, c + 1, trackPositionOffset));
+                        expressionList.Add(new Expression(fileName, t, lineNum + 1, c + 1, trackPositionOffset));
                         e++;
                     }
                 }
@@ -165,19 +174,6 @@ public class Expression
         }
 
         return expressionList;
-    }
-
-    private static Expression CreateExpression(string fileName, string expText, int lineNum, int colNum, double trackPos)
-    {
-        // TODO: probably refactor to constructor
-        return new Expression 
-        {
-            File = fileName,
-            Text = expText,
-            Line = lineNum,
-            Column = colNum,
-            TrackPositionOffset = trackPos
-        };
     }
 
     public static void SeparateCommandsAndArguments(Expression expression, out string command, out string argumentSequence, System.Globalization.CultureInfo culture, string fileName, int lineNum, bool raiseErrors)

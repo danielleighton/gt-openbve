@@ -511,6 +511,101 @@ public static class CsvRwRouteParser
         }
     }
 
+	private static void PreprocessSortByTrackPosition(double[] unitFactors, bool isRW, ref Expression[] expressions) 
+    {
+        CultureInfo culture = CultureInfo.CurrentCulture;
+
+        PositionedExpression[] p = new PositionedExpression[expressions.Length];
+        int n = 0;
+        double a = -1.0;
+        bool numberCheck = !isRW;
+        for (int i = 0; i < expressions.Length; i++)
+        {
+            if (isRW)
+            {
+                // only check for track positions in the railway section for RW routes
+                if (expressions[i].Text.StartsWith("[", StringComparison.Ordinal) && expressions[i].Text.EndsWith("]", StringComparison.Ordinal))
+                {
+                    string s = expressions[i].Text.Substring(1, expressions[i].Text.Length - 2).Trim();
+                    numberCheck = string.Compare(s, "Railway", StringComparison.OrdinalIgnoreCase) == 0;
+                }
+            }
+            double x;
+            if (numberCheck && Conversions.TryParseDouble(expressions[i].Text, unitFactors, out x))
+            {
+                x += expressions[i].TrackPositionOffset;
+                if (x >= 0.0)
+                {
+                    // TODO: BveTsHacks
+                    // if (Plugin.CurrentOptions.EnableBveTsHacks)
+                    // {
+                    // 	switch (System.IO.Path.GetFileName(Expressions[i].File.ToLowerInvariant()))
+                    // 	{
+                    // 		case "balloch - dumbarton central special nighttime run.csv":
+                    // 		case "balloch - dumbarton central summer 2004 morning run.csv":
+                    // 			if (x != 0 || a != 4125)
+                    // 			{
+                    // 				//Misplaced comma in the middle of the line causes this to be interpreted as a track position
+                    // 				a = x;
+                    // 			}
+                    // 			break;
+                    // 		default:
+                    // 			a = x;
+                    // 			break;
+                    // 	}
+                    // }
+                    // else
+                    // {
+                    a = x;
+                    // }
+
+                }
+                else
+                {
+                    // TODO: GD.Print can be refactored back into Plugin.CurrentHost.AddMessage
+                    GD.Print("Negative track position encountered at line " + expressions[i].Line.ToString(culture) + ", column " + expressions[i].Column.ToString(culture) + " in file " + expressions[i].File);
+                    //Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Negative track position encountered at line " + Expressions[i].Line.ToString(Culture) + ", column " + Expressions[i].Column.ToString(Culture) + " in file " + Expressions[i].File);
+                }
+            }
+            else
+            {
+                p[n].TrackPosition = a;
+                p[n].Expression = expressions[i];
+                int j = n;
+                n++;
+                while (j > 0)
+                {
+                    if (p[j].TrackPosition < p[j - 1].TrackPosition)
+                    {
+                        PositionedExpression t = p[j];
+                        p[j] = p[j - 1];
+                        p[j - 1] = t;
+                        j--;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+        a = -1.0;
+        Expression[] e = new Expression[expressions.Length];
+        int m = 0;
+        for (int i = 0; i < n; i++)
+        {
+            if (p[i].TrackPosition != a)
+            {
+                a = p[i].TrackPosition;
+                e[m] = new Expression(string.Empty, (a / unitFactors[unitFactors.Length - 1]).ToString(culture), -1, -1, -1);
+                m++;
+            }
+            e[m] = p[i].Expression;
+            m++;
+        }
+        Array.Resize(ref e, m);
+        expressions = e;
+    }
 
     #endregion
 
@@ -723,6 +818,7 @@ public static class CsvRwRouteParser
         /// CswRwRouterParser.Preprocess.cs 
         //PreprocessOptions(fileName, isRW, Encoding, expressions, ref Data, ref UnitOfLength);
         //PreprocessSortByTrackPosition(fileName, isRW, UnitOfLength, ref expressions);
+        PreprocessSortByTrackPosition(unitOfLength, isRW, ref expressionArray);
         ParseRouteDetails(fileName, fileEncoding, isRW, expressionArray, trainPath, objectPath, soundPath, unitOfLength, ref routeData, previewOnly);
 
         //Game.RouteUnitOfLength = UnitOfLength;

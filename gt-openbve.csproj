@@ -18,6 +18,7 @@
   <ItemGroup>
     <Compile Include="lblInformation.cs" />
     <Compile Include="Plugins\Route - CsvRw\Parser\Expression.cs" />
+    <Compile Include="Plugins\Route - CsvRw\Parser\PositionedExpression.cs" />
     <Compile Include="Plugins\Route - CsvRw\Parser\RouteData.cs" />
     <Compile Include="Plugins\Route - CsvRw\Parser\SignalData.cs" />
     <Compile Include="Plugins\Route - CsvRw\Parser\StructureData.cs" />
