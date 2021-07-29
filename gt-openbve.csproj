@@ -22,6 +22,7 @@
     <Compile Include="Plugins\Route - CsvRw\Parser\RouteData.cs" />
     <Compile Include="Plugins\Route - CsvRw\Parser\SignalData.cs" />
     <Compile Include="Plugins\Route - CsvRw\Parser\StructureData.cs" />
+    <Compile Include="Plugins\Route - CsvRw\Plugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Plugins\Object\AnimatedObject.cs" />
     <Compile Include="Plugins\Object\CsvB3dObjectParser.cs" />

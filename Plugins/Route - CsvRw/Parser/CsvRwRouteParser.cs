@@ -7,6 +7,311 @@ public static class CsvRwRouteParser
 {
     #region Preprocessing (CsvRwRouteParser.Preprocess.cs)
 
+    /// <summary>Preprocesses the options contained within a route file</summary>
+    /// <param name="expressions">The initial list of expressions</param>
+    /// <param name="routeData">The finalized route data</param>
+    /// <param name="unitOfLength">The units of length conversion factor to be applied</param>
+    /// <param name="previewOnly">Whether this is a preview only</param>
+    private static void PreprocessOptions(Expression[] expressions, bool isRW, ref RouteData routeData, ref double[] unitOfLength, bool previewOnly)
+    {
+        CultureInfo culture = CultureInfo.CurrentCulture;
+        string section = "";
+        bool sectionAlwaysPrefix = false;
+        
+        // process expressions
+        for (int j = 0; j < expressions.Length; j++)
+        {
+            if (isRW && expressions[j].Text.StartsWith("[") && expressions[j].Text.EndsWith("]"))
+            {
+                section = expressions[j].Text.Substring(1, expressions[j].Text.Length - 2).Trim();
+                if (string.Compare(section, "object", StringComparison.OrdinalIgnoreCase) == 0)
+                {
+                    section = "Structure";
+                }
+                else if (string.Compare(section, "railway", StringComparison.OrdinalIgnoreCase) == 0)
+                {
+                    section = "Track";
+                }
+                sectionAlwaysPrefix = true;
+            }
+            else
+            {
+                expressions[j].Text = Expression.ConvertRwToCsv(expressions[j].Text, section, sectionAlwaysPrefix);
+
+                // separate command and arguments
+                string Command, ArgumentSequence;
+             	Expression.SeparateCommandsAndArguments(expressions[j], out Command, out ArgumentSequence, culture, true, isRW, section);
+					
+
+                // process command
+                double Number;
+                bool NumberCheck = !isRW || string.Compare(section, "track", StringComparison.OrdinalIgnoreCase) == 0;
+                if (!NumberCheck || !Conversions.TryParseDoubleVb6(Command, unitOfLength, out Number))
+                {
+                    // split arguments
+                    string[] Arguments;
+                    {
+                        int n = 0;
+                        for (int k = 0; k < ArgumentSequence.Length; k++)
+                        {
+                            if (isRW && ArgumentSequence[k] == ',')
+                            {
+                                n++;
+                            }
+                            else if (ArgumentSequence[k] == ';')
+                            {
+                                n++;
+                            }
+                        }
+                        Arguments = new string[n + 1];
+                        int a = 0, h = 0;
+                        for (int k = 0; k < ArgumentSequence.Length; k++)
+                        {
+                            if (isRW && ArgumentSequence[k] == ',')
+                            {
+                                Arguments[h] = ArgumentSequence.Substring(a, k - a).Trim();
+                                a = k + 1; h++;
+                            }
+                            else if (ArgumentSequence[k] == ';')
+                            {
+                                Arguments[h] = ArgumentSequence.Substring(a, k - a).Trim();
+                                a = k + 1; h++;
+                            }
+                        }
+                        if (ArgumentSequence.Length - a > 0)
+                        {
+                            Arguments[h] = ArgumentSequence.Substring(a).Trim();
+                            h++;
+                        }
+                        Array.Resize(ref Arguments, h);
+                    }
+                    // preprocess command
+                    if (Command.ToLowerInvariant() == "with")
+                    {
+                        if (Arguments.Length >= 1)
+                        {
+                            section = Arguments[0];
+                            sectionAlwaysPrefix = false;
+                        }
+                        else
+                        {
+                            section = "";
+                            sectionAlwaysPrefix = false;
+                        }
+                        Command = null;
+                    }
+                    else
+                    {
+                        if (Command.StartsWith("."))
+                        {
+                            Command = section + Command;
+                        }
+                        else if (sectionAlwaysPrefix)
+                        {
+                            Command = section + "." + Command;
+                        }
+                        Command = Command.Replace(".Void", "");
+                    }
+                    // handle indices
+                    if (Command != null && Command.EndsWith(")"))
+                    {
+                        for (int k = Command.Length - 2; k >= 0; k--)
+                        {
+                            if (Command[k] == '(')
+                            {
+                                string Indices = Command.Substring(k + 1, Command.Length - k - 2).TrimStart();
+                                Command = Command.Substring(0, k).TrimEnd();
+                                int h = Indices.IndexOf(";", StringComparison.Ordinal);
+                                int CommandIndex1;
+                                if (h >= 0)
+                                {
+                                    string a = Indices.Substring(0, h).TrimEnd();
+                                    string b = Indices.Substring(h + 1).TrimStart();
+                                    if (a.Length > 0 && !Conversions.TryParseIntVb6(a, out CommandIndex1))
+                                    {
+                                        Command = null; break;
+                                    }
+                                    int CommandIndex2;
+                                    if (b.Length > 0 && !Conversions.TryParseIntVb6(b, out CommandIndex2))
+                                    {
+                                        Command = null;
+                                    }
+                                }
+                                else
+                                {
+                                    if (Indices.Length > 0 && !Conversions.TryParseIntVb6(Indices, out CommandIndex1))
+                                    {
+                                        Command = null;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    // process command
+                    if (Command != null)
+                    {
+                        switch (Command.ToLowerInvariant())
+                        {
+                            // options
+                            case "options.unitoflength":
+                                {
+                                    if (Arguments.Length == 0)
+                                    {
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "At least 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    }
+                                    else
+                                    {
+                                        unitOfLength = new double[Arguments.Length];
+                                        for (int i = 0; i < Arguments.Length; i++)
+                                        {
+                                            unitOfLength[i] = i == Arguments.Length - 1 ? 1.0 : 0.0;
+                                            if (Arguments[i].Length > 0 && !Conversions.TryParseDoubleVb6(Arguments[i], out unitOfLength[i]))
+                                            {
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FactorInMeters" + i.ToString(culture) + " is invalid in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                unitOfLength[i] = i == 0 ? 1.0 : 0.0;
+                                            }
+                                            else if (unitOfLength[i] <= 0.0)
+                                            {
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FactorInMeters" + i.ToString(culture) + " is expected to be positive in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                unitOfLength[i] = i == Arguments.Length - 1 ? 1.0 : 0.0;
+                                            }
+                                        }
+                                    }
+                                }
+                                break;
+                            case "options.unitofspeed":
+                                {
+                                    if (Arguments.Length < 1)
+                                    {
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    }
+                                    else
+                                    {
+                                        if (Arguments.Length > 1)
+                                        {
+                                            Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        }
+                                        if (Arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(Arguments[0], out routeData.UnitOfSpeed))
+                                        {
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FactorInKmph is invalid in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            routeData.UnitOfSpeed = 0.277777777777778;
+                                        }
+                                        else if (routeData.UnitOfSpeed <= 0.0)
+                                        {
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FactorInKmph is expected to be positive in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            routeData.UnitOfSpeed = 0.277777777777778;
+                                        }
+                                        else
+                                        {
+                                            routeData.UnitOfSpeed *= 0.277777777777778;
+                                        }
+                                    }
+                                }
+                                break;
+                            case "options.objectvisibility":
+                                {
+                                    if (Arguments.Length == 0)
+                                    {
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    }
+                                    else
+                                    {
+                                        if (Arguments.Length > 1)
+                                        {
+                                            Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        }
+                                        int mode = 0;
+                                        if (Arguments.Length >= 1 && Arguments[0].Length != 0 && !Conversions.TryParseIntVb6(Arguments[0], out mode))
+                                        {
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            mode = 0;
+                                        }
+                                        else if (mode != 0 & mode != 1)
+                                        {
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The specified Mode is not supported in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            mode = 0;
+                                        }
+                                        routeData.AccurateObjectDisposal = mode == 1;
+                                    }
+                                }
+                                break;
+                            case "options.compatibletransparencymode":
+                                {
+                                    //Whether to use fuzzy matching for BVE2 / BVE4 transparencies
+                                    //Should be DISABLED on openBVE content
+                                    if (previewOnly)
+                                    {
+                                        continue;
+                                    }
+                                    if (Arguments.Length == 0)
+                                    {
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    }
+                                    else
+                                    {
+                                        if (Arguments.Length > 1)
+                                        {
+                                            Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        }
+                                        int mode = 0;
+                                        if (Arguments.Length >= 1 && Arguments[0].Length != 0 && !Conversions.TryParseIntVb6(Arguments[0], out mode))
+                                        {
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            mode = 0;
+                                        }
+                                        else if (mode != 0 & mode != 1)
+                                        {
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The specified Mode is not supported in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            mode = 0;
+                                        }
+                                        //Plugin.CurrentOptions.OldTransparencyMode = mode == 1;        // TODO
+                                    }
+                                }
+                                break;
+                            case "options.enablebvetshacks":
+                            case "options.enablehacks":
+                                {
+                                    //Whether to apply various hacks to fix BVE2 / BVE4 routes
+                                    //Whilst this is harmless, it should be DISABLED on openBVE content
+                                    //in order to ensure that all errors are correctly fixed by the developer
+                                    if (previewOnly)
+                                    {
+                                        continue;
+                                    }
+                                    if (Arguments.Length == 0)
+                                    {
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    }
+                                    else
+                                    {
+                                        if (Arguments.Length > 1)
+                                        {
+                                            Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        }
+                                        int mode = 0;
+                                        if (Arguments.Length >= 1 && Arguments[0].Length != 0 && !Conversions.TryParseIntVb6(Arguments[0], out mode))
+                                        {
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            mode = 0;
+                                        }
+                                        else if (mode != 0 & mode != 1)
+                                        {
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The specified Mode is not supported in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            mode = 0;
+                                        }
+                                        // TODO
+                                        // Plugin.CurrentOptions.EnableBveTsHacks = mode == 1; 
+                                    }
+                                }
+                                break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // preprocess chrrndsub
     private static void PreprocessChrRndSub(string fileName, Encoding fileEncoding, bool isRW, ref Expression[] expressions)
     {
@@ -228,7 +533,7 @@ public static class CsvRwRouteParser
                                         {
                                             includeFile = args[2 * ia].Substring(0, colon).TrimEnd();
                                             string value = args[2 * ia].Substring(colon + 1).TrimStart();
-                                            
+
                                             if (!double.TryParse(value, NumberStyles.Float, Culture, out offset))
                                             {
                                                 continueWithNextExpression = true;
@@ -511,7 +816,7 @@ public static class CsvRwRouteParser
         }
     }
 
-	private static void PreprocessSortByTrackPosition(double[] unitFactors, bool isRW, ref Expression[] expressions) 
+    private static void PreprocessSortByTrackPosition(double[] unitFactors, bool isRW, ref Expression[] expressions)
     {
         CultureInfo culture = CultureInfo.CurrentCulture;
 
@@ -665,10 +970,10 @@ public static class CsvRwRouteParser
             routeData.Blocks[0].Transponder = new Transponder[] { };
             routeData.Blocks[0].PointsOfInterest = new PointOfInterest[] { };
             routeData.Markers = new Marker[] { };
-            
+
             // poles
             // Node poleParent = new Node("Poles");
-            Node poleParent = new Node ();
+            Node poleParent = new Node();
             poleParent.Name = "Poles";
             string poleFolder = System.IO.Path.Combine(compatibilityFolder, "Poles");
             routeData.Structure.Poles = new UnifiedObject[][] {
@@ -828,7 +1133,7 @@ public static class CsvRwRouteParser
 
 
     }
-        
+
     private static void ParseRouteDetails(string fileName, Encoding fileEncoding, bool isRW, Expression[] expressions, string trainPath, string objectPath, string soundPath, double[] unitOfLength, ref RouteData routeData, bool previewOnly)
     {
         System.Globalization.CultureInfo culture = System.Globalization.CultureInfo.InvariantCulture;
@@ -895,7 +1200,7 @@ public static class CsvRwRouteParser
                 }
                 // separate command and arguments
                 string command, argumentSequence;
-                Expression.SeparateCommandsAndArguments(expressions[j], out command, out argumentSequence, culture, expressions[j].File, j, false);
+                Expression.SeparateCommandsAndArguments(expressions[j], out command, out argumentSequence, culture, true, isRW, Section);
 
                 // process command
                 double number;
@@ -2577,8 +2882,8 @@ public static class CsvRwRouteParser
                                                 else
                                                 {
                                                     // TODO: Only BMP support...
-                                                    
-                                                    ImageTexture background = new ImageTexture(); 
+
+                                                    ImageTexture background = new ImageTexture();
                                                     background.Load(f);
                                                     if (background != null)
                                                         routeData.Backgrounds[commandIndex1] = background;
@@ -2756,8 +3061,9 @@ public static class CsvRwRouteParser
                 }
                 // separate command and arguments
                 string command, argumentSequence;
-                Expression.SeparateCommandsAndArguments(expressions[j], out command, out argumentSequence, culture, expressions[j].File, j, false);
+                Expression.SeparateCommandsAndArguments(expressions[j], out command, out argumentSequence, culture,  false, isRW, Section);
                 
+
                 // process command
                 double number;
                 bool numberCheck = !isRW || string.Compare(Section, "track", StringComparison.OrdinalIgnoreCase) == 0;
@@ -5440,7 +5746,7 @@ public static class CsvRwRouteParser
                 }
             }
         }
-     
+
 
         // create objects and track
         Vector3 playerRailPos = new Vector3(0.0f, 0.0f, 0.0f);
@@ -5464,7 +5770,7 @@ public static class CsvRwRouteParser
         {
             double startingDistance = (double)blockIdx * routeData.BlockInterval;
             double endingDistance = startingDistance + routeData.BlockInterval;
-            
+
             playerRailDir = playerRailDir.Normalized();
 
             // track
@@ -5472,7 +5778,7 @@ public static class CsvRwRouteParser
             {
                 if (routeData.Blocks[blockIdx].Cycle.Length == 1 && routeData.Blocks[blockIdx].Cycle[0] == -1)
                 {
-                     if (routeData.Structure.Cycle.Length == 0 || routeData.Structure.Cycle[0] == null)
+                    if (routeData.Structure.Cycle.Length == 0 || routeData.Structure.Cycle[0] == null)
                     {
                         routeData.Blocks[blockIdx].Cycle = new int[] { 0 };
                     }
@@ -5828,10 +6134,10 @@ public static class CsvRwRouteParser
             float trackYaw = (float)Math.Atan2(playerRailDir.x, playerRailDir.y);
             float trackPitch = (float)Math.Atan(routeData.Blocks[blockIdx].Pitch);
 
-            Transform groundTransformation = new Transform(Basis.Identity,  Vector3.Zero);
+            Transform groundTransformation = new Transform(Basis.Identity, Vector3.Zero);
             groundTransformation = groundTransformation.Rotated(Vector3.Up, -(float)trackYaw);
 
-            Transform trackTransformation = new Transform(Basis.Identity,  Vector3.Zero);
+            Transform trackTransformation = new Transform(Basis.Identity, Vector3.Zero);
             trackTransformation = trackTransformation.Rotated(Vector3.Up, -(float)trackYaw);
             trackTransformation = trackTransformation.Rotated(Vector3.Right, (float)trackPitch);
 
@@ -5848,9 +6154,9 @@ public static class CsvRwRouteParser
                     if (routeData.Structure.Ground[gi] != null)
                     {
                         //ObjectManager.CreateObject(Data.Structure.Ground[Data.Blocks[i].Cycle[ci]], Position + new Vector3D(0.0, -Data.Blocks[i].Height, 0.0), GroundTransformation, NullTransformation, Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, StartingDistance);
-                        ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.Ground[routeData.Blocks[blockIdx].Cycle[ci]],
-                                                                    playerRailPos + new Vector3(0.0f, (float)-routeData.Blocks[blockIdx].Height, 0.0f), 
-                                                                    groundTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, 
+                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.Ground[routeData.Blocks[blockIdx].Cycle[ci]],
+                                                                    playerRailPos + new Vector3(0.0f, (float)-routeData.Blocks[blockIdx].Height, 0.0f),
+                                                                    groundTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance,
                                                                     routeData.BlockInterval, startingDistance);
                     }
                 }
@@ -5866,9 +6172,9 @@ public static class CsvRwRouteParser
                     double d = routeData.Blocks[blockIdx].GroundFreeObj[j].TrackPosition - startingDistance;
                     double dx = routeData.Blocks[blockIdx].GroundFreeObj[j].X;
                     double dy = routeData.Blocks[blockIdx].GroundFreeObj[j].Y;
-                    
-                    Vector3 wpos = playerRailPos + new Vector3( (float)(playerRailDir.x * d + playerRailDir.y * dx), 
-                                                                (float)(dy - routeData.Blocks[blockIdx].Height), 
+
+                    Vector3 wpos = playerRailPos + new Vector3((float)(playerRailDir.x * d + playerRailDir.y * dx),
+                                                                (float)(dy - routeData.Blocks[blockIdx].Height),
                                                                 (float)(playerRailDir.y * d - playerRailDir.x * dx));
                     double tpos = routeData.Blocks[blockIdx].GroundFreeObj[j].TrackPosition;
 
@@ -5877,7 +6183,7 @@ public static class CsvRwRouteParser
                     gafTran = gafTran.Rotated(Vector3.Right, (float)routeData.Blocks[blockIdx].GroundFreeObj[j].Pitch);
                     gafTran = gafTran.Rotated(Vector3.Forward, (float)routeData.Blocks[blockIdx].GroundFreeObj[j].Roll);
 
-                    ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.FreeObj[sttype], wpos, groundTransformation, gafTran, 
+                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FreeObj[sttype], wpos, groundTransformation, gafTran,
                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, tpos);
                 }
             }
@@ -5898,7 +6204,7 @@ public static class CsvRwRouteParser
                     if (railIdx == 0)
                     {
                         // Rail 0 (player rail)
-                        planar = 0.0;               
+                        planar = 0.0;
                         updown = 0.0;
                         railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);
                         railTransformation = railTransformation.Rotated(Vector3.Up, -(float)planar);            // TODO: seems a waste, always rotating by 0.0 planar / updown ???
@@ -5988,7 +6294,7 @@ public static class CsvRwRouteParser
                             //railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);
                             double dx = routeData.Blocks[blockIdx + 1].Rail[railIdx].RailEndX - routeData.Blocks[blockIdx].Rail[railIdx].RailStartX;
                             double dy = routeData.Blocks[blockIdx + 1].Rail[railIdx].RailEndY - routeData.Blocks[blockIdx].Rail[railIdx].RailStartY;
-                            
+
                             planar = Math.Atan(dx / c);
                             dh = dy / c;
                             updown = Math.Atan(dh);
@@ -6011,8 +6317,8 @@ public static class CsvRwRouteParser
                         if (routeData.Structure.Rail[routeData.Blocks[blockIdx].RailType[railIdx]] != null)
                         {
                             // ObjectManager.CreateObject(routeData.Structure.Rail[routeData.Blocks[i].RailType[j]], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.Rail[routeData.Blocks[blockIdx].RailType[railIdx]], 
-                                                                        railPosition, railTransformation, nullTransformation, 
+                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.Rail[routeData.Blocks[blockIdx].RailType[railIdx]],
+                                                                        railPosition, railTransformation, nullTransformation,
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                     }
@@ -6058,7 +6364,7 @@ public static class CsvRwRouteParser
                         {
                             if (routeData.Blocks[blockIdx].RailPole[railIdx].Mode == 0)
                             {
-                                UnifiedObject poleObj = ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.Poles[0][routeData.Blocks[blockIdx].RailPole[railIdx].Type], railPosition, railTransformation, nullTransformation, 
+                                UnifiedObject poleObj = ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.Poles[0][routeData.Blocks[blockIdx].RailPole[railIdx].Type], railPosition, railTransformation, nullTransformation,
                                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 if (routeData.Blocks[blockIdx].RailPole[railIdx].Location > 0)
                                     poleObj.Mirror();
@@ -6078,7 +6384,7 @@ public static class CsvRwRouteParser
                                 Vector3 wpos = railPosition + new Vector3((float)(sx * dx + wx * dz), (float)(sy * dx + wy * dz), (float)(sz * dx + wz * dz));
                                 int type = routeData.Blocks[blockIdx].RailPole[railIdx].Type;
                                 //ObjectManager.CreateObject(routeData.Structure.Poles[m][type], wpos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.Poles[m][type], railPosition, railTransformation, nullTransformation, 
+                                ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.Poles[m][type], railPosition, railTransformation, nullTransformation,
                                                                             routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                             }
                         }
@@ -6088,15 +6394,15 @@ public static class CsvRwRouteParser
                     if (routeData.Blocks[blockIdx].RailWall.Length > railIdx && routeData.Blocks[blockIdx].RailWall[railIdx].Exists)
                     {
                         if (routeData.Blocks[blockIdx].RailWall[railIdx].Direction <= 0)
-                        {                
+                        {
                             //ObjectManager.CreateObject(routeData.Structure.WallL[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.WallL[routeData.Blocks[blockIdx].RailWall[railIdx].Type], railPosition, railTransformation, nullTransformation, 
+                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.WallL[routeData.Blocks[blockIdx].RailWall[railIdx].Type], railPosition, railTransformation, nullTransformation,
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                         if (routeData.Blocks[blockIdx].RailWall[railIdx].Direction >= 0)
-                        {                            
+                        {
                             //ObjectManager.CreateObject(routeData.Structure.WallR[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.WallR[routeData.Blocks[blockIdx].RailWall[railIdx].Type], railPosition, railTransformation, nullTransformation, 
+                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.WallR[routeData.Blocks[blockIdx].RailWall[railIdx].Type], railPosition, railTransformation, nullTransformation,
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                     }
@@ -6107,13 +6413,13 @@ public static class CsvRwRouteParser
                         if (routeData.Blocks[blockIdx].RailDike[railIdx].Direction <= 0)
                         {
                             //ObjectManager.CreateObject(routeData.Structure.DikeL[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.blockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.DikeL[routeData.Blocks[blockIdx].RailDike[railIdx].Type], railPosition, railTransformation, nullTransformation,
+                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.DikeL[routeData.Blocks[blockIdx].RailDike[railIdx].Type], railPosition, railTransformation, nullTransformation,
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                         if (routeData.Blocks[blockIdx].RailDike[railIdx].Direction >= 0)
                         {
                             //ObjectManager.CreateObject(routeData.Structure.DikeR[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.blockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.DikeR[routeData.Blocks[blockIdx].RailDike[railIdx].Type], railPosition, railTransformation, nullTransformation,
+                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.DikeR[routeData.Blocks[blockIdx].RailDike[railIdx].Type], railPosition, railTransformation, nullTransformation,
                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                         }
                     }
@@ -6172,7 +6478,7 @@ public static class CsvRwRouteParser
                                         else
                                         {
                                             //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation, 
+                                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
                                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                         }
                                     }
@@ -6187,7 +6493,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                                 if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCL.Length || routeData.Structure.FormCL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
@@ -6197,7 +6503,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateStaticObject(routeData.Structure.FormCL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.FormCL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormCL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
 
@@ -6210,7 +6516,7 @@ public static class CsvRwRouteParser
                                     else
                                     {
                                         //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                     if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCL.Length || routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
@@ -6220,7 +6526,7 @@ public static class CsvRwRouteParser
                                     else
                                     {
                                         //ObjectManager.CreateStaticObject(routeData.Structure.RoofCL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                 }
@@ -6234,7 +6540,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                                 if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCR.Length || routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
@@ -6244,7 +6550,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateStaticObject(routeData.Structure.FormCR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                                 if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
@@ -6256,7 +6562,7 @@ public static class CsvRwRouteParser
                                     else
                                     {
                                         //ObjectManager.CreateObject(routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                     if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCR.Length || routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
@@ -6266,7 +6572,7 @@ public static class CsvRwRouteParser
                                     else
                                     {
                                         //ObjectManager.CreateStaticObject(routeData.Structure.RoofCR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                 }
@@ -6296,7 +6602,7 @@ public static class CsvRwRouteParser
                                         else
                                         {
                                             //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
+                                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
                                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                         }
 
@@ -6319,7 +6625,7 @@ public static class CsvRwRouteParser
                                             else
                                             {
                                                 //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                                ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation, 
+                                                ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
                                                                                             routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                             }
                                             if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCL.Length || routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
@@ -6343,7 +6649,7 @@ public static class CsvRwRouteParser
                                         else
                                         {
                                             //ObjectManager.CreateObject(routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation, 
+                                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
                                                                                         routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                         }
                                         if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCR.Length || routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
@@ -6365,7 +6671,7 @@ public static class CsvRwRouteParser
                                             else
                                             {
                                                 //ObjectManager.CreateObject(routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                                ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation, 
+                                                ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
                                                                                             routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                             }
                                             if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCR.Length || routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
@@ -6400,7 +6706,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                                 if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
@@ -6412,7 +6718,7 @@ public static class CsvRwRouteParser
                                     else
                                     {
                                         //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                 }
@@ -6426,7 +6732,7 @@ public static class CsvRwRouteParser
                                 else
                                 {
                                     //ObjectManager.CreateObject(routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation, 
+                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
                                                                                 routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                 }
                                 if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
@@ -6438,7 +6744,7 @@ public static class CsvRwRouteParser
                                     else
                                     {
                                         //ObjectManager.CreateObject(routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation, 
+                                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
                                                                                     routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
                                     }
                                 }
@@ -6508,14 +6814,14 @@ public static class CsvRwRouteParser
                             wpos.z += (float)(dx * railTransformation.basis.x.z + dy * railTransformation.basis.y.z + dz * railTransformation.basis.z.z);
                             double tpos = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].TrackPosition;
                             //ObjectManager.CreateObject(Data.Structure.FreeObj[sttype], wpos, RailTransformation, new World.Transformation(Data.Blocks[i].RailFreeObj[j][k].Yaw, Data.Blocks[i].RailFreeObj[j][k].Pitch, Data.Blocks[i].RailFreeObj[j][k].Roll), -1, Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, tpos, 1.0, false);
-                            
+
                             // new Transformation((float)routeData.Blocks[i].RailFreeObj[j][k].Yaw, (float)routeData.Blocks[i].RailFreeObj[j][k].Pitch, (float)routeData.Blocks[i].RailFreeObj[j][k].Roll)
                             Transform foTran = new Transform(Basis.Identity, new Vector3(0, 0, 0));
                             foTran = foTran.Rotated(Vector3.Up, -(float)routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Yaw);
                             foTran = foTran.Rotated(Vector3.Right, (float)routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Pitch);
                             foTran = foTran.Rotated(Vector3.Forward, (float)routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Roll);
 
-                            ObjectManager.Instance.InstantiateObject(   routeRootNode, routeData.Structure.FreeObj[sttype], wpos, railTransformation, foTran, false, 
+                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FreeObj[sttype], wpos, railTransformation, foTran, false,
                                                                         startingDistance, endingDistance, routeData.BlockInterval, tpos);
                         }
                     }
@@ -7116,52 +7422,64 @@ public static class CsvRwRouteParser
         // cant
         if (!previewOnly)
         {
-           ComputeCantTangents();
-           int subdivisions = (int)Math.Floor(routeData.BlockInterval / 5.0);
-           if (subdivisions >= 2)
-           {
-               SmoothenOutTurns(subdivisions);
-               ComputeCantTangents();
-           }
+            ComputeCantTangents();
+            int subdivisions = (int)Math.Floor(routeData.BlockInterval / 5.0);
+            if (subdivisions >= 2)
+            {
+                SmoothenOutTurns(subdivisions);
+                ComputeCantTangents();
+            }
         }
     }
 
     #endregion
-  
 
-    private static void ComputeCantTangents() {
-			if (TrackManager.CurrentTrack.Elements.Length == 1) {
-				TrackManager.CurrentTrack.Elements[0].CurveCantTangent = 0.0;
-			} else if (TrackManager.CurrentTrack.Elements.Length != 0) {
-				double[] deltas = new double[TrackManager.CurrentTrack.Elements.Length - 1];
-				for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length - 1; i++) {
-					deltas[i] = TrackManager.CurrentTrack.Elements[i + 1].CurveCant - TrackManager.CurrentTrack.Elements[i].CurveCant;
-				}
-				double[] tangents = new double[TrackManager.CurrentTrack.Elements.Length];
-				tangents[0] = deltas[0];
-				tangents[TrackManager.CurrentTrack.Elements.Length - 1] = deltas[TrackManager.CurrentTrack.Elements.Length - 2];
-				for (int i = 1; i < TrackManager.CurrentTrack.Elements.Length - 1; i++) {
-					tangents[i] = 0.5 * (deltas[i - 1] + deltas[i]);
-				}
-				for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length - 1; i++) {
-					if (deltas[i] == 0.0) {
-						tangents[i] = 0.0;
-						tangents[i + 1] = 0.0;
-					} else {
-						double a = tangents[i] / deltas[i];
-						double b = tangents[i + 1] / deltas[i];
-						if (a * a + b * b > 9.0) {
-							double t = 3.0 / Math.Sqrt(a * a + b * b);
-							tangents[i] = t * a * deltas[i];
-							tangents[i + 1] = t * b * deltas[i];
-						}
-					}
-				}
-				for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length; i++) {
-					TrackManager.CurrentTrack.Elements[i].CurveCantTangent = tangents[i];
-				}
-			}
-		}
+
+    private static void ComputeCantTangents()
+    {
+        if (TrackManager.CurrentTrack.Elements.Length == 1)
+        {
+            TrackManager.CurrentTrack.Elements[0].CurveCantTangent = 0.0;
+        }
+        else if (TrackManager.CurrentTrack.Elements.Length != 0)
+        {
+            double[] deltas = new double[TrackManager.CurrentTrack.Elements.Length - 1];
+            for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length - 1; i++)
+            {
+                deltas[i] = TrackManager.CurrentTrack.Elements[i + 1].CurveCant - TrackManager.CurrentTrack.Elements[i].CurveCant;
+            }
+            double[] tangents = new double[TrackManager.CurrentTrack.Elements.Length];
+            tangents[0] = deltas[0];
+            tangents[TrackManager.CurrentTrack.Elements.Length - 1] = deltas[TrackManager.CurrentTrack.Elements.Length - 2];
+            for (int i = 1; i < TrackManager.CurrentTrack.Elements.Length - 1; i++)
+            {
+                tangents[i] = 0.5 * (deltas[i - 1] + deltas[i]);
+            }
+            for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length - 1; i++)
+            {
+                if (deltas[i] == 0.0)
+                {
+                    tangents[i] = 0.0;
+                    tangents[i + 1] = 0.0;
+                }
+                else
+                {
+                    double a = tangents[i] / deltas[i];
+                    double b = tangents[i + 1] / deltas[i];
+                    if (a * a + b * b > 9.0)
+                    {
+                        double t = 3.0 / Math.Sqrt(a * a + b * b);
+                        tangents[i] = t * a * deltas[i];
+                        tangents[i + 1] = t * b * deltas[i];
+                    }
+                }
+            }
+            for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length; i++)
+            {
+                TrackManager.CurrentTrack.Elements[i].CurveCantTangent = tangents[i];
+            }
+        }
+    }
 
     private static void SmoothenOutTurns(int subdivisions)
     {
