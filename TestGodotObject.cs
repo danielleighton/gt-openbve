@@ -116,7 +116,6 @@ public class TestGodotObject : MeshInstance
         {
             am.SurfaceSetMaterial(i, mats[i]);
         }
-
     }
 
 }

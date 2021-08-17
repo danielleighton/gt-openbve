@@ -293,9 +293,7 @@ public class CsvB3dObjectParser
                             // Set submesh to use to simple color shader/material
                             gdMesh.SurfaceSetMaterial(gdMesh.GetSurfaceCount() - 1, matColor);
                         }
-
                     }
-
                 }
 
             }

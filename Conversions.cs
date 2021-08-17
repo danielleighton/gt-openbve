@@ -39,6 +39,81 @@ public static class Conversions
         Value = 0.0f;
         return false;
     }
+
+
+
+    public static bool TryParseFloatVb6(string Expression, float[] UnitFactors, out float Value)
+    {
+        float a;
+        if (float.TryParse(Expression, NumberStyles.Number, CultureInfo.InvariantCulture, out a))
+        {
+            Value = a * UnitFactors[UnitFactors.Length - 1];
+            return true;
+        }
+        else
+        {
+            string[] parameters = Expression.Split(new[] { ':' });
+            Value = 0.0f;
+            if (parameters.Length <= UnitFactors.Length)
+            {
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    if (TryParseFloatVb6(parameters[i].Trim(new char[] { }), out a))
+                    {
+                        int j = i + UnitFactors.Length - parameters.Length;
+                        Value += a * UnitFactors[j];
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+    }
+
+
+    public static bool TryParseFloat(string Expression, float[] UnitFactors, out float Value)
+    {
+        float a;
+        if (float.TryParse(Expression, NumberStyles.Number, CultureInfo.InvariantCulture, out a))
+        {
+            Value = a * UnitFactors[UnitFactors.Length - 1];
+            return true;
+        }
+        else
+        {
+            string[] parameters = Expression.Split(new[] { ':' });
+            if (parameters.Length <= UnitFactors.Length)
+            {
+                Value = 0.0f;
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    if (float.TryParse(parameters[i].Trim(new char[] { }), NumberStyles.Float, CultureInfo.InvariantCulture, out a))
+                    {
+                        int j = i + UnitFactors.Length - parameters.Length;
+                        Value += a * UnitFactors[j];
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            else
+            {
+                Value = 0.0f;
+                return false;
+            }
+        }
+    }
+
     internal static bool TryParseIntVb6(string Expression, out int Value)
     {
         Expression = TrimInside(Expression);

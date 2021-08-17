@@ -3,8 +3,56 @@ using System;
 using System.Globalization;
 using System.Collections.Generic;
 using System.Text;
+
+
+
 public static class CsvRwRouteParser
 {
+
+    /// <summary>
+    /// TODO - move this
+    /// </summary>
+    public enum Direction
+    {
+        Left = -1,
+        Both = 0,
+        Right = 1,
+        None = 2,
+        Invalid = int.MaxValue
+    }
+    internal static Direction FindDirection(string direction, string command, bool isWallDike, int line, string file)
+    {
+
+        direction = direction.Trim();
+        switch (direction.ToUpperInvariant())
+        {
+            case "-1":
+            case "L":
+            case "LEFT":
+                return CsvRwRouteParser.Direction.Left;
+            case "B":
+            case "BOTH":
+                return CsvRwRouteParser.Direction.Both;
+            case "+1":
+            case "1":
+            case "R":
+            case "RIGHT":
+                return CsvRwRouteParser.Direction.Right;
+            case "0":
+                // BVE is inconsistent: Walls / Dikes use 0 for *both* sides, stations use 0 for none....
+                return isWallDike ? CsvRwRouteParser.Direction.Both : CsvRwRouteParser.Direction.None;
+            case "N":
+            case "NONE":
+            case "NEITHER":
+                return CsvRwRouteParser.Direction.None;
+            default:
+                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Direction is invalid in " + command + " at line " + line + " in file " + file);
+                return CsvRwRouteParser.Direction.Invalid;
+
+        }
+    }
+
+
     #region Preprocessing (CsvRwRouteParser.Preprocess.cs)
 
     /// <summary>Preprocesses the options contained within a route file</summary>
@@ -12,12 +60,12 @@ public static class CsvRwRouteParser
     /// <param name="routeData">The finalized route data</param>
     /// <param name="unitOfLength">The units of length conversion factor to be applied</param>
     /// <param name="previewOnly">Whether this is a preview only</param>
-    private static void PreprocessOptions(Expression[] expressions, bool isRW, ref RouteData routeData, ref double[] unitOfLength, bool previewOnly)
+    private static void PreprocessOptions(Expression[] expressions, bool isRW, ref RouteData routeData, ref float[] unitOfLength, bool previewOnly)
     {
         CultureInfo culture = CultureInfo.CurrentCulture;
         string section = "";
         bool sectionAlwaysPrefix = false;
-        
+
         // process expressions
         for (int j = 0; j < expressions.Length; j++)
         {
@@ -39,58 +87,58 @@ public static class CsvRwRouteParser
                 expressions[j].Text = Expression.ConvertRwToCsv(expressions[j].Text, section, sectionAlwaysPrefix);
 
                 // separate command and arguments
-                string Command, ArgumentSequence;
-             	Expression.SeparateCommandsAndArguments(expressions[j], out Command, out ArgumentSequence, culture, true, isRW, section);
-					
+                string command, argumentSequence;
+                Expression.SeparateCommandsAndArguments(expressions[j], out command, out argumentSequence, culture, true, isRW, section);
+
 
                 // process command
-                double Number;
-                bool NumberCheck = !isRW || string.Compare(section, "track", StringComparison.OrdinalIgnoreCase) == 0;
-                if (!NumberCheck || !Conversions.TryParseDoubleVb6(Command, unitOfLength, out Number))
+                float number;
+                bool numberCheck = !isRW || string.Compare(section, "track", StringComparison.OrdinalIgnoreCase) == 0;
+                if (!numberCheck || !Conversions.TryParseFloatVb6(command, unitOfLength, out number))
                 {
                     // split arguments
-                    string[] Arguments;
+                    string[] arguments;
                     {
                         int n = 0;
-                        for (int k = 0; k < ArgumentSequence.Length; k++)
+                        for (int k = 0; k < argumentSequence.Length; k++)
                         {
-                            if (isRW && ArgumentSequence[k] == ',')
+                            if (isRW && argumentSequence[k] == ',')
                             {
                                 n++;
                             }
-                            else if (ArgumentSequence[k] == ';')
+                            else if (argumentSequence[k] == ';')
                             {
                                 n++;
                             }
                         }
-                        Arguments = new string[n + 1];
+                        arguments = new string[n + 1];
                         int a = 0, h = 0;
-                        for (int k = 0; k < ArgumentSequence.Length; k++)
+                        for (int k = 0; k < argumentSequence.Length; k++)
                         {
-                            if (isRW && ArgumentSequence[k] == ',')
+                            if (isRW && argumentSequence[k] == ',')
                             {
-                                Arguments[h] = ArgumentSequence.Substring(a, k - a).Trim();
+                                arguments[h] = argumentSequence.Substring(a, k - a).Trim();
                                 a = k + 1; h++;
                             }
-                            else if (ArgumentSequence[k] == ';')
+                            else if (argumentSequence[k] == ';')
                             {
-                                Arguments[h] = ArgumentSequence.Substring(a, k - a).Trim();
+                                arguments[h] = argumentSequence.Substring(a, k - a).Trim();
                                 a = k + 1; h++;
                             }
                         }
-                        if (ArgumentSequence.Length - a > 0)
+                        if (argumentSequence.Length - a > 0)
                         {
-                            Arguments[h] = ArgumentSequence.Substring(a).Trim();
+                            arguments[h] = argumentSequence.Substring(a).Trim();
                             h++;
                         }
-                        Array.Resize(ref Arguments, h);
+                        Array.Resize(ref arguments, h);
                     }
                     // preprocess command
-                    if (Command.ToLowerInvariant() == "with")
+                    if (command.ToLowerInvariant() == "with")
                     {
-                        if (Arguments.Length >= 1)
+                        if (arguments.Length >= 1)
                         {
-                            section = Arguments[0];
+                            section = arguments[0];
                             sectionAlwaysPrefix = false;
                         }
                         else
@@ -98,29 +146,29 @@ public static class CsvRwRouteParser
                             section = "";
                             sectionAlwaysPrefix = false;
                         }
-                        Command = null;
+                        command = null;
                     }
                     else
                     {
-                        if (Command.StartsWith("."))
+                        if (command.StartsWith("."))
                         {
-                            Command = section + Command;
+                            command = section + command;
                         }
                         else if (sectionAlwaysPrefix)
                         {
-                            Command = section + "." + Command;
+                            command = section + "." + command;
                         }
-                        Command = Command.Replace(".Void", "");
+                        command = command.Replace(".Void", "");
                     }
                     // handle indices
-                    if (Command != null && Command.EndsWith(")"))
+                    if (command != null && command.EndsWith(")"))
                     {
-                        for (int k = Command.Length - 2; k >= 0; k--)
+                        for (int k = command.Length - 2; k >= 0; k--)
                         {
-                            if (Command[k] == '(')
+                            if (command[k] == '(')
                             {
-                                string Indices = Command.Substring(k + 1, Command.Length - k - 2).TrimStart();
-                                Command = Command.Substring(0, k).TrimEnd();
+                                string Indices = command.Substring(k + 1, command.Length - k - 2).TrimStart();
+                                command = command.Substring(0, k).TrimEnd();
                                 int h = Indices.IndexOf(";", StringComparison.Ordinal);
                                 int CommandIndex1;
                                 if (h >= 0)
@@ -129,19 +177,19 @@ public static class CsvRwRouteParser
                                     string b = Indices.Substring(h + 1).TrimStart();
                                     if (a.Length > 0 && !Conversions.TryParseIntVb6(a, out CommandIndex1))
                                     {
-                                        Command = null; break;
+                                        command = null; break;
                                     }
                                     int CommandIndex2;
                                     if (b.Length > 0 && !Conversions.TryParseIntVb6(b, out CommandIndex2))
                                     {
-                                        Command = null;
+                                        command = null;
                                     }
                                 }
                                 else
                                 {
                                     if (Indices.Length > 0 && !Conversions.TryParseIntVb6(Indices, out CommandIndex1))
                                     {
-                                        Command = null;
+                                        command = null;
                                     }
                                 }
                                 break;
@@ -149,32 +197,32 @@ public static class CsvRwRouteParser
                         }
                     }
                     // process command
-                    if (Command != null)
+                    if (command != null)
                     {
-                        switch (Command.ToLowerInvariant())
+                        switch (command.ToLowerInvariant())
                         {
                             // options
                             case "options.unitoflength":
                                 {
-                                    if (Arguments.Length == 0)
+                                    if (arguments.Length == 0)
                                     {
-                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "At least 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "At least 1 argument is expected in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
-                                        unitOfLength = new double[Arguments.Length];
-                                        for (int i = 0; i < Arguments.Length; i++)
+                                        unitOfLength = new float[arguments.Length];
+                                        for (int i = 0; i < arguments.Length; i++)
                                         {
-                                            unitOfLength[i] = i == Arguments.Length - 1 ? 1.0 : 0.0;
-                                            if (Arguments[i].Length > 0 && !Conversions.TryParseDoubleVb6(Arguments[i], out unitOfLength[i]))
+                                            unitOfLength[i] = i == arguments.Length - 1 ? 1.0f : 0.0f;
+                                            if (arguments[i].Length > 0 && !Conversions.TryParseFloatVb6(arguments[i], out unitOfLength[i]))
                                             {
-                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FactorInMeters" + i.ToString(culture) + " is invalid in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                unitOfLength[i] = i == 0 ? 1.0 : 0.0;
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FactorInMeters" + i.ToString(culture) + " is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                unitOfLength[i] = i == 0 ? 1.0f : 0.0f;
                                             }
                                             else if (unitOfLength[i] <= 0.0)
                                             {
-                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FactorInMeters" + i.ToString(culture) + " is expected to be positive in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                unitOfLength[i] = i == Arguments.Length - 1 ? 1.0 : 0.0;
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FactorInMeters" + i.ToString(culture) + " is expected to be positive in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                unitOfLength[i] = i == arguments.Length - 1 ? 1.0f : 0.0f;
                                             }
                                         }
                                     }
@@ -182,54 +230,54 @@ public static class CsvRwRouteParser
                                 break;
                             case "options.unitofspeed":
                                 {
-                                    if (Arguments.Length < 1)
+                                    if (arguments.Length < 1)
                                     {
-                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Exactly 1 argument is expected in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
-                                        if (Arguments.Length > 1)
+                                        if (arguments.Length > 1)
                                         {
-                                            Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "Exactly 1 argument is expected in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
-                                        if (Arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(Arguments[0], out routeData.UnitOfSpeed))
+                                        if (arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], out routeData.UnitOfSpeed))
                                         {
-                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FactorInKmph is invalid in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            routeData.UnitOfSpeed = 0.277777777777778;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FactorInKmph is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            routeData.UnitOfSpeed = 0.277777777777778f;
                                         }
                                         else if (routeData.UnitOfSpeed <= 0.0)
                                         {
-                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FactorInKmph is expected to be positive in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            routeData.UnitOfSpeed = 0.277777777777778;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FactorInKmph is expected to be positive in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            routeData.UnitOfSpeed = 0.277777777777778f;
                                         }
                                         else
                                         {
-                                            routeData.UnitOfSpeed *= 0.277777777777778;
+                                            routeData.UnitOfSpeed *= 0.277777777777778f;
                                         }
                                     }
                                 }
                                 break;
                             case "options.objectvisibility":
                                 {
-                                    if (Arguments.Length == 0)
+                                    if (arguments.Length == 0)
                                     {
-                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Exactly 1 argument is expected in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
-                                        if (Arguments.Length > 1)
+                                        if (arguments.Length > 1)
                                         {
-                                            Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "Exactly 1 argument is expected in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         int mode = 0;
-                                        if (Arguments.Length >= 1 && Arguments[0].Length != 0 && !Conversions.TryParseIntVb6(Arguments[0], out mode))
+                                        if (arguments.Length >= 1 && arguments[0].Length != 0 && !Conversions.TryParseIntVb6(arguments[0], out mode))
                                         {
-                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             mode = 0;
                                         }
                                         else if (mode != 0 & mode != 1)
                                         {
-                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The specified Mode is not supported in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The specified Mode is not supported in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             mode = 0;
                                         }
                                         routeData.AccurateObjectDisposal = mode == 1;
@@ -244,25 +292,25 @@ public static class CsvRwRouteParser
                                     {
                                         continue;
                                     }
-                                    if (Arguments.Length == 0)
+                                    if (arguments.Length == 0)
                                     {
-                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Exactly 1 argument is expected in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
-                                        if (Arguments.Length > 1)
+                                        if (arguments.Length > 1)
                                         {
-                                            Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "Exactly 1 argument is expected in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         int mode = 0;
-                                        if (Arguments.Length >= 1 && Arguments[0].Length != 0 && !Conversions.TryParseIntVb6(Arguments[0], out mode))
+                                        if (arguments.Length >= 1 && arguments[0].Length != 0 && !Conversions.TryParseIntVb6(arguments[0], out mode))
                                         {
-                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             mode = 0;
                                         }
                                         else if (mode != 0 & mode != 1)
                                         {
-                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The specified Mode is not supported in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The specified Mode is not supported in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             mode = 0;
                                         }
                                         //Plugin.CurrentOptions.OldTransparencyMode = mode == 1;        // TODO
@@ -279,25 +327,25 @@ public static class CsvRwRouteParser
                                     {
                                         continue;
                                     }
-                                    if (Arguments.Length == 0)
+                                    if (arguments.Length == 0)
                                     {
-                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Exactly 1 argument is expected in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                     }
                                     else
                                     {
-                                        if (Arguments.Length > 1)
+                                        if (arguments.Length > 1)
                                         {
-                                            Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "Exactly 1 argument is expected in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "Exactly 1 argument is expected in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         int mode = 0;
-                                        if (Arguments.Length >= 1 && Arguments[0].Length != 0 && !Conversions.TryParseIntVb6(Arguments[0], out mode))
+                                        if (arguments.Length >= 1 && arguments[0].Length != 0 && !Conversions.TryParseIntVb6(arguments[0], out mode))
                                         {
-                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             mode = 0;
                                         }
                                         else if (mode != 0 & mode != 1)
                                         {
-                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The specified Mode is not supported in " + Command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The specified Mode is not supported in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             mode = 0;
                                         }
                                         // TODO
@@ -312,16 +360,22 @@ public static class CsvRwRouteParser
         }
     }
 
-    // preprocess chrrndsub
+    /// <summary>
+    /// Preprocess chr / rnd / sub statements
+    /// </summary>
+    /// <param name="fileName"></param>
+    /// <param name="fileEncoding"></param>
+    /// <param name="isRW"></param>
+    /// <param name="expressions"></param>
     private static void PreprocessChrRndSub(string fileName, Encoding fileEncoding, bool isRW, ref Expression[] expressions)
     {
         System.Globalization.CultureInfo Culture = System.Globalization.CultureInfo.InvariantCulture;
         System.Text.Encoding Encoding = new System.Text.ASCIIEncoding();
-        string[] Subs = new string[16];
+        string[] subs = new string[16];
         int openIfs = 0;
         for (int i = 0; i < expressions.Length; i++)
         {
-            string Epilog = " at line " + expressions[i].Line.ToString(Culture) + ", column " + expressions[i].Column.ToString(Culture) + " in file " + expressions[i].File;
+            string epilog = " at line " + expressions[i].Line.ToString(Culture) + ", column " + expressions[i].Column.ToString(Culture) + " in file " + expressions[i].File;
             bool continueWithNextExpression = false;
             for (int j = expressions[i].Text.Length - 1; j >= 0; j--)
             {
@@ -356,7 +410,7 @@ public static class CsvRwRouteParser
                                     if (l < 0)
                                     {
                                         continueWithNextExpression = true;
-                                        GD.Print("Invalid parenthesis structure in " + t + Epilog);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Invalid parenthesis structure in " + t + epilog);
                                     }
                                     break;
                             }
@@ -371,7 +425,7 @@ public static class CsvRwRouteParser
                         }
                         if (l != 0)
                         {
-                            GD.Print("Invalid parenthesis structure in " + t + Epilog);
+                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Invalid parenthesis structure in " + t + epilog);
                             continueWithNextExpression = true;
                             break;
                         }
@@ -381,7 +435,7 @@ public static class CsvRwRouteParser
                             case "$if":
                                 if (j != 0)
                                 {
-                                    GD.Print("The $If directive must not appear within another statement" + Epilog);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The $If directive must not appear within another statement" + epilog);
                                 }
                                 else
                                 {
@@ -429,7 +483,7 @@ public static class CsvRwRouteParser
                                             }
                                             if (level != 0)
                                             {
-                                                GD.Print("$EndIf missing at the end of the file" + Epilog);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "$EndIf missing at the end of the file" + epilog);
                                             }
                                         }
                                         continueWithNextExpression = true;
@@ -437,7 +491,7 @@ public static class CsvRwRouteParser
                                     }
                                     else
                                     {
-                                        GD.Print("The $If condition does not evaluate to a number" + Epilog);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The $If condition does not evaluate to a number" + epilog);
                                     }
                                 }
                                 continueWithNextExpression = true;
@@ -463,7 +517,7 @@ public static class CsvRwRouteParser
                                             expressions[i].Text = string.Empty;
                                             if (level == 1)
                                             {
-                                                GD.Print("Duplicate $Else encountered" + Epilog);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Duplicate $Else encountered" + epilog);
                                             }
                                         }
                                         else if (expressions[i].Text.StartsWith("$endif", StringComparison.OrdinalIgnoreCase))
@@ -484,12 +538,12 @@ public static class CsvRwRouteParser
                                     }
                                     if (level != 0)
                                     {
-                                        GD.Print("$EndIf missing at the end of the file" + Epilog);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "$EndIf missing at the end of the file" + epilog);
                                     }
                                 }
                                 else
                                 {
-                                    GD.Print("$Else without matching $If encountered" + Epilog);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "$Else without matching $If encountered" + epilog);
                                 }
                                 continueWithNextExpression = true;
                                 break;
@@ -501,14 +555,14 @@ public static class CsvRwRouteParser
                                 }
                                 else
                                 {
-                                    GD.Print("$EndIf without matching $If encountered" + Epilog);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "$EndIf without matching $If encountered" + epilog);
                                 }
                                 continueWithNextExpression = true;
                                 break;
                             case "$include":
                                 if (j != 0)
                                 {
-                                    GD.Print("The $Include directive must not appear within another statement" + Epilog);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The $Include directive must not appear within another statement" + epilog);
                                     continueWithNextExpression = true;
                                     break;
                                 }
@@ -537,7 +591,7 @@ public static class CsvRwRouteParser
                                             if (!double.TryParse(value, NumberStyles.Float, Culture, out offset))
                                             {
                                                 continueWithNextExpression = true;
-                                                GD.Print("The track position offset " + value + " is invalid in " + t + Epilog);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The track position offset " + value + " is invalid in " + t + epilog);
                                                 break;
                                             }
                                         }
@@ -552,7 +606,7 @@ public static class CsvRwRouteParser
                                         if (!System.IO.File.Exists(files[ia]))
                                         {
                                             continueWithNextExpression = true;
-                                            GD.Print("The file " + includeFile + " could not be found in " + t + Epilog);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The file " + includeFile + " could not be found in " + t + epilog);
                                             break;
                                         }
                                         else if (2 * ia + 1 < args.Length)
@@ -560,13 +614,13 @@ public static class CsvRwRouteParser
                                             if (!Conversions.TryParseDoubleVb6(args[2 * ia + 1], out weights[ia]))
                                             {
                                                 continueWithNextExpression = true;
-                                                GD.Print("A weight is invalid in " + t + Epilog);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "A weight is invalid in " + t + epilog);
                                                 break;
                                             }
                                             else if (weights[ia] <= 0.0)
                                             {
                                                 continueWithNextExpression = true;
-                                                GD.Print("A weight is not positive in " + t + Epilog);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "A weight is not positive in " + t + epilog);
                                                 break;
                                             }
                                             else
@@ -583,7 +637,7 @@ public static class CsvRwRouteParser
                                     if (count == 0)
                                     {
                                         continueWithNextExpression = true;
-                                        GD.Print("No file was specified in " + t + Epilog);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "No file was specified in " + t + epilog);
                                         break;
                                     }
                                     else if (!continueWithNextExpression)
@@ -645,13 +699,13 @@ public static class CsvRwRouteParser
                                         else
                                         {
                                             continueWithNextExpression = true;
-                                            GD.Print("Index does not correspond to a valid ASCII character in " + t + Epilog);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Index does not correspond to a valid ASCII character in " + t + epilog);
                                         }
                                     }
                                     else
                                     {
                                         continueWithNextExpression = true;
-                                        GD.Print("Index is invalid in " + t + Epilog);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Index is invalid in " + t + epilog);
                                     }
                                 }
                                 break;
@@ -672,19 +726,19 @@ public static class CsvRwRouteParser
                                             else
                                             {
                                                 continueWithNextExpression = true;
-                                                GD.Print("Index2 is invalid in " + t + Epilog);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Index2 is invalid in " + t + epilog);
                                             }
                                         }
                                         else
                                         {
                                             continueWithNextExpression = true;
-                                            GD.Print("Index1 is invalid in " + t + Epilog);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Index1 is invalid in " + t + epilog);
                                         }
                                     }
                                     else
                                     {
                                         continueWithNextExpression = true;
-                                        GD.Print("Two arguments are expected in " + t + Epilog);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Two arguments are expected in " + t + epilog);
                                     }
                                 }
                                 break;
@@ -729,23 +783,23 @@ public static class CsvRwRouteParser
                                         {
                                             if (x >= 0)
                                             {
-                                                while (x >= Subs.Length)
+                                                while (x >= subs.Length)
                                                 {
-                                                    Array.Resize<string>(ref Subs, Subs.Length << 1);
+                                                    Array.Resize<string>(ref subs, subs.Length << 1);
                                                 }
-                                                Subs[x] = expressions[i].Text.Substring(m + 1, n - m - 1).Trim();
+                                                subs[x] = expressions[i].Text.Substring(m + 1, n - m - 1).Trim();
                                                 expressions[i].Text = expressions[i].Text.Substring(0, j) + expressions[i].Text.Substring(n);
                                             }
                                             else
                                             {
                                                 continueWithNextExpression = true;
-                                                GD.Print("Index is expected to be non-negative in " + t + Epilog);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Index is expected to be non-negative in " + t + epilog);
                                             }
                                         }
                                         else
                                         {
                                             continueWithNextExpression = true;
-                                            GD.Print("Index is invalid in " + t + Epilog);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Index is invalid in " + t + epilog);
                                         }
                                     }
                                     else
@@ -753,20 +807,20 @@ public static class CsvRwRouteParser
                                         int x;
                                         if (Conversions.TryParseIntVb6(s, out x))
                                         {
-                                            if (x >= 0 & x < Subs.Length && Subs[x] != null)
+                                            if (x >= 0 & x < subs.Length && subs[x] != null)
                                             {
-                                                expressions[i].Text = expressions[i].Text.Substring(0, j) + Subs[x] + expressions[i].Text.Substring(h + 1);
+                                                expressions[i].Text = expressions[i].Text.Substring(0, j) + subs[x] + expressions[i].Text.Substring(h + 1);
                                             }
                                             else
                                             {
                                                 continueWithNextExpression = true;
-                                                GD.Print("Index is out of range in " + t + Epilog);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Index is out of range in " + t + epilog);
                                             }
                                         }
                                         else
                                         {
                                             continueWithNextExpression = true;
-                                            GD.Print("Index is invalid in " + t + Epilog);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Index is invalid in " + t + epilog);
                                         }
                                     }
 
@@ -816,7 +870,13 @@ public static class CsvRwRouteParser
         }
     }
 
-    private static void PreprocessSortByTrackPosition(double[] unitFactors, bool isRW, ref Expression[] expressions)
+    /// <summary>
+    /// Preprocessing step - sort expressions by track position
+    /// </summary>
+    /// <param name="unitFactors"></param>
+    /// <param name="isRW"></param>
+    /// <param name="expressions"></param>
+    private static void PreprocessSortByTrackPosition(float[] unitFactors, bool isRW, ref Expression[] expressions)
     {
         CultureInfo culture = CultureInfo.CurrentCulture;
 
@@ -835,10 +895,10 @@ public static class CsvRwRouteParser
                     numberCheck = string.Compare(s, "Railway", StringComparison.OrdinalIgnoreCase) == 0;
                 }
             }
-            double x;
-            if (numberCheck && Conversions.TryParseDouble(expressions[i].Text, unitFactors, out x))
+            float x;
+            if (numberCheck && Conversions.TryParseFloat(expressions[i].Text, unitFactors, out x))
             {
-                x += expressions[i].TrackPositionOffset;
+                x += (float)expressions[i].TrackPositionOffset;
                 if (x >= 0.0)
                 {
                     // TODO: BveTsHacks
@@ -868,7 +928,7 @@ public static class CsvRwRouteParser
                 else
                 {
                     // TODO: GD.Print can be refactored back into Plugin.CurrentHost.AddMessage
-                    GD.Print("Negative track position encountered at line " + expressions[i].Line.ToString(culture) + ", column " + expressions[i].Column.ToString(culture) + " in file " + expressions[i].File);
+                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Negative track position encountered at line " + expressions[i].Line.ToString(culture) + ", column " + expressions[i].Column.ToString(culture) + " in file " + expressions[i].File);
                     //Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Negative track position encountered at line " + Expressions[i].Line.ToString(Culture) + ", column " + Expressions[i].Column.ToString(Culture) + " in file " + Expressions[i].File);
                 }
             }
@@ -932,170 +992,158 @@ public static class CsvRwRouteParser
         // initialize data
         string compatibilityFolder = System.IO.Path.Combine(objectPath, "Compatibility");
 
-        RouteData routeData = new RouteData();
-        routeData.BlockInterval = 25.0;
-        routeData.AccurateObjectDisposal = false;
-        routeData.FirstUsedBlock = -1;
-        routeData.Blocks = new Block[1];
-        routeData.Blocks[0] = new Block();
-        routeData.Blocks[0].Rail = new Rail[1];
-        routeData.Blocks[0].Rail[0].RailStart = true;
-        routeData.Blocks[0].RailType = new int[] { 0 };
-        routeData.Blocks[0].Limit = new Limit[] { };
-        routeData.Blocks[0].Stop = new Stop[] { };
-        routeData.Blocks[0].Station = -1;
-        routeData.Blocks[0].StationPassAlarm = false;
-        routeData.Blocks[0].Accuracy = 2.0;
-        routeData.Blocks[0].AdhesionMultiplier = 1.0;
-        //Data.Blocks[0].CurrentTrackState = new TrackManager.TrackElement(0.0);
+        RouteData routeData = new RouteData
+        {
+            BlockInterval = 25.0f,
+            AccurateObjectDisposal = false,
+            FirstUsedBlock = -1,
+            Blocks = new List<Block>()
+        };
+        routeData.Blocks.Add(new Block(previewOnly));
+        routeData.Blocks[0].Rails.Add(0, new Rail { RailStarted = true });
+        routeData.Blocks[0].RailType = new[] { 0 };
+        routeData.Blocks[0].Accuracy = 2.0f;
+        routeData.Blocks[0].AdhesionMultiplier = 1.0f;
+        routeData.Blocks[0].CurrentTrackState = new TrackElement(0.0f);
+
         if (!previewOnly)
         {
             routeData.Blocks[0].Background = 0;
-            routeData.Blocks[0].Brightness = new Brightness[] { };
-            //Data.Blocks[0].Fog.Start = Game.NoFogStart;
-            //Data.Blocks[0].Fog.End = Game.NoFogEnd;
-            //Data.Blocks[0].Fog.Color = new Color24(128, 128, 128);
-            routeData.Blocks[0].Cycle = new int[] { -1 };
-            routeData.Blocks[0].Height = isRW ? 0.3 : 0.0;
-            routeData.Blocks[0].RailFreeObj = new FreeObj[][] { };
-            routeData.Blocks[0].GroundFreeObj = new FreeObj[] { };
-            routeData.Blocks[0].RailWall = new WallDike[] { };
-            routeData.Blocks[0].RailDike = new WallDike[] { };
+            // routeData.Blocks[0].Fog = new Fog(CurrentRoute.NoFogStart, CurrentRoute.NoFogEnd, Color24.Grey, 0);
+            routeData.Blocks[0].GroundCycles = new[] { -1 };
+            routeData.Blocks[0].RailCycles = new RailCycle[1];
+            routeData.Blocks[0].RailCycles[0].RailCycleIndex = -1;
+            routeData.Blocks[0].Height = isRW ? 0.3f : 0.0f;
+            routeData.Blocks[0].RailFreeObj = new Dictionary<int, List<FreeObj>>();
+            routeData.Blocks[0].GroundFreeObj = new List<FreeObj>();
+            routeData.Blocks[0].RailWall = new Dictionary<int, WallDike>();
+            routeData.Blocks[0].RailDike = new Dictionary<int, WallDike>();
             routeData.Blocks[0].RailPole = new Pole[] { };
-            routeData.Blocks[0].Form = new Form[] { };
-            routeData.Blocks[0].Crack = new Crack[] { };
-            routeData.Blocks[0].Signal = new Signal[] { };
-            routeData.Blocks[0].Section = new Section[] { };
-            routeData.Blocks[0].Sound = new Sound[] { };
-            routeData.Blocks[0].Transponder = new Transponder[] { };
-            routeData.Blocks[0].PointsOfInterest = new PointOfInterest[] { };
             routeData.Markers = new Marker[] { };
-
-            // poles
-            // Node poleParent = new Node("Poles");
-            Node poleParent = new Node();
-            poleParent.Name = "Poles";
+            routeData.RequestStops = new StopRequest[] { };
             string poleFolder = System.IO.Path.Combine(compatibilityFolder, "Poles");
-            routeData.Structure.Poles = new UnifiedObject[][] {
-                    new UnifiedObject[] {
-                        ObjectManager.Instance.LoadStaticObject(poleParent, System.IO.Path.Combine (poleFolder, "pole_1.csv"), fileEncoding, false, false, false)
-                    }, new UnifiedObject[] {
-                        ObjectManager.Instance.LoadStaticObject(poleParent, System.IO.Path.Combine (poleFolder, "pole_2.csv"), fileEncoding, false, false, false)
-                    }, new UnifiedObject[] {
-                        ObjectManager.Instance.LoadStaticObject(poleParent, System.IO.Path.Combine (poleFolder, "pole_3.csv"), fileEncoding, false, false, false)
-                    }, new UnifiedObject[] {
-                        ObjectManager.Instance.LoadStaticObject(poleParent, System.IO.Path.Combine (poleFolder, "pole_4.csv"), fileEncoding, false, false, false)
-                    }
+            routeData.Structure.Poles = new PoleDictionary
+                {
+                    {0, new ObjectDictionary()},
+                    {1, new ObjectDictionary()},
+                    {2, new ObjectDictionary()},
+                    {3, new ObjectDictionary()}
                 };
+            routeData.Structure.Poles[0].Add(0, UnifiedObject.LoadStaticObject(root,System.IO.Path.Combine(poleFolder, "pole_1.csv"), System.Text.Encoding.UTF8, false, false, false));
+            routeData.Structure.Poles[1].Add(0, UnifiedObject.LoadStaticObject(root,System.IO.Path.Combine(poleFolder, "pole_2.csv"), System.Text.Encoding.UTF8, false, false, false));
+            routeData.Structure.Poles[2].Add(0, UnifiedObject.LoadStaticObject(root,System.IO.Path.Combine(poleFolder, "pole_3.csv"), System.Text.Encoding.UTF8, false, false, false));
+            routeData.Structure.Poles[3].Add(0, UnifiedObject.LoadStaticObject(root,System.IO.Path.Combine(poleFolder, "pole_4.csv"), System.Text.Encoding.UTF8, false, false, false));
 
-
-            routeData.Structure.Rail = new UnifiedObject[] { };
-            routeData.Structure.Ground = new UnifiedObject[] { };
-            routeData.Structure.WallL = new UnifiedObject[] { };
-            routeData.Structure.WallR = new UnifiedObject[] { };
-            routeData.Structure.DikeL = new UnifiedObject[] { };
-            routeData.Structure.DikeR = new UnifiedObject[] { };
-            routeData.Structure.FormL = new UnifiedObject[] { };
-            routeData.Structure.FormR = new UnifiedObject[] { };
-            routeData.Structure.FormCL = new UnifiedObject[] { };
-            routeData.Structure.FormCR = new UnifiedObject[] { };
-            routeData.Structure.RoofL = new UnifiedObject[] { };
-            routeData.Structure.RoofR = new UnifiedObject[] { };
-            routeData.Structure.RoofCL = new UnifiedObject[] { };
-            routeData.Structure.RoofCR = new UnifiedObject[] { };
-            routeData.Structure.CrackL = new UnifiedObject[] { };
-            routeData.Structure.CrackR = new UnifiedObject[] { };
-            routeData.Structure.FreeObj = new UnifiedObject[] { };
-            routeData.Structure.Beacon = new UnifiedObject[] { };
-            routeData.Structure.Cycle = new int[][] { };
+            routeData.Structure.RailObjects = new ObjectDictionary();
+            routeData.Structure.Ground = new ObjectDictionary();
+            routeData.Structure.WallL = new ObjectDictionary();
+            routeData.Structure.WallR = new ObjectDictionary();
+            routeData.Structure.DikeL = new ObjectDictionary();
+            routeData.Structure.DikeR = new ObjectDictionary();
+            routeData.Structure.FormL = new ObjectDictionary();
+            routeData.Structure.FormR = new ObjectDictionary();
+            routeData.Structure.FormCL = new ObjectDictionary();
+            routeData.Structure.FormCR = new ObjectDictionary();
+            routeData.Structure.RoofL = new ObjectDictionary();
+            routeData.Structure.RoofR = new ObjectDictionary();
+            routeData.Structure.RoofCL = new ObjectDictionary();
+            routeData.Structure.RoofCR = new ObjectDictionary();
+            routeData.Structure.CrackL = new ObjectDictionary();
+            routeData.Structure.CrackR = new ObjectDictionary();
+            routeData.Structure.FreeObjects = new ObjectDictionary();
+            routeData.Structure.Beacon = new ObjectDictionary();
+            routeData.Structure.GroundCycles = new int[][] { };
+            routeData.Structure.RailCycles = new int[][] { };
             routeData.Structure.Run = new int[] { };
             routeData.Structure.Flange = new int[] { };
-            routeData.Backgrounds = new ImageTexture[] { };
-            //Data.TimetableDaytime = new Textures.Texture[] { null, null, null, null };
-            //Data.TimetableNighttime = new Textures.Texture[] { null, null, null, null };
+            // routeData.Backgrounds = new BackgroundDictionary();
+            routeData.TimetableDaytime = new ImageTexture[] { null, null, null, null };
+            routeData.TimetableNighttime = new ImageTexture[] { null, null, null, null };
+            routeData.Structure.WeatherObjects = new ObjectDictionary();
 
             Node signalParent = new Node();
             signalParent.Name = "Signals";
 
+            // TODO alternate method compatibility signal
             // signals
             string signalFolder = System.IO.Path.Combine(compatibilityFolder, @"Signals\Japanese"); //TODO path
-            routeData.SignalData = new SignalData[7];
-            routeData.SignalData[3] = new CompatibilitySignalData(new int[] { 0, 2, 4 }, new UnifiedObject[] {
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_3_0.csv"), fileEncoding, false, false, false),
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_3_2.csv"), fileEncoding, false, false, false),
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_3_4.csv"), fileEncoding, false, false, false)
-                                                                 });
-            routeData.SignalData[4] = new CompatibilitySignalData(new int[] { 0, 1, 2, 4 }, new UnifiedObject[] {
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_4_0.csv"), fileEncoding, false, false, false),
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_4a_2.csv"), fileEncoding, false, false, false),
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_4a_1.csv"), fileEncoding, false, false, false),
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_4a_4.csv"), fileEncoding, false, false, false)
-                                                                 });
-            routeData.SignalData[5] = new CompatibilitySignalData(new int[] { 0, 1, 2, 3, 4 }, new UnifiedObject[] {
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_0.csv"), fileEncoding, false, false, false),
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5a_1.csv"), fileEncoding, false, false, false),
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_2.csv"), fileEncoding, false, false, false),
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_3.csv"), fileEncoding, false, false, false),
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_4.csv"), fileEncoding, false, false, false)
-                                                                 });
-            routeData.SignalData[6] = new CompatibilitySignalData(new int[] { 0, 3, 4 }, new UnifiedObject[] {
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "repeatingsignal_0.csv"), fileEncoding, false, false, false),
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "repeatingsignal_3.csv"), fileEncoding, false, false, false),
-                                                                     ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "repeatingsignal_4.csv"), fileEncoding, false, false, false)
-                                                                 });
+            // routeData.SignalData = new SignalData[7];
+            // routeData.SignalData[3] = new CompatibilitySignalData(new int[] { 0, 2, 4 }, new UnifiedObject[] {
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_3_0.csv"), fileEncoding, false, false, false),
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_3_2.csv"), fileEncoding, false, false, false),
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_3_4.csv"), fileEncoding, false, false, false)
+            //                                                      });
+            // routeData.SignalData[4] = new CompatibilitySignalData(new int[] { 0, 1, 2, 4 }, new UnifiedObject[] {
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_4_0.csv"), fileEncoding, false, false, false),
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_4a_2.csv"), fileEncoding, false, false, false),
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_4a_1.csv"), fileEncoding, false, false, false),
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine (signalFolder, "signal_4a_4.csv"), fileEncoding, false, false, false)
+            //                                                      });
+            // routeData.SignalData[5] = new CompatibilitySignalData(new int[] { 0, 1, 2, 3, 4 }, new UnifiedObject[] {
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_0.csv"), fileEncoding, false, false, false),
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5a_1.csv"), fileEncoding, false, false, false),
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_2.csv"), fileEncoding, false, false, false),
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_3.csv"), fileEncoding, false, false, false),
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_4.csv"), fileEncoding, false, false, false)
+            //                                                      });
+            // routeData.SignalData[6] = new CompatibilitySignalData(new int[] { 0, 3, 4 }, new UnifiedObject[] {
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "repeatingsignal_0.csv"), fileEncoding, false, false, false),
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "repeatingsignal_3.csv"), fileEncoding, false, false, false),
+            //                                                          UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "repeatingsignal_4.csv"), fileEncoding, false, false, false)
+            //                                                      });
             // compatibility signals
-            routeData.CompatibilitySignalData = new CompatibilitySignalData[9];
-            routeData.CompatibilitySignalData[0] = new CompatibilitySignalData(new int[] { 0, 2 }, new UnifiedObject[] {
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_2_0.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_2a_2.csv"), fileEncoding, false, false, false)
+            routeData.CompatibilitySignals = new CompatibilitySignalData[9];
+            routeData.CompatibilitySignals[0] = new CompatibilitySignalData(new int[] { 0, 2 }, new UnifiedObject[] {
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_2_0.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_2a_2.csv"), fileEncoding, false, false, false)
                                                                               });
-            routeData.CompatibilitySignalData[1] = new CompatibilitySignalData(new int[] { 0, 4 }, new UnifiedObject[] {
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_2_0.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_2b_4.csv"), fileEncoding, false, false, false)
+            routeData.CompatibilitySignals[1] = new CompatibilitySignalData(new int[] { 0, 4 }, new UnifiedObject[] {
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_2_0.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_2b_4.csv"), fileEncoding, false, false, false)
                                                                               });
-            routeData.CompatibilitySignalData[2] = new CompatibilitySignalData(new int[] { 0, 2, 4 }, new UnifiedObject[] {
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_3_0.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_3_2.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_3_4.csv"), fileEncoding, false, false, false)
+            routeData.CompatibilitySignals[2] = new CompatibilitySignalData(new int[] { 0, 2, 4 }, new UnifiedObject[] {
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_3_0.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_3_2.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_3_4.csv"), fileEncoding, false, false, false)
                                                                               });
-            routeData.CompatibilitySignalData[3] = new CompatibilitySignalData(new int[] { 0, 1, 2, 4 }, new UnifiedObject[] {
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4_0.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4a_1.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4a_2.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4a_4.csv"), fileEncoding, false, false, false)
+            routeData.CompatibilitySignals[3] = new CompatibilitySignalData(new int[] { 0, 1, 2, 4 }, new UnifiedObject[] {
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4_0.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4a_1.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4a_2.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4a_4.csv"), fileEncoding, false, false, false)
                                                                               });
-            routeData.CompatibilitySignalData[4] = new CompatibilitySignalData(new int[] { 0, 2, 3, 4 }, new UnifiedObject[] {
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4_0.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4b_2.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4b_3.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4b_4.csv"), fileEncoding, false, false, false)
+            routeData.CompatibilitySignals[4] = new CompatibilitySignalData(new int[] { 0, 2, 3, 4 }, new UnifiedObject[] {
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4_0.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4b_2.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4b_3.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_4b_4.csv"), fileEncoding, false, false, false)
                                                                               });
-            routeData.CompatibilitySignalData[5] = new CompatibilitySignalData(new int[] { 0, 1, 2, 3, 4 }, new UnifiedObject[] {
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_0.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5a_1.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_2.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_3.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_4.csv"), fileEncoding, false, false, false)
+            routeData.CompatibilitySignals[5] = new CompatibilitySignalData(new int[] { 0, 1, 2, 3, 4 }, new UnifiedObject[] {
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_0.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5a_1.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_2.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_3.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_4.csv"), fileEncoding, false, false, false)
                                                                               });
-            routeData.CompatibilitySignalData[6] = new CompatibilitySignalData(new int[] { 0, 2, 3, 4, 5 }, new UnifiedObject[] {
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_0.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_2.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_3.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_4.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5b_5.csv"), fileEncoding, false, false, false)
+            routeData.CompatibilitySignals[6] = new CompatibilitySignalData(new int[] { 0, 2, 3, 4, 5 }, new UnifiedObject[] {
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_0.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_2.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_3.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5_4.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_5b_5.csv"), fileEncoding, false, false, false)
                                                                               });
-            routeData.CompatibilitySignalData[7] = new CompatibilitySignalData(new int[] { 0, 1, 2, 3, 4, 5 }, new UnifiedObject[] {
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_6_0.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_6_1.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_6_2.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_6_3.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_6_4.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_6_5.csv"), fileEncoding, false, false, false)
+            routeData.CompatibilitySignals[7] = new CompatibilitySignalData(new int[] { 0, 1, 2, 3, 4, 5 }, new UnifiedObject[] {
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_6_0.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_6_1.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_6_2.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_6_3.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_6_4.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "signal_6_5.csv"), fileEncoding, false, false, false)
                                                                               });
-            routeData.CompatibilitySignalData[8] = new CompatibilitySignalData(new int[] { 0, 3, 4 }, new UnifiedObject[] {
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "repeatingsignal_0.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "repeatingsignal_3.csv"), fileEncoding, false, false, false),
-                                                                                  ObjectManager.Instance.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "repeatingsignal_4.csv"), fileEncoding, false, false, false)
+            routeData.CompatibilitySignals[8] = new CompatibilitySignalData(new int[] { 0, 3, 4 }, new UnifiedObject[] {
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "repeatingsignal_0.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "repeatingsignal_3.csv"), fileEncoding, false, false, false),
+                                                                                  UnifiedObject.LoadStaticObject(signalParent, System.IO.Path.Combine(signalFolder, "repeatingsignal_4.csv"), fileEncoding, false, false, false)
                                                                               });
             // game data
             //Game.Sections = new Game.Section[1];
@@ -1112,47 +1160,44 @@ public static class CsvRwRouteParser
         }
 
         // >> Start OpenBVE ParseRouteForData()
+        float[] unitOfLength = new float[] { 1.0f };
+        routeData.UnitOfSpeed = 0.277777777777778f;
+
         string[] lines = System.IO.File.ReadAllLines(fileName, fileEncoding);
-        List<Expression> expressions = Expression.PreprocessSplitIntoExpressions(fileName, fileEncoding, isRW, lines, true, 0.0);
-        Expression[] expressionArray = expressions.ToArray();
+        Expression[] expressionArray = Expression.PreprocessSplitIntoExpressions(fileName, fileEncoding, isRW, lines, true, 0.0).ToArray();
+
         PreprocessChrRndSub(fileName, fileEncoding, isRW, ref expressionArray);
-
-        double[] unitOfLength = new double[] { 1.0 };
-        routeData.UnitOfSpeed = 0.277777777777778;
-
-        /// CswRwRouterParser.Preprocess.cs 
-        //PreprocessOptions(fileName, isRW, Encoding, expressions, ref Data, ref UnitOfLength);
-        //PreprocessSortByTrackPosition(fileName, isRW, UnitOfLength, ref expressions);
+        PreprocessOptions(expressionArray, isRW, ref routeData, ref unitOfLength, previewOnly);
         PreprocessSortByTrackPosition(unitOfLength, isRW, ref expressionArray);
         ParseRouteDetails(fileName, fileEncoding, isRW, expressionArray, trainPath, objectPath, soundPath, unitOfLength, ref routeData, previewOnly);
+        // >> End OpenBVE ParseRouteForData()
 
         //Game.RouteUnitOfLength = UnitOfLength;
-        // >> End OpenBVE ParseRouteForData()
-        ApplyRouteData(root, fileName, compatibilityFolder, fileEncoding, ref routeData, previewOnly);
-        // >> End OpenBVE ParseRoute
-
-
+        // CurrentRoute currRoute = new CurrentRoute();
+        CurrentRoute.ApplyRouteData(root, fileName, compatibilityFolder, fileEncoding, ref routeData, previewOnly);
     }
 
-    private static void ParseRouteDetails(string fileName, Encoding fileEncoding, bool isRW, Expression[] expressions, string trainPath, string objectPath, string soundPath, double[] unitOfLength, ref RouteData routeData, bool previewOnly)
+    private static void ParseRouteDetails(string fileName, Encoding fileEncoding, bool isRW, Expression[] routeExpressions, string trainPath, string objectPath, string soundPath, float[] unitOfLength, ref RouteData routeData, bool previewOnly)
     {
         System.Globalization.CultureInfo culture = System.Globalization.CultureInfo.InvariantCulture;
-        string Section = ""; bool sectionAlwaysPrefix = false;
+        string section = ""; 
+        bool sectionAlwaysPrefix = false;
         int blockIndex = 0;
-        int blocksUsed = routeData.Blocks.Length;
+        int blocksUsed = routeData.Blocks.Count;
+        
         //Game.Stations = new Game.Station[] { };
         int currentStation = -1;
         int currentStop = -1;
         bool departureSignalUsed = false;
         int currentSection = 0;
         bool valueBasedSection = false;
-        double progressFactor = expressions.Length == 0 ? 0.3333 : 0.3333 / (double)expressions.Length;
+        double progressFactor = routeExpressions.Length == 0 ? 0.3333 : 0.3333 / (double)routeExpressions.Length;
 
         Node rootRoutePrefabs = new Node();
         rootRoutePrefabs.Name = "Route (Prefabs)";
 
         // process non-track namespaces
-        for (int j = 0; j < expressions.Length; j++)
+        for (int j = 0; j < routeExpressions.Length; j++)
         {
             //Loading.RouteProgress = (double)j * progressFactor;
             if ((j & 255) == 0)
@@ -1160,35 +1205,36 @@ public static class CsvRwRouteParser
                 //System.Threading.Thread.Sleep(1);
                 //if (Loading.Cancel) return;
             }
-            if (expressions[j].Text.StartsWith("[") & expressions[j].Text.EndsWith("]"))
+
+            if (routeExpressions[j].Text.StartsWith("[") & routeExpressions[j].Text.EndsWith("]"))
             {
-                Section = expressions[j].Text.Substring(1, expressions[j].Text.Length - 2).Trim();
-                if (string.Compare(Section, "object", StringComparison.OrdinalIgnoreCase) == 0)
+                section = routeExpressions[j].Text.Substring(1, routeExpressions[j].Text.Length - 2).Trim();
+                if (string.Compare(section, "object", StringComparison.OrdinalIgnoreCase) == 0)
                 {
-                    Section = "Structure";
+                    section = "Structure";
                 }
-                else if (string.Compare(Section, "railway", StringComparison.OrdinalIgnoreCase) == 0)
+                else if (string.Compare(section, "railway", StringComparison.OrdinalIgnoreCase) == 0)
                 {
-                    Section = "Track";
+                    section = "Track";
                 }
                 sectionAlwaysPrefix = true;
             }
             else
             {
                 // find equals
-                int equals = expressions[j].Text.IndexOf('=');
+                int equals = routeExpressions[j].Text.IndexOf('=');
                 if (equals >= 0)
                 {
                     // handle RW cycle syntax
-                    string t = expressions[j].Text.Substring(0, equals);
-                    if (Section.ToLowerInvariant() == "cycle" & sectionAlwaysPrefix)
+                    string t = routeExpressions[j].Text.Substring(0, equals);
+                    if (section.ToLowerInvariant() == "cycle" & sectionAlwaysPrefix)
                     {
                         double b; if (Conversions.TryParseDoubleVb6(t, out b))
                         {
                             t = ".Ground(" + t + ")";
                         }
                     }
-                    else if (Section.ToLowerInvariant() == "signal" & sectionAlwaysPrefix)
+                    else if (section.ToLowerInvariant() == "signal" & sectionAlwaysPrefix)
                     {
                         double b; if (Conversions.TryParseDoubleVb6(t, out b))
                         {
@@ -1196,16 +1242,16 @@ public static class CsvRwRouteParser
                         }
                     }
                     // convert RW style into CSV style
-                    expressions[j].Text = t + " " + expressions[j].Text.Substring(equals + 1);
+                    routeExpressions[j].Text = t + " " + routeExpressions[j].Text.Substring(equals + 1);
                 }
                 // separate command and arguments
                 string command, argumentSequence;
-                Expression.SeparateCommandsAndArguments(expressions[j], out command, out argumentSequence, culture, true, isRW, Section);
+                Expression.SeparateCommandsAndArguments(routeExpressions[j], out command, out argumentSequence, culture, true, isRW, section);
 
                 // process command
-                double number;
-                bool numberCheck = !isRW || string.Compare(Section, "track", StringComparison.OrdinalIgnoreCase) == 0;
-                if (numberCheck && Conversions.TryParseDouble(command, unitOfLength, out number))
+                float number;
+                bool numberCheck = !isRW || string.Compare(section, "track", StringComparison.OrdinalIgnoreCase) == 0;
+                if (numberCheck && Conversions.TryParseFloat(command, unitOfLength, out number))
                 {
                     // track position (ignored)
                 }
@@ -1253,12 +1299,12 @@ public static class CsvRwRouteParser
                     {
                         if (arguments.Length >= 1)
                         {
-                            Section = arguments[0];
+                            section = arguments[0];
                             sectionAlwaysPrefix = false;
                         }
                         else
                         {
-                            Section = "";
+                            section = "";
                             sectionAlwaysPrefix = false;
                         }
                         command = null;
@@ -1267,11 +1313,11 @@ public static class CsvRwRouteParser
                     {
                         if (command.StartsWith("."))
                         {
-                            command = Section + command;
+                            command = section + command;
                         }
                         else if (sectionAlwaysPrefix)
                         {
-                            command = Section + "." + command;
+                            command = section + "." + command;
                         }
                         command = command.Replace(".Void", "");
                         if (command.StartsWith("structure", StringComparison.OrdinalIgnoreCase) & command.EndsWith(".load", StringComparison.OrdinalIgnoreCase))
@@ -1352,12 +1398,12 @@ public static class CsvRwRouteParser
                                     string b = Indices.Substring(h + 1).TrimStart();
                                     if (a.Length > 0 && !Conversions.TryParseIntVb6(a, out commandIndex1))
                                     {
-                                        GD.Print("Invalid first index appeared at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File + ".");
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Invalid first index appeared at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File + ".");
                                         command = null; break;
                                     }
                                     else if (b.Length > 0 && !Conversions.TryParseIntVb6(b, out commandIndex2))
                                     {
-                                        GD.Print("Invalid second index appeared at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File + ".");
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Invalid second index appeared at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File + ".");
                                         command = null; break;
                                     }
                                 }
@@ -1365,7 +1411,7 @@ public static class CsvRwRouteParser
                                 {
                                     if (Indices.Length > 0 && !Conversions.TryParseIntVb6(Indices, out commandIndex1))
                                     {
-                                        GD.Print("Invalid index appeared at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File + ".");
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Invalid index appeared at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File + ".");
                                         command = null; break;
                                     }
                                 }
@@ -1381,11 +1427,11 @@ public static class CsvRwRouteParser
                             // options
                             case "options.blocklength":
                                 {
-                                    double length = 25.0;
-                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], unitOfLength, out length))
+                                    float length = 25.0f;
+                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], unitOfLength, out length))
                                     {
-                                        GD.Print("Length is invalid in Options.BlockLength at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        length = 25.0;
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Length is invalid in Options.BlockLength at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        length = 25.0f;
                                     }
                                     routeData.BlockInterval = length;
                                 }
@@ -1397,18 +1443,18 @@ public static class CsvRwRouteParser
                             case "options.sectionbehavior":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                 }
                                 else
                                 {
                                     int a;
                                     if (!Conversions.TryParseIntVb6(arguments[0], out a))
                                     {
-                                        GD.Print("Mode is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (a != 0 & a != 1)
                                     {
-                                        GD.Print("Mode is expected to be either 0 or 1 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is expected to be either 0 or 1 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else
                                     {
@@ -1419,18 +1465,18 @@ public static class CsvRwRouteParser
                             case "options.cantbehavior":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                 }
                                 else
                                 {
                                     int a;
                                     if (!Conversions.TryParseIntVb6(arguments[0], out a))
                                     {
-                                        GD.Print("Mode is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (a != 0 & a != 1)
                                     {
-                                        GD.Print("Mode is expected to be either 0 or 1 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is expected to be either 0 or 1 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else
                                     {
@@ -1441,18 +1487,18 @@ public static class CsvRwRouteParser
                             case "options.fogbehavior":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                 }
                                 else
                                 {
                                     int a;
                                     if (!Conversions.TryParseIntVb6(arguments[0], out a))
                                     {
-                                        GD.Print("Mode is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (a != 0 & a != 1)
                                     {
-                                        GD.Print("Mode is expected to be either 0 or 1 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is expected to be either 0 or 1 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else
                                     {
@@ -1464,7 +1510,7 @@ public static class CsvRwRouteParser
                             case "route.comment":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                 }
                                 else
                                 {
@@ -1474,14 +1520,14 @@ public static class CsvRwRouteParser
                             case "route.image":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                 }
                                 else
                                 {
                                     string f = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(fileName), arguments[0]);
                                     if (!System.IO.File.Exists(f))
                                     {
-                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else
                                     {
@@ -1494,7 +1540,7 @@ public static class CsvRwRouteParser
                                 {
                                     if (arguments.Length < 1)
                                     {
-                                        GD.Print("" + command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "" + command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else
                                     {
@@ -1508,12 +1554,12 @@ public static class CsvRwRouteParser
                                     int change = 0;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out change))
                                     {
-                                        GD.Print("Mode is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         change = 0;
                                     }
                                     else if (change < -1 | change > 1)
                                     {
-                                        GD.Print("Mode is expected to be -1, 0 or 1 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Mode is expected to be -1, 0 or 1 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         change = 0;
                                     }
                                     //Game.TrainStart = (Game.TrainStartMode)change;
@@ -1523,18 +1569,18 @@ public static class CsvRwRouteParser
                             case "train.gauge":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                 }
                                 else
                                 {
                                     double a;
                                     if (!Conversions.TryParseDoubleVb6(arguments[0], out a))
                                     {
-                                        GD.Print("ValueInMillimeters is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ValueInMillimeters is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (a <= 0.0)
                                     {
-                                        GD.Print("ValueInMillimeters is expected to be positive in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ValueInMillimeters is expected to be positive in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else
                                     {
@@ -1547,24 +1593,24 @@ public static class CsvRwRouteParser
                                 {
                                     if (arguments.Length < 1)
                                     {
-                                        GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else
                                     {
                                         double a;
                                         if (!Conversions.TryParseDoubleVb6(arguments[0], out a))
                                         {
-                                            GD.Print("Speed is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Speed is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (commandIndex1 < 0)
                                             {
-                                                GD.Print("AspectIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "AspectIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (a < 0.0)
                                             {
-                                                GD.Print("Speed is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Speed is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
@@ -1593,7 +1639,7 @@ public static class CsvRwRouteParser
                                         {
                                             if (!Conversions.TryParseDoubleVb6(arguments[k], out intervals[k]))
                                             {
-                                                GD.Print("Interval" + k.ToString(culture) + " is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Interval" + k.ToString(culture) + " is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                         }
                                         Array.Sort<double>(intervals);
@@ -1608,7 +1654,7 @@ public static class CsvRwRouteParser
                                         double limit = 0.0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out limit))
                                         {
-                                            GD.Print("Speed is invalid in Train.Velocity at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Speed is invalid in Train.Velocity at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             limit = 0.0;
                                         }
                                         //Game.PrecedingTrainSpeedLimit = limit <= 0.0 ? double.PositiveInfinity : data.UnitOfSpeed * limit;
@@ -1618,18 +1664,18 @@ public static class CsvRwRouteParser
                             case "route.accelerationduetogravity":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                 }
                                 else
                                 {
                                     double a;
                                     if (!Conversions.TryParseDoubleVb6(arguments[0], out a))
                                     {
-                                        GD.Print("Value is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Value is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (a <= 0.0)
                                     {
-                                        GD.Print("Value is expected to be positive in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Value is expected to be positive in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else
                                     {
@@ -1640,14 +1686,14 @@ public static class CsvRwRouteParser
                             case "route.elevation":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                 }
                                 else
                                 {
-                                    double a;
-                                    if (!Conversions.TryParseDoubleVb6(arguments[0], unitOfLength, out a))
+                                    float a;
+                                    if (!Conversions.TryParseFloatVb6(arguments[0], unitOfLength, out a))
                                     {
-                                        GD.Print("Height is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Height is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else
                                     {
@@ -1658,18 +1704,18 @@ public static class CsvRwRouteParser
                             case "route.temperature":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                 }
                                 else
                                 {
                                     double a;
                                     if (!Conversions.TryParseDoubleVb6(arguments[0], out a))
                                     {
-                                        GD.Print("ValueInCelsius is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ValueInCelsius is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (a <= -273.15)
                                     {
-                                        GD.Print("ValueInCelsius is expected to be greater than to -273.15 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ValueInCelsius is expected to be greater than to -273.15 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else
                                     {
@@ -1680,18 +1726,18 @@ public static class CsvRwRouteParser
                             case "route.pressure":
                                 if (arguments.Length < 1)
                                 {
-                                    GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                 }
                                 else
                                 {
                                     double a;
                                     if (!Conversions.TryParseDoubleVb6(arguments[0], out a))
                                     {
-                                        GD.Print("ValueInKPa is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ValueInKPa is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (a <= 0.0)
                                     {
-                                        GD.Print("ValueInKPa is expected to be positive in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ValueInKPa is expected to be positive in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else
                                     {
@@ -1704,29 +1750,29 @@ public static class CsvRwRouteParser
                                     int r = 255, g = 255, b = 255;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out r))
                                     {
-                                        GD.Print("RedValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RedValue is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (r < 0 | r > 255)
                                     {
-                                        GD.Print("RedValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RedValue is required to be within the range from 0 to 255 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         r = r < 0 ? 0 : 255;
                                     }
                                     if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out g))
                                     {
-                                        GD.Print("GreenValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "GreenValue is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (g < 0 | g > 255)
                                     {
-                                        GD.Print("GreenValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "GreenValue is required to be within the range from 0 to 255 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         g = g < 0 ? 0 : 255;
                                     }
                                     if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out b))
                                     {
-                                        GD.Print("BlueValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BlueValue is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (b < 0 | b > 255)
                                     {
-                                        GD.Print("BlueValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BlueValue is required to be within the range from 0 to 255 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         b = b < 0 ? 0 : 255;
                                     }
                                     //Renderer.OptionAmbientColor = new Color24((byte)r, (byte)g, (byte)b);
@@ -1737,29 +1783,29 @@ public static class CsvRwRouteParser
                                     int r = 255, g = 255, b = 255;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out r))
                                     {
-                                        GD.Print("RedValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RedValue is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (r < 0 | r > 255)
                                     {
-                                        GD.Print("RedValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RedValue is required to be within the range from 0 to 255 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         r = r < 0 ? 0 : 255;
                                     }
                                     if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out g))
                                     {
-                                        GD.Print("GreenValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "GreenValue is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (g < 0 | g > 255)
                                     {
-                                        GD.Print("GreenValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "GreenValue is required to be within the range from 0 to 255 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         g = g < 0 ? 0 : 255;
                                     }
                                     if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out b))
                                     {
-                                        GD.Print("BlueValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BlueValue is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     else if (b < 0 | b > 255)
                                     {
-                                        GD.Print("BlueValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BlueValue is required to be within the range from 0 to 255 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         b = b < 0 ? 0 : 255;
                                     }
                                     //Renderer.OptionDiffuseColor = new Color24((byte)r, (byte)g, (byte)b);
@@ -1770,11 +1816,11 @@ public static class CsvRwRouteParser
                                     double theta = 60.0, phi = -26.565051177078;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out theta))
                                     {
-                                        GD.Print("Theta is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Theta is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out phi))
                                     {
-                                        GD.Print("Phi is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Phi is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                     }
                                     theta *= 0.0174532925199433;
                                     phi *= 0.0174532925199433;
@@ -1792,13 +1838,13 @@ public static class CsvRwRouteParser
                                     {
                                         if (arguments.Length < 1)
                                         {
-                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FolderName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FolderName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
@@ -1815,19 +1861,19 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RailTypeIndex is out of range in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailTypeIndex is out of range in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             int val = 0;
                                             if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out val))
                                             {
-                                                GD.Print("RunSoundIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RunSoundIndex is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 val = 0;
                                             }
                                             if (val < 0)
                                             {
-                                                GD.Print("RunSoundIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RunSoundIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 val = 0;
                                             }
                                             if (commandIndex1 >= routeData.Structure.Run.Length)
@@ -1845,19 +1891,19 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RailTypeIndex is out of range in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailTypeIndex is out of range in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             int val = 0;
                                             if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out val))
                                             {
-                                                GD.Print("FlangeSoundIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FlangeSoundIndex is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 val = 0;
                                             }
                                             if (val < 0)
                                             {
-                                                GD.Print("FlangeSoundIndex expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FlangeSoundIndex expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 val = 0;
                                             }
                                             if (commandIndex1 >= routeData.Structure.Flange.Length)
@@ -1875,17 +1921,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("TimetableIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "TimetableIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else if (arguments.Length < 1)
                                         {
-                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
@@ -1918,17 +1964,17 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("TimetableIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "TimetableIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else if (arguments.Length < 1)
                                         {
-                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
@@ -1963,32 +2009,44 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RailStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.Rail.Length)
+                                                if (!previewOnly)
                                                 {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.Rail, commandIndex1 + 1);
-                                                }
-                                                string f = System.IO.Path.Combine(objectPath, arguments[0]);
-                                                if (!System.IO.File.Exists(f))
-                                                {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                }
-                                                else
-                                                {
-                                                    routeData.Structure.Rail[commandIndex1] = ObjectManager.Instance.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    string f = System.IO.Path.Combine(objectPath, arguments[0]);
+
+                                                    if (!System.IO.File.Exists(f))
+                                                    {
+                                                        Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                        // missingObjectCount++;
+                                                    }
+                                                    else
+                                                    {
+                                                        if (!previewOnly)
+                                                        {
+                                                            UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                            if (obj != null)
+                                                            {
+                                                                routeData.Structure.RailObjects.Add(commandIndex1, obj, "RailStructure");
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            // railtypeCount++;
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -2001,32 +2059,32 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("BeaconStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BeaconStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.Beacon.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.Beacon, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    routeData.Structure.Beacon[commandIndex1] = ObjectManager.Instance.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    if (obj != null)
+                                                    {
+                                                        routeData.Structure.Beacon.Add(commandIndex1, obj, "BeaconStructure");
+                                                    }
                                                 }
                                             }
                                         }
@@ -2039,44 +2097,39 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("AdditionalRailsCovered is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "AdditionalRailsCovered is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else if (commandIndex2 < 0)
                                         {
-                                            GD.Print("PoleStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "PoleStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.Poles.Length)
+                                                if (!routeData.Structure.Poles.ContainsKey(commandIndex1))
                                                 {
-                                                    Array.Resize<UnifiedObject[]>(ref routeData.Structure.Poles, commandIndex1 + 1);
+                                                    routeData.Structure.Poles.Add(commandIndex1, new ObjectDictionary());
                                                 }
-                                                if (routeData.Structure.Poles[commandIndex1] == null)
-                                                {
-                                                    routeData.Structure.Poles[commandIndex1] = new UnifiedObject[commandIndex2 + 1];
-                                                }
-                                                else if (commandIndex2 >= routeData.Structure.Poles[commandIndex1].Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.Poles[commandIndex1], commandIndex2 + 1);
-                                                }
+
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    routeData.Structure.Poles[commandIndex1][commandIndex2] = ObjectManager.Instance.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    bool overwriteDefault = commandIndex2 >= 0 && commandIndex2 >= 3;
+                                                    routeData.Structure.Poles[commandIndex1].Add(commandIndex2, obj, overwriteDefault);
                                                 }
                                             }
                                         }
@@ -2089,32 +2142,32 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("GroundStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "GroundStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.Ground.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.Ground, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    routeData.Structure.Ground[commandIndex1] = ObjectManager.Instance.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    if (obj != null)
+                                                    {
+                                                        routeData.Structure.Ground.Add(commandIndex1, obj, "GroundStructure");
+                                                    }
                                                 }
                                             }
                                         }
@@ -2127,32 +2180,32 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("WallStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "WallStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.WallL.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.WallL, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    routeData.Structure.WallL[commandIndex1] = ObjectManager.Instance.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    if (obj != null)
+                                                    {
+                                                        routeData.Structure.WallL.Add(commandIndex1, obj, "Left WallStructure");
+                                                    }
                                                 }
                                             }
                                         }
@@ -2165,32 +2218,32 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("WallStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "WallStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.WallR.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.WallR, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    routeData.Structure.WallR[commandIndex1] = ObjectManager.Instance.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    if (obj != null)
+                                                    {
+                                                        routeData.Structure.WallR.Add(commandIndex1, obj, "Right WallStructure");
+                                                    }
                                                 }
                                             }
                                         }
@@ -2203,32 +2256,32 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("DikeStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DikeStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.DikeL.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.DikeL, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    routeData.Structure.DikeL[commandIndex1] = ObjectManager.Instance.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    if (obj != null)
+                                                    {
+                                                        routeData.Structure.DikeL.Add(commandIndex1, obj, "Left DikeStructure");
+                                                    }
                                                 }
                                             }
                                         }
@@ -2241,32 +2294,32 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("DikeStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DikeStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.DikeR.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.DikeR, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    routeData.Structure.DikeR[commandIndex1] = ObjectManager.Instance.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    if (obj != null)
+                                                    {
+                                                        routeData.Structure.DikeR.Add(commandIndex1, obj, "Right DikeStructure");
+                                                    }
                                                 }
                                             }
                                         }
@@ -2279,32 +2332,32 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("FormStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FormStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.FormL.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.FormL, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    routeData.Structure.FormL[commandIndex1] = ObjectManager.Instance.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    if (obj != null)
+                                                    {
+                                                        routeData.Structure.FormL.Add(commandIndex1, obj, "Left FormStructure");
+                                                    }
                                                 }
                                             }
                                         }
@@ -2317,32 +2370,32 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("FormStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FormStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.FormR.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.FormR, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    routeData.Structure.FormR[commandIndex1] = ObjectManager.Instance.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    if (obj != null)
+                                                    {
+                                                        routeData.Structure.FormR.Add(commandIndex1, obj, "Right FormStructure");
+                                                    }
                                                 }
                                             }
                                         }
@@ -2355,32 +2408,32 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("FormStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FormStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.FormCL.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.FormCL, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    routeData.Structure.FormCL[commandIndex1] = ObjectManager.Instance.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, true, false, false);
+                                                    UnifiedObject obj = UnifiedObject.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    if (obj != null)
+                                                    {
+                                                        routeData.Structure.FormCL.Add(commandIndex1, obj, "Left FormCStructure");
+                                                    }
                                                 }
                                             }
                                         }
@@ -2393,32 +2446,32 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("FormStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FormStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.FormCR.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.FormCR, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    routeData.Structure.FormCR[commandIndex1] = ObjectManager.Instance.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, true, false, false);
+                                                    UnifiedObject obj = UnifiedObject.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    if (obj != null)
+                                                    {
+                                                        routeData.Structure.FormCR.Add(commandIndex1, obj, "Right FormCStructure");
+                                                    }
                                                 }
                                             }
                                         }
@@ -2431,43 +2484,43 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
                                                 if (commandIndex1 == 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                     commandIndex1 = 1;
                                                 }
                                                 if (commandIndex1 < 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    if (commandIndex1 >= routeData.Structure.RoofL.Length)
-                                                    {
-                                                        Array.Resize<UnifiedObject>(ref routeData.Structure.RoofL, commandIndex1 + 1);
-                                                    }
                                                     string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                     if (!System.IO.File.Exists(f))
                                                     {
-                                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                        Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                     }
                                                     else
                                                     {
-                                                        routeData.Structure.RoofL[commandIndex1] = ObjectManager.Instance.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                        UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                        if (obj != null)
+                                                        {
+                                                            routeData.Structure.RoofL.Add(commandIndex1, obj, "Left RoofStructure");
+                                                        }
                                                     }
                                                 }
                                             }
@@ -2481,43 +2534,43 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
                                                 if (commandIndex1 == 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                     commandIndex1 = 1;
                                                 }
                                                 if (commandIndex1 < 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    if (commandIndex1 >= routeData.Structure.RoofR.Length)
-                                                    {
-                                                        Array.Resize<UnifiedObject>(ref routeData.Structure.RoofR, commandIndex1 + 1);
-                                                    }
                                                     string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                     if (!System.IO.File.Exists(f))
                                                     {
-                                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                        Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                     }
                                                     else
                                                     {
-                                                        routeData.Structure.RoofR[commandIndex1] = ObjectManager.Instance.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                        UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                        if (obj != null)
+                                                        {
+                                                            routeData.Structure.RoofR.Add(commandIndex1, obj, "Right RoofStructure");
+                                                        }
                                                     }
                                                 }
                                             }
@@ -2531,43 +2584,43 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
                                                 if (commandIndex1 == 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                     commandIndex1 = 1;
                                                 }
                                                 if (commandIndex1 < 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    if (commandIndex1 >= routeData.Structure.RoofCL.Length)
-                                                    {
-                                                        Array.Resize<UnifiedObject>(ref routeData.Structure.RoofCL, commandIndex1 + 1);
-                                                    }
                                                     string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                     if (!System.IO.File.Exists(f))
                                                     {
-                                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                        Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                     }
                                                     else
                                                     {
-                                                        routeData.Structure.RoofCL[commandIndex1] = ObjectManager.Instance.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, true, false, false);
+                                                        UnifiedObject obj = UnifiedObject.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                        if (obj != null)
+                                                        {
+                                                            routeData.Structure.RoofCL.Add(commandIndex1, obj, "Left RoofCStructure");
+                                                        }
                                                     }
                                                 }
                                             }
@@ -2581,43 +2634,43 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
                                                 if (commandIndex1 == 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex was omitted or is 0 in " + command + " argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                     commandIndex1 = 1;
                                                 }
                                                 if (commandIndex1 < 0)
                                                 {
-                                                    GD.Print("RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex is expected to be non-negative in " + command + " argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    if (commandIndex1 >= routeData.Structure.RoofCR.Length)
-                                                    {
-                                                        Array.Resize<UnifiedObject>(ref routeData.Structure.RoofCR, commandIndex1 + 1);
-                                                    }
                                                     string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                     if (!System.IO.File.Exists(f))
                                                     {
-                                                        GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                        Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                     }
                                                     else
                                                     {
-                                                        routeData.Structure.RoofCR[commandIndex1] = ObjectManager.Instance.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, true, false, false);
+                                                        UnifiedObject obj = UnifiedObject.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                        if (obj != null)
+                                                        {
+                                                            routeData.Structure.RoofCR.Add(commandIndex1, obj, "Right RoofCStructure");
+                                                        }
                                                     }
                                                 }
                                             }
@@ -2631,32 +2684,32 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("CrackStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "CrackStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.CrackL.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.CrackL, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                                 if (!System.IO.File.Exists(f))
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, true, "FileName " + f + " not found in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
                                                 else
                                                 {
-                                                    routeData.Structure.CrackL[commandIndex1] = ObjectManager.Instance.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, true, false, false);
+                                                    UnifiedObject obj = UnifiedObject.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    if (obj != null)
+                                                    {
+                                                        routeData.Structure.CrackL.Add(commandIndex1, obj, "Left CrackStructure");
+                                                    }
                                                 }
                                             }
                                         }
@@ -2669,32 +2722,25 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("CrackStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "CrackStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.CrackR.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.CrackR, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
-                                                if (!System.IO.File.Exists(f))
+                                                UnifiedObject obj = UnifiedObject.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                if (obj != null)
                                                 {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                }
-                                                else
-                                                {
-                                                    routeData.Structure.CrackR[commandIndex1] = ObjectManager.Instance.LoadStaticObject(rootRoutePrefabs, f, fileEncoding, true, false, false);
+                                                    routeData.Structure.CrackR.Add(commandIndex1, obj, "Right CrackStructure");
                                                 }
                                             }
                                         }
@@ -2707,32 +2753,25 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("FreeObjStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FreeObjStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (arguments.Length < 1)
                                             {
-                                                GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                             {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (commandIndex1 >= routeData.Structure.FreeObj.Length)
-                                                {
-                                                    Array.Resize<UnifiedObject>(ref routeData.Structure.FreeObj, commandIndex1 + 1);
-                                                }
                                                 string f = System.IO.Path.Combine(objectPath, arguments[0]);
-                                                if (!System.IO.File.Exists(f))
+                                                UnifiedObject obj = UnifiedObject.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                if (obj != null)
                                                 {
-                                                    GD.Print("FileName " + f + " could not be found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                }
-                                                else
-                                                {
-                                                    routeData.Structure.FreeObj[commandIndex1] = ObjectManager.Instance.LoadObject(rootRoutePrefabs, f, fileEncoding, false, false, false);
+                                                    routeData.Structure.FreeObjects.Add(commandIndex1, obj, "FreeObject");
                                                 }
                                             }
                                         }
@@ -2743,103 +2782,7 @@ public static class CsvRwRouteParser
                             // signal
                             case "signal":
                                 {
-                                    if (!previewOnly)
-                                    {
-                                        if (arguments.Length < 1)
-                                        {
-                                            GD.Print(command + " is expected to have between 1 and 2 arguments at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else
-                                        {
-                                            if (commandIndex1 >= routeData.SignalData.Length)
-                                            {
-                                                Array.Resize<SignalData>(ref routeData.SignalData, commandIndex1 + 1);
-                                            }
-                                            if (arguments[0].EndsWith(".animated", StringComparison.OrdinalIgnoreCase))
-                                            {
-                                                if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
-                                                {
-                                                    GD.Print("AnimatedObjectFile contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                }
-                                                else
-                                                {
-                                                    if (arguments.Length > 1)
-                                                    {
-                                                        GD.Print(command + " is expected to have exactly 1 argument when using animated objects at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                    }
-                                                    string f = System.IO.Path.Combine(objectPath, arguments[0]);
-                                                    if (!System.IO.File.Exists(f))
-                                                    {
-                                                        GD.Print("SignalFileWithoutExtension " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                    }
-                                                    else
-                                                    {
-                                                        //ObjectManager.UnifiedObject Object = ObjectManager.Instance.LoadObjectAsPrefab(f, fileEncoding, false, false, false);
-                                                        //if (Object is ObjectManager.AnimatedObjectCollection)
-                                                        //{
-                                                        //    AnimatedObjectSignalData Signal = new AnimatedObjectSignalData();
-                                                        //    Signal.Objects = (ObjectManager.AnimatedObjectCollection)Object;
-                                                        //    data.SignalData[commandIndex1] = Signal;
-                                                        //}
-                                                        //else
-                                                        //{
-                                                        //     GD.Print("GlowFileWithoutExtension " + f + " is not a valid animated object in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
-                                                        //}
-                                                    }
-                                                }
-                                            }
-                                            else
-                                            {
-                                                //if (arguments[0].LastIndexOfAny(Path.GetInvalidPathChars()) >= 0)
-                                                //{
-                                                //     GD.Print("SignalFileWithoutExtension contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
-                                                //}
-                                                //else
-                                                //{
-                                                //    if (arguments.Length > 2)
-                                                //    {
-                                                //        GD.Print(command + " is expected to have between 1 and 2 arguments at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
-                                                //    }
-                                                //    string f = System.IO.Path.Combine(ObjectPath, arguments[0]);
-                                                //    Bve4SignalData Signal = new Bve4SignalData();
-                                                //    Signal.BaseObject = ObjectManager.Instance.LoadStaticObject(f, fileEncoding, false, false, false);
-                                                //    Signal.GlowObject = null;
-                                                //    string Folder = System.IO.Path.GetDirectoryName(f);
-                                                //    if (!System.IO.Directory.Exists(Folder))
-                                                //    {
-                                                //         GD.Print("The folder " + Folder + " could not be found in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
-                                                //    }
-                                                //    else
-                                                //    {
-                                                //        Signal.SignalTextures = LoadAllTextures(f, false);
-                                                //        Signal.GlowTextures = new Textures.texture[] { };
-                                                //        if (arguments.Length >= 2 && arguments[1].Length != 0)
-                                                //        {
-                                                //            if (arguments[1].LastIndexOfAny(Path.GetInvalidPathChars()) >= 0)
-                                                //            {
-                                                //                 GD.Print("GlowFileWithoutExtension contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
-                                                //            }
-                                                //            else
-                                                //            {
-                                                //                f = System.IO.Path.Combine(objectPath, arguments[1]);
-                                                //                Signal.GlowObject = ObjectManager.Instance.LoadStaticObject(f, fileEncoding, false, false, false);
-                                                //                if (Signal.GlowObject != null)
-                                                //                {
-                                                //                    Signal.GlowTextures = LoadAllTextures(f, true);
-                                                //                    for (int p = 0; p < Signal.GlowObject.Mesh.Materials.Length; p++)
-                                                //                    {
-                                                //                        Signal.GlowObject.Mesh.Materials[p].BlendMode = World.MeshMaterialBlendMode.Additive;
-                                                //                        Signal.GlowObject.Mesh.Materials[p].GlowAttenuationData = World.GetGlowAttenuationData(200.0, World.GlowAttenuationMode.DivisionExponent4);
-                                                //                    }
-                                                //                }
-                                                //            }
-                                                //        }
-                                                //        data.SignalData[commandIndex1] = Signal;
-                                                //    }
-                                                //}
-                                            }
-                                        }
-                                    }
+                                    // TODO
                                 }
                                 break;
 
@@ -2847,96 +2790,96 @@ public static class CsvRwRouteParser
                             case "texture.background":
                             case "structure.back":
                                 {
-                                    if (!previewOnly)
-                                    {
-                                        if (commandIndex1 < 0)
-                                        {
-                                            GD.Print("BackgroundTextureIndex is expected to be non-negative at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else if (arguments.Length < 1)
-                                        {
-                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else
-                                        {
-                                            if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
-                                            {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            }
-                                            else
-                                            {
-                                                if (commandIndex1 >= routeData.Backgrounds.Length)
-                                                {
-                                                    int a = routeData.Backgrounds.Length;
-                                                    Array.Resize<ImageTexture>(ref routeData.Backgrounds, commandIndex1 + 1);
-                                                    for (int k = a; k <= commandIndex1; k++)
-                                                    {
-                                                        routeData.Backgrounds[k] = new ImageTexture();
-                                                    }
-                                                }
-                                                string f = System.IO.Path.Combine(objectPath, arguments[0]);
-                                                if (!System.IO.File.Exists(f))
-                                                {
-                                                    GD.Print("FileName" + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                }
-                                                else
-                                                {
-                                                    // TODO: Only BMP support...
+                                    // if (!previewOnly)
+                                    // {
+                                    //     if (commandIndex1 < 0)
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BackgroundTextureIndex is expected to be non-negative at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //     }
+                                    //     else if (arguments.Length < 1)
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //     }
+                                    //     else
+                                    //     {
+                                    //         if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //         }
+                                    //         else
+                                    //         {
+                                    //             if (commandIndex1 >= routeData.Backgrounds.Length)
+                                    //             {
+                                    //                 int a = routeData.Backgrounds.Length;
+                                    //                 Array.Resize<ImageTexture>(ref routeData.Backgrounds, commandIndex1 + 1);
+                                    //                 for (int k = a; k <= commandIndex1; k++)
+                                    //                 {
+                                    //                     routeData.Backgrounds[k] = new ImageTexture();
+                                    //                 }
+                                    //             }
+                                    //             string f = System.IO.Path.Combine(objectPath, arguments[0]);
+                                    //             if (!System.IO.File.Exists(f))
+                                    //             {
+                                    //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName" + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             }
+                                    //             else
+                                    //             {
+                                    //                 // TODO: Only BMP support...
 
-                                                    ImageTexture background = new ImageTexture();
-                                                    background.Load(f);
-                                                    if (background != null)
-                                                        routeData.Backgrounds[commandIndex1] = background;
+                                    //                 ImageTexture background = new ImageTexture();
+                                    //                 background.Load(f);
+                                    //                 if (background != null)
+                                    //                     routeData.Backgrounds[commandIndex1] = background;
 
-                                                    //routeData.Backgrounds
+                                    //                 //routeData.Backgrounds
 
-                                                    // OLD (works when the textuers are in the asset folder, and have been converted by unity editor) 
-                                                    // routeData.Backgrounds[commandIndex1] = Resources.Load(Path.Combine("Objects/gaku/", Path.GetFileNameWithoutExtension(arguments[0]))) as Texture;
-                                                }
-                                            }
-                                        }
-                                    }
+                                    //                 // OLD (works when the textuers are in the asset folder, and have been converted by unity editor) 
+                                    //                 // routeData.Backgrounds[commandIndex1] = Resources.Load(Path.Combine("Objects/gaku/", Path.GetFileNameWithoutExtension(arguments[0]))) as Texture;
+                                    //             }
+                                    //         }
+                                    //     }
+                                    // }
                                 }
                                 break;
                             case "texture.background.x":
                             case "structure.back.x":
                                 {
-                                    if (!previewOnly)
-                                    {
-                                        if (commandIndex1 < 0)
-                                        {
-                                            GD.Print("BackgroundTextureIndex is expected to be non-negative at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else if (arguments.Length < 1)
-                                        {
-                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else
-                                        {
-                                            //if (commandIndex1 >= data.Backgrounds.Length)
-                                            //{
-                                            //    int a = data.Backgrounds.Length;
-                                            //    Array.Resize<World.Background>(ref data.Backgrounds, commandIndex1 + 1);
-                                            //    for (int k = a; k <= commandIndex1; k++)
-                                            //    {
-                                            //        data.Backgrounds[k] = new World.Background(null, 6, false);
-                                            //    }
-                                            //}
-                                            //int x;
-                                            //if (!Conversions.TryParseIntVb6(arguments[0], out x))
-                                            //{
-                                            //     GD.Print("BackgroundTextureIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
-                                            //}
-                                            //else if (x == 0)
-                                            //{
-                                            //     GD.Print("RepetitionCount is expected to be non-zero in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
-                                            //}
-                                            //else
-                                            //{
-                                            //    data.Backgrounds[commandIndex1].Repetition = x;
-                                            //}
-                                        }
-                                    }
+                                    // if (!previewOnly)
+                                    // {
+                                    //     if (commandIndex1 < 0)
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BackgroundTextureIndex is expected to be non-negative at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //     }
+                                    //     else if (arguments.Length < 1)
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //     }
+                                    //     else
+                                    //     {
+                                    //         if (commandIndex1 >= data.Backgrounds.Length)
+                                    //         {
+                                    //            int a = data.Backgrounds.Length;
+                                    //            Array.Resize<World.Background>(ref data.Backgrounds, commandIndex1 + 1);
+                                    //            for (int k = a; k <= commandIndex1; k++)
+                                    //            {
+                                    //                data.Backgrounds[k] = new World.Background(null, 6, false);
+                                    //            }
+                                    //         }
+                                    //         int x;
+                                    //         if (!Conversions.TryParseIntVb6(arguments[0], out x))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BackgroundTextureIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    //         }
+                                    //         else if (x == 0)
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RepetitionCount is expected to be non-zero in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    //         }
+                                    //         else
+                                    //         {
+                                    //            data.Backgrounds[commandIndex1].Repetition = x;
+                                    //         }
+                                    //     }
+                                    // }
                                 }
                                 break;
                             case "texture.background.aspect":
@@ -2946,14 +2889,15 @@ public static class CsvRwRouteParser
                                     {
                                         if (commandIndex1 < 0)
                                         {
-                                            GD.Print("BackgroundTextureIndex is expected to be non-negative at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BackgroundTextureIndex is expected to be non-negative at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else if (arguments.Length < 1)
                                         {
-                                            GD.Print(command + " is expected to have one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
+                                            // TODO: Dynamic and static backgrounds
                                             //if (commandIndex1 >= data.Backgrounds.Length)
                                             //{
                                             //    int a = data.Backgrounds.Length;
@@ -2966,11 +2910,11 @@ public static class CsvRwRouteParser
                                             //int aspect;
                                             //if (!Conversions.TryParseIntVb6(arguments[0], out aspect))
                                             //{
-                                            //     GD.Print("BackgroundTextureIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            //     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BackgroundTextureIndex is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                                             //}
                                             //else if (aspect != 0 & aspect != 1)
                                             //{
-                                            //     GD.Print("Value is expected to be either 0 or 1 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                            //     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Value is expected to be either 0 or 1 in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                                             //}
                                             //else
                                             //{
@@ -2984,27 +2928,30 @@ public static class CsvRwRouteParser
                             case "cycle.ground":
                                 if (!previewOnly)
                                 {
-                                    if (commandIndex1 >= routeData.Structure.Cycle.Length)
+                                    if (commandIndex1 >= routeData.Structure.GroundCycles.Length)
                                     {
-                                        Array.Resize<int[]>(ref routeData.Structure.Cycle, commandIndex1 + 1);
+                                        Array.Resize(ref routeData.Structure.GroundCycles, commandIndex1 + 1);
                                     }
-                                    routeData.Structure.Cycle[commandIndex1] = new int[arguments.Length];
+                                    routeData.Structure.GroundCycles[commandIndex1] = new int[arguments.Length];
                                     for (int k = 0; k < arguments.Length; k++)
                                     {
                                         int ix = 0;
                                         if (arguments[k].Length > 0 && !Conversions.TryParseIntVb6(arguments[k], out ix))
                                         {
-                                            GD.Print("GroundStructureIndex" + (k + 1).ToString(culture) + " is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            // Plugin.CurrentHost.AddMessage(MessageType.Error, false, "GroundStructureIndex " + (k + 1).ToString(culture) + " is invalid in " + command + " at line " + Expression.Line.ToString(Culture) + ", column " + Expression.Column.ToString(Culture) + " in file " + Expression.File);
                                             ix = 0;
                                         }
-                                        if (ix < 0 | ix >= routeData.Structure.Ground.Length)
+
+                                        if (ix < 0 | !routeData.Structure.Ground.ContainsKey(ix))
                                         {
-                                            GD.Print("GroundStructureIndex" + (k + 1).ToString(culture) + " is out of range in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            // Plugin.CurrentHost.AddMessage(MessageType.Error, false, "GroundStructureIndex " + (k + 1).ToString(culture) + " is out of range in " + command + " at line " + Expression.Line.ToString(Culture) + ", column " + Expression.Column.ToString(Culture) + " in file " + Expression.File);
                                             ix = 0;
                                         }
-                                        routeData.Structure.Cycle[commandIndex1][k] = ix;
+
+                                        routeData.Structure.GroundCycles[commandIndex1][k] = ix;
                                     }
                                 }
+
                                 break;
                         }
                     }
@@ -3013,7 +2960,7 @@ public static class CsvRwRouteParser
         }
 
         // process track namespace
-        for (int j = 0; j < expressions.Length; j++)
+        for (int j = 0; j < routeExpressions.Length; j++)
         {
             //Loading.RouteProgress = 0.3333 + (double)j * progressFactor;
             if ((j & 255) == 0)
@@ -3021,35 +2968,35 @@ public static class CsvRwRouteParser
                 //System.Threading.Thread.Sleep(1);
                 //if (Loading.Cancel) return;
             }
-            if (expressions[j].Text.StartsWith("[") & expressions[j].Text.EndsWith("]"))
+            if (routeExpressions[j].Text.StartsWith("[") & routeExpressions[j].Text.EndsWith("]"))
             {
-                Section = expressions[j].Text.Substring(1, expressions[j].Text.Length - 2).Trim();
-                if (string.Compare(Section, "object", StringComparison.OrdinalIgnoreCase) == 0)
+                section = routeExpressions[j].Text.Substring(1, routeExpressions[j].Text.Length - 2).Trim();
+                if (string.Compare(section, "object", StringComparison.OrdinalIgnoreCase) == 0)
                 {
-                    Section = "Structure";
+                    section = "Structure";
                 }
-                else if (string.Compare(Section, "railway", StringComparison.OrdinalIgnoreCase) == 0)
+                else if (string.Compare(section, "railway", StringComparison.OrdinalIgnoreCase) == 0)
                 {
-                    Section = "Track";
+                    section = "Track";
                 }
                 sectionAlwaysPrefix = true;
             }
             else
             {
                 // find equals
-                int equals = expressions[j].Text.IndexOf('=');
+                int equals = routeExpressions[j].Text.IndexOf('=');
                 if (equals >= 0)
                 {
                     // handle RW cycle syntax
-                    string t = expressions[j].Text.Substring(0, equals);
-                    if (Section.ToLowerInvariant() == "cycle" & sectionAlwaysPrefix)
+                    string t = routeExpressions[j].Text.Substring(0, equals);
+                    if (section.ToLowerInvariant() == "cycle" & sectionAlwaysPrefix)
                     {
                         double b; if (Conversions.TryParseDoubleVb6(t, out b))
                         {
                             t = ".Ground(" + t + ")";
                         }
                     }
-                    else if (Section.ToLowerInvariant() == "signal" & sectionAlwaysPrefix)
+                    else if (section.ToLowerInvariant() == "signal" & sectionAlwaysPrefix)
                     {
                         double b; if (Conversions.TryParseDoubleVb6(t, out b))
                         {
@@ -3057,33 +3004,32 @@ public static class CsvRwRouteParser
                         }
                     }
                     // convert RW style into CSV style
-                    expressions[j].Text = t + " " + expressions[j].Text.Substring(equals + 1);
+                    routeExpressions[j].Text = t + " " + routeExpressions[j].Text.Substring(equals + 1);
                 }
                 // separate command and arguments
                 string command, argumentSequence;
-                Expression.SeparateCommandsAndArguments(expressions[j], out command, out argumentSequence, culture,  false, isRW, Section);
-                
+                Expression.SeparateCommandsAndArguments(routeExpressions[j], out command, out argumentSequence, culture, false, isRW, section);
 
                 // process command
-                double number;
-                bool numberCheck = !isRW || string.Compare(Section, "track", StringComparison.OrdinalIgnoreCase) == 0;
-                if (numberCheck && Conversions.TryParseDouble(command, unitOfLength, out number))
+                float number;
+                bool numberCheck = !isRW || string.Compare(section, "track", StringComparison.OrdinalIgnoreCase) == 0;
+                if (numberCheck && Conversions.TryParseFloat(command, unitOfLength, out number))
                 {
                     // track position
                     if (argumentSequence.Length != 0)
                     {
-                        GD.Print("A track position must not contain any arguments at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "A track position must not contain any arguments at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                     }
                     else if (number < 0.0)
                     {
-                        GD.Print("Negative track position encountered at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Negative track position encountered at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                     }
                     else
                     {
                         routeData.TrackPosition = number;
                         blockIndex = (int)Math.Floor(number / routeData.BlockInterval + 0.001);
                         if (routeData.FirstUsedBlock == -1) routeData.FirstUsedBlock = blockIndex;
-                        CreateMissingBlocks(ref routeData, ref blocksUsed, blockIndex, previewOnly);
+                        routeData.CreateMissingBlocks(blockIndex, previewOnly);
                     }
                 }
                 else
@@ -3130,12 +3076,12 @@ public static class CsvRwRouteParser
                     {
                         if (arguments.Length >= 1)
                         {
-                            Section = arguments[0];
+                            section = arguments[0];
                             sectionAlwaysPrefix = false;
                         }
                         else
                         {
-                            Section = "";
+                            section = "";
                             sectionAlwaysPrefix = false;
                         }
                         command = null;
@@ -3144,11 +3090,11 @@ public static class CsvRwRouteParser
                     {
                         if (command.StartsWith("."))
                         {
-                            command = Section + command;
+                            command = section + command;
                         }
                         else if (sectionAlwaysPrefix)
                         {
-                            command = Section + "." + command;
+                            command = section + "." + command;
                         }
                         command = command.Replace(".Void", "");
                         if (command.StartsWith("structure", StringComparison.OrdinalIgnoreCase) & command.EndsWith(".load", StringComparison.OrdinalIgnoreCase))
@@ -3229,12 +3175,12 @@ public static class CsvRwRouteParser
                                     string b = Indices.Substring(h + 1).TrimStart();
                                     if (a.Length > 0 && !Conversions.TryParseIntVb6(a, out CommandIndex1))
                                     {
-                                        GD.Print("Invalid first index appeared at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File + ".");
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Invalid first index appeared at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File + ".");
                                         command = null; break;
                                     }
                                     else if (b.Length > 0 && !Conversions.TryParseIntVb6(b, out CommandIndex2))
                                     {
-                                        GD.Print("Invalid second index appeared at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File + ".");
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Invalid second index appeared at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File + ".");
                                         command = null; break;
                                     }
                                 }
@@ -3242,7 +3188,7 @@ public static class CsvRwRouteParser
                                 {
                                     if (Indices.Length > 0 && !Conversions.TryParseIntVb6(Indices, out CommandIndex1))
                                     {
-                                        GD.Print("Invalid index appeared at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File + ".");
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Invalid index appeared at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File + ".");
                                         command = null; break;
                                     }
                                 }
@@ -3321,100 +3267,141 @@ public static class CsvRwRouteParser
                             // track
                             case "track.railstart":
                             case "track.rail":
+                                if (!previewOnly)
                                 {
-                                    if (!previewOnly)
+                                    int idx = 0;
+                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                     {
-                                        int idx = 0;
-                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        idx = 0;
+                                    }
+                                    if (idx < 1)
+                                    {
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is expected to be positive in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                    }
+                                    else
+                                    {
+                                        if (string.Compare(command, "track.railstart", StringComparison.OrdinalIgnoreCase) == 0)
                                         {
-                                            GD.Print("RailIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            idx = 0;
+                                            if (routeData.Blocks[blockIndex].Rails.ContainsKey(idx) && routeData.Blocks[blockIndex].Rails[idx].RailStarted)
+                                            {
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is required to reference a non-existing rail in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            }
                                         }
-                                        if (idx < 1)
+
+                                        if (!routeData.Blocks[blockIndex].Rails.ContainsKey(idx))
                                         {
-                                            GD.Print("RailIndex is expected to be positive in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            routeData.Blocks[blockIndex].Rails.Add(idx, new Rail());
+
+                                            if (idx >= routeData.Blocks[blockIndex].RailCycles.Length)
+                                            {
+                                                int ol = routeData.Blocks[blockIndex].RailCycles.Length;
+                                                Array.Resize(ref routeData.Blocks[blockIndex].RailCycles, idx + 1);
+                                                for (int rc = ol; rc < routeData.Blocks[blockIndex].RailCycles.Length; rc++)
+                                                {
+                                                    routeData.Blocks[blockIndex].RailCycles[rc].RailCycleIndex = -1;
+                                                }
+                                            }
+
+                                        }
+
+                                        Rail currentRail = routeData.Blocks[blockIndex].Rails[idx];
+                                        if (currentRail.RailStartRefreshed)
+                                        {
+                                            currentRail.RailEnded = true;
+                                        }
+
+                                        currentRail.RailStarted = true;
+                                        currentRail.RailStartRefreshed = true;
+                                        if (arguments.Length >= 2)
+                                        {
+                                            if (arguments[1].Length > 0)
+                                            {
+                                                if (!Conversions.TryParseFloatVb6(arguments[1], unitOfLength, out currentRail.RailStart.x))
+                                                {
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "X is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                    currentRail.RailStart.x = 0.0f;
+                                                }
+                                            }
+
+                                            if (!currentRail.RailEnded)
+                                            {
+                                                currentRail.RailEnd.x = currentRail.RailStart.x;
+                                            }
+                                        }
+
+                                        if (arguments.Length >= 3)
+                                        {
+                                            if (arguments[2].Length > 0)
+                                            {
+                                                if (!Conversions.TryParseFloatVb6(arguments[2], unitOfLength, out currentRail.RailStart.y))
+                                                {
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Y is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                    currentRail.RailStart.y = 0.0f;
+                                                }
+                                            }
+
+                                            if (!currentRail.RailEnded)
+                                            {
+                                                currentRail.RailEnd.y = currentRail.RailStart.y;
+                                            }
+                                        }
+
+                                        if (routeData.Blocks[blockIndex].RailType.Length <= idx)
+                                        {
+                                            Array.Resize(ref routeData.Blocks[blockIndex].RailType, idx + 1);
+                                        }
+
+                                        if (arguments.Length >= 4 && arguments[3].Length != 0)
+                                        {
+                                            int sttype;
+                                            if (!Conversions.TryParseIntVb6(arguments[3], out sttype))
+                                            {
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailStructureIndex is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                sttype = 0;
+                                            }
+
+                                            if (sttype < 0)
+                                            {
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailStructureIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            }
+                                            else if (!routeData.Structure.RailObjects.ContainsKey(sttype))
+                                            {
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailStructureIndex " + sttype + " references an object not loaded in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            }
+                                            else
+                                            {
+                                                if (sttype < routeData.Structure.RailCycles.Length && routeData.Structure.RailCycles[sttype] != null)
+                                                {
+                                                    routeData.Blocks[blockIndex].RailType[idx] = routeData.Structure.RailCycles[sttype][0];
+                                                    routeData.Blocks[blockIndex].RailCycles[idx].RailCycleIndex = sttype;
+                                                    routeData.Blocks[blockIndex].RailCycles[idx].CurrentCycle = 0;
+                                                }
+                                                else
+                                                {
+                                                    routeData.Blocks[blockIndex].RailType[idx] = sttype;
+                                                    routeData.Blocks[blockIndex].RailCycles[idx].RailCycleIndex = -1;
+                                                }
+                                            }
+                                        }
+
+                                        float cant = 0.0f;
+                                        if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseFloatVb6(arguments[4], out cant))
+                                        {
+                                            if (arguments[4] != "id 0") //RouteBuilder inserts these, harmless so let's ignore
+                                            {
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "CantInMillimeters is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            }
+
+                                            cant = 0.0f;
                                         }
                                         else
                                         {
-                                            if (string.Compare(command, "track.railstart", StringComparison.OrdinalIgnoreCase) == 0)
-                                            {
-                                                if (idx < routeData.Blocks[blockIndex].Rail.Length && routeData.Blocks[blockIndex].Rail[idx].RailStart)
-                                                {
-                                                    GD.Print("RailIndex is required to reference a non-existing rail in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                }
-                                            }
-                                            if (routeData.Blocks[blockIndex].Rail.Length <= idx)
-                                            {
-                                                Array.Resize<Rail>(ref routeData.Blocks[blockIndex].Rail, idx + 1);
-                                            }
-                                            if (routeData.Blocks[blockIndex].Rail[idx].RailStartRefreshed)
-                                            {
-                                                routeData.Blocks[blockIndex].Rail[idx].RailEnd = true;
-                                            }
-                                            {
-                                                routeData.Blocks[blockIndex].Rail[idx].RailStart = true;
-                                                routeData.Blocks[blockIndex].Rail[idx].RailStartRefreshed = true;
-                                                if (arguments.Length >= 2)
-                                                {
-                                                    if (arguments[1].Length > 0)
-                                                    {
-                                                        double x;
-                                                        if (!Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out x))
-                                                        {
-                                                            GD.Print("X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                            x = 0.0;
-                                                        }
-                                                        routeData.Blocks[blockIndex].Rail[idx].RailStartX = x;
-                                                    }
-                                                    if (!routeData.Blocks[blockIndex].Rail[idx].RailEnd)
-                                                    {
-                                                        routeData.Blocks[blockIndex].Rail[idx].RailEndX = routeData.Blocks[blockIndex].Rail[idx].RailStartX;
-                                                    }
-                                                }
-                                                if (arguments.Length >= 3)
-                                                {
-                                                    if (arguments[2].Length > 0)
-                                                    {
-                                                        double y;
-                                                        if (!Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out y))
-                                                        {
-                                                            GD.Print("Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                            y = 0.0;
-                                                        }
-                                                        routeData.Blocks[blockIndex].Rail[idx].RailStartY = y;
-                                                    }
-                                                    if (!routeData.Blocks[blockIndex].Rail[idx].RailEnd)
-                                                    {
-                                                        routeData.Blocks[blockIndex].Rail[idx].RailEndY = routeData.Blocks[blockIndex].Rail[idx].RailStartY;
-                                                    }
-                                                }
-                                                if (routeData.Blocks[blockIndex].RailType.Length <= idx)
-                                                {
-                                                    Array.Resize<int>(ref routeData.Blocks[blockIndex].RailType, idx + 1);
-                                                }
-                                                if (arguments.Length >= 4 && arguments[3].Length != 0)
-                                                {
-                                                    int sttype;
-                                                    if (!Conversions.TryParseIntVb6(arguments[3], out sttype))
-                                                    {
-                                                        GD.Print("RailStructureIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                        sttype = 0;
-                                                    }
-                                                    if (sttype < 0)
-                                                    {
-                                                        GD.Print("RailStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                    }
-                                                    else if (sttype >= routeData.Structure.Rail.Length || routeData.Structure.Rail[sttype] == null)
-                                                    {
-                                                        GD.Print("RailStructureIndex references an object not loaded in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                    }
-                                                    else
-                                                    {
-                                                        routeData.Blocks[blockIndex].RailType[idx] = sttype;
-                                                    }
-                                                }
-                                            }
+                                            cant *= 0.001f;
                                         }
+
+                                        currentRail.CurveCant = cant;
+                                        routeData.Blocks[blockIndex].Rails[idx] = currentRail;
                                     }
                                 }
                                 break;
@@ -3425,43 +3412,50 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            idx = 0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex " + idx + " is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            break;
                                         }
-                                        if (idx < 0 || idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart)
+
+                                        if (idx == 0)
                                         {
-                                            GD.Print("RailIndex references a non-existing rail in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The command " + command + " is invalid for Rail 0 at line " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            break;
                                         }
-                                        else
+
+                                        if (idx < 0 || !routeData.Blocks[blockIndex].Rails.ContainsKey(idx) || !routeData.Blocks[blockIndex].Rails[idx].RailStarted)
                                         {
-                                            if (routeData.Blocks[blockIndex].RailType.Length <= idx)
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex " + idx + " references a non-existing rail in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            break;
+                                        }
+
+                                        if (!routeData.Blocks[blockIndex].Rails.ContainsKey(idx))
+                                        {
+                                            routeData.Blocks[blockIndex].Rails.Add(idx, new Rail());
+                                        }
+
+                                        Rail currentRail = routeData.Blocks[blockIndex].Rails[idx];
+                                        currentRail.RailStarted = false;
+                                        currentRail.RailStartRefreshed = false;
+                                        currentRail.RailEnded = true;
+                                        if (arguments.Length >= 2 && arguments[1].Length > 0)
+                                        {
+                                            if (!Conversions.TryParseFloatVb6(arguments[1], unitOfLength, out currentRail.RailEnd.x))
                                             {
-                                                Array.Resize<Rail>(ref routeData.Blocks[blockIndex].Rail, idx + 1);
-                                            }
-                                            routeData.Blocks[blockIndex].Rail[idx].RailStart = false;
-                                            routeData.Blocks[blockIndex].Rail[idx].RailStartRefreshed = false;
-                                            routeData.Blocks[blockIndex].Rail[idx].RailEnd = true;
-                                            if (arguments.Length >= 2 && arguments[1].Length > 0)
-                                            {
-                                                double x;
-                                                if (!Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out x))
-                                                {
-                                                    GD.Print("X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                    x = 0.0;
-                                                }
-                                                routeData.Blocks[blockIndex].Rail[idx].RailEndX = x;
-                                            }
-                                            if (arguments.Length >= 3 && arguments[2].Length > 0)
-                                            {
-                                                double y;
-                                                if (!Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out y))
-                                                {
-                                                    GD.Print("Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                    y = 0.0;
-                                                }
-                                                routeData.Blocks[blockIndex].Rail[idx].RailEndY = y;
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "X is invalid in " + command + " is invalid for Rail 0 at line " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                currentRail.RailEnd.x = 0.0f;
                                             }
                                         }
+
+                                        if (arguments.Length >= 3 && arguments[2].Length > 0)
+                                        {
+                                            if (!Conversions.TryParseFloatVb6(arguments[2], unitOfLength, out currentRail.RailEnd.y))
+                                            {
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Y is invalid in " + command + " is invalid for Rail 0 at line " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                currentRail.RailEnd.y = 0.0f;
+                                            }
+                                        }
+
+                                        routeData.Blocks[blockIndex].Rails[idx] = currentRail;
                                     }
                                 }
                                 break;
@@ -3472,40 +3466,60 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is invalid in " + command + " is invalid for Rail 0 at line " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             idx = 0;
                                         }
+
                                         int sttype = 0;
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out sttype))
                                         {
-                                            GD.Print("RailStructureIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailStructureIndex is invalid in " + command + " is invalid for Rail 0 at line " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             sttype = 0;
                                         }
+
                                         if (idx < 0)
                                         {
-                                            GD.Print("RailIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is expected to be non-negative in " + command + " is invalid for Rail 0 at line " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
-                                            if (idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart)
+                                            if (!routeData.Blocks[blockIndex].Rails.ContainsKey(idx) || !routeData.Blocks[blockIndex].Rails[idx].RailStarted)
                                             {
-                                                GD.Print("RailIndex could be out of range in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "RailIndex " + idx + " could be out of range in " + command + " is invalid for Rail 0 at line " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
+
                                             if (sttype < 0)
                                             {
-                                                GD.Print("RailStructureIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailStructureIndex is expected to be non-negative in " + command + " is invalid for Rail 0 at line " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
-                                            else if (sttype >= routeData.Structure.Rail.Length || routeData.Structure.Rail[sttype] == null)
+                                            else if (!routeData.Structure.RailObjects.ContainsKey(sttype))
                                             {
-                                                GD.Print("RailStructureIndex references an object not loaded in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailStructureIndex " + sttype + " references an object not loaded in " + command + " is invalid for Rail 0 at line " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
                                                 if (routeData.Blocks[blockIndex].RailType.Length <= idx)
                                                 {
-                                                    Array.Resize<int>(ref routeData.Blocks[blockIndex].RailType, idx + 1);
+                                                    Array.Resize(ref routeData.Blocks[blockIndex].RailType, idx + 1);
+                                                    int ol = routeData.Blocks[blockIndex].RailCycles.Length;
+                                                    Array.Resize(ref routeData.Blocks[blockIndex].RailCycles, idx + 1);
+                                                    for (int rc = ol; rc < routeData.Blocks[blockIndex].RailCycles.Length; rc++)
+                                                    {
+                                                        routeData.Blocks[blockIndex].RailCycles[rc].RailCycleIndex = -1;
+                                                    }
                                                 }
-                                                routeData.Blocks[blockIndex].RailType[idx] = sttype;
+
+                                                if (sttype < routeData.Structure.RailCycles.Length && routeData.Structure.RailCycles[sttype] != null)
+                                                {
+                                                    routeData.Blocks[blockIndex].RailType[idx] = routeData.Structure.RailCycles[sttype][0];
+                                                    routeData.Blocks[blockIndex].RailCycles[idx].RailCycleIndex = sttype;
+                                                    routeData.Blocks[blockIndex].RailCycles[idx].CurrentCycle = 0;
+                                                }
+                                                else
+                                                {
+                                                    routeData.Blocks[blockIndex].RailType[idx] = sttype;
+                                                    routeData.Blocks[blockIndex].RailCycles[idx].RailCycleIndex = -1;
+                                                }
                                             }
                                         }
                                     }
@@ -3513,113 +3527,113 @@ public static class CsvRwRouteParser
                                 break;
                             case "track.accuracy":
                                 {
-                                    double r = 2.0;
-                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out r))
+                                    float r = 2.0f;
+                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], out r))
                                     {
-                                        GD.Print("Value is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        r = 2.0;
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Value is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        r = 2.0f;
                                     }
                                     if (r < 0.0)
                                     {
-                                        r = 0.0;
+                                        r = 0.0f;
                                     }
                                     else if (r > 4.0)
                                     {
-                                        r = 4.0;
+                                        r = 4.0f;
                                     }
                                     routeData.Blocks[blockIndex].Accuracy = r;
                                 }
                                 break;
                             case "track.pitch":
                                 {
-                                    double p = 0.0;
-                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out p))
+                                    float p = 0.0f;
+                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], out p))
                                     {
-                                        GD.Print("ValueInPermille is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        p = 0.0;
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ValueInPermille is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        p = 0.0f;
                                     }
-                                    routeData.Blocks[blockIndex].Pitch = 0.001 * p;
+                                    routeData.Blocks[blockIndex].Pitch = 0.001f * p;
                                 }
                                 break;
                             case "track.curve":
                                 {
-                                    double radius = 0.0;
-                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], unitOfLength, out radius))
+                                    float radius = 0.0f;
+                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], unitOfLength, out radius))
                                     {
-                                        GD.Print("Radius is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        radius = 0.0;
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Radius is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        radius = 0.0f;
                                     }
-                                    double cant = 0.0;
-                                    if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out cant))
+                                    float cant = 0.0f;
+                                    if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseFloatVb6(arguments[1], out cant))
                                     {
-                                        GD.Print("CantInMillimeters is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        cant = 0.0;
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "CantInMillimeters is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        cant = 0.0f;
                                     }
                                     else
                                     {
-                                        cant *= 0.001;
+                                        cant *= 0.001f;
                                     }
                                     if (routeData.SignedCant)
                                     {
                                         if (radius != 0.0)
                                         {
-                                            cant *= (double)Math.Sign(radius);
+                                            cant *= Mathf.Sign(radius);
                                         }
                                     }
                                     else
                                     {
-                                        cant = Math.Abs(cant) * (double)Math.Sign(radius);
+                                        cant = Mathf.Abs(cant) * Mathf.Sign(radius);
                                     }
                                     routeData.Blocks[blockIndex].CurrentTrackState.CurveRadius = radius;
                                     routeData.Blocks[blockIndex].CurrentTrackState.CurveCant = cant;
-                                    routeData.Blocks[blockIndex].CurrentTrackState.CurveCantTangent = 0.0;
+                                    routeData.Blocks[blockIndex].CurrentTrackState.CurveCantTangent = 0.0f;
                                 }
                                 break;
                             case "track.turn":
                                 {
-                                    double s = 0.0;
-                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out s))
+                                    float s = 0.0f;
+                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], out s))
                                     {
-                                        GD.Print("Ratio is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        s = 0.0;
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Ratio is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        s = 0.0f;
                                     }
                                     routeData.Blocks[blockIndex].Turn = s;
                                 }
                                 break;
                             case "track.adhesion":
                                 {
-                                    double a = 100.0;
-                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out a))
+                                    float a = 100.0f;
+                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], out a))
                                     {
-                                        GD.Print("Value is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        a = 100.0;
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Value is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        a = 100.0f;
                                     }
                                     if (a < 0.0)
                                     {
-                                        GD.Print("Value is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        a = 100.0;
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Value is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        a = 100.0f;
                                     }
-                                    routeData.Blocks[blockIndex].AdhesionMultiplier = 0.01 * a;
+                                    routeData.Blocks[blockIndex].AdhesionMultiplier = 0.01f * a;
                                 }
                                 break;
                             case "track.brightness":
                                 {
-                                    if (!previewOnly)
-                                    {
-                                        float value = 255.0f;
-                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], out value))
-                                        {
-                                            GD.Print("Value is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            value = 255.0f;
-                                        }
-                                        value /= 255.0f;
-                                        if (value < 0.0f) value = 0.0f;
-                                        if (value > 1.0f) value = 1.0f;
-                                        int n = routeData.Blocks[blockIndex].Brightness.Length;
-                                        Array.Resize<Brightness>(ref routeData.Blocks[blockIndex].Brightness, n + 1);
-                                        routeData.Blocks[blockIndex].Brightness[n].TrackPosition = routeData.TrackPosition;
-                                        routeData.Blocks[blockIndex].Brightness[n].Value = value;
-                                    }
+                                    // if (!previewOnly)
+                                    // {
+                                    //     float value = 255.0f;
+                                    //     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], out value))
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Value is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //         value = 255.0f;
+                                    //     }
+                                    //     value /= 255.0f;
+                                    //     if (value < 0.0f) value = 0.0f;
+                                    //     if (value > 1.0f) value = 1.0f;
+                                    //     int n = routeData.Blocks[blockIndex].Brightness.Length;
+                                    //     Array.Resize<Brightness>(ref routeData.Blocks[blockIndex].Brightness, n + 1);
+                                    //     routeData.Blocks[blockIndex].Brightness[n].TrackPosition = routeData.TrackPosition;
+                                    //     routeData.Blocks[blockIndex].Brightness[n].Value = value;
+                                    // }
                                 }
                                 break;
                             case "track.fog":
@@ -3630,42 +3644,42 @@ public static class CsvRwRouteParser
                                         int r = 128, g = 128, b = 128;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out start))
                                         {
-                                            GD.Print("StartingDistance is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "StartingDistance is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             start = 0.0;
                                         }
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out end))
                                         {
-                                            GD.Print("EndingDistance is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "EndingDistance is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             end = 0.0;
                                         }
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out r))
                                         {
-                                            GD.Print("RedValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RedValue is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             r = 128;
                                         }
                                         else if (r < 0 | r > 255)
                                         {
-                                            GD.Print("RedValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RedValue is required to be within the range from 0 to 255 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             r = r < 0 ? 0 : 255;
                                         }
                                         if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out g))
                                         {
-                                            GD.Print("GreenValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "GreenValue is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             g = 128;
                                         }
                                         else if (g < 0 | g > 255)
                                         {
-                                            GD.Print("GreenValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "GreenValue is required to be within the range from 0 to 255 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             g = g < 0 ? 0 : 255;
                                         }
                                         if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseIntVb6(arguments[4], out b))
                                         {
-                                            GD.Print("BlueValue is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BlueValue is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             b = 128;
                                         }
                                         else if (b < 0 | b > 255)
                                         {
-                                            GD.Print("BlueValue is required to be within the range from 0 to 255 in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BlueValue is required to be within the range from 0 to 255 in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             b = b < 0 ? 0 : 255;
                                         }
                                         //if (start < end)
@@ -3690,7 +3704,7 @@ public static class CsvRwRouteParser
                                     {
                                         if (arguments.Length == 0)
                                         {
-                                            GD.Print("At least one argument is required in " + command + "at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "At least one argument is required in " + command + "at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
@@ -3699,12 +3713,12 @@ public static class CsvRwRouteParser
                                             {
                                                 if (!Conversions.TryParseIntVb6(arguments[i], out aspects[i]))
                                                 {
-                                                    GD.Print("Aspect" + i.ToString(culture) + " is invalid in " + command + "at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Aspect" + i.ToString(culture) + " is invalid in " + command + "at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                     aspects[i] = -1;
                                                 }
                                                 else if (aspects[i] < 0)
                                                 {
-                                                    GD.Print("Aspect" + i.ToString(culture) + " is expected to be non-negative in " + command + "at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Aspect" + i.ToString(culture) + " is expected to be non-negative in " + command + "at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                     aspects[i] = -1;
                                                 }
                                             }
@@ -3713,12 +3727,24 @@ public static class CsvRwRouteParser
                                             {
                                                 Array.Sort<int>(aspects);
                                             }
-                                            int n = routeData.Blocks[blockIndex].Section.Length;
-                                            Array.Resize<Section>(ref routeData.Blocks[blockIndex].Section, n + 1);
-                                            routeData.Blocks[blockIndex].Section[n].TrackPosition = routeData.TrackPosition;
-                                            routeData.Blocks[blockIndex].Section[n].Aspects = aspects;
+
+                                            int n = routeData.Blocks[blockIndex].Sections.Length;
+                                            Array.Resize<Section>(ref routeData.Blocks[blockIndex].Sections, n + 1);
+                                            int departureStationIndex = -1;
+                                            // if (CurrentStation >= 0 && CurrentRoute.Stations[CurrentStation].ForceStopSignal)
+                                            // {
+                                            //     if (CurrentStation >= 0 & CurrentStop >= 0 & !DepartureSignalUsed)
+                                            //     {
+                                            //         departureStationIndex = CurrentStation;
+                                            //         DepartureSignalUsed = true;
+                                            //     }
+                                            // }
+                                            routeData.Blocks[blockIndex].Sections[n] = new Section(routeData.TrackPosition, aspects, departureStationIndex, valueBased ? SectionType.ValueBased : SectionType.IndexBased);
+
+                                            // routeData.Blocks[blockIndex].Section[n].TrackPosition = routeData.TrackPosition;
+                                            // routeData.Blocks[blockIndex].Section[n].Aspects = aspects;
                                             //data.Blocks[blockIndex].Section[n].Type = valueBased ? Game.SectionType.ValueBased : Game.SectionType.IndexBased;
-                                            routeData.Blocks[blockIndex].Section[n].DepartureStationIndex = -1;
+                                            // routeData.Blocks[blockIndex].Section[n].DepartureStationIndex = -1;
                                             //if (currentStation >= 0 && Game.Stations[currentStation].ForceStopSignal)
                                             //{
                                             //    if (currentStation >= 0 & currentStop >= 0 & !departureSignalUsed)
@@ -3734,69 +3760,66 @@ public static class CsvRwRouteParser
                                 break;
                             case "track.sigf":
                                 {
-                                    if (!previewOnly)
-                                    {
-                                        int objidx = 0;
-                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out objidx))
-                                        {
-                                            GD.Print("SignalIndex is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            objidx = 0;
-                                        }
-                                        if (objidx >= 0 & objidx < routeData.SignalData.Length && routeData.SignalData[objidx] != null)
-                                        {
-                                            int section = 0;
-                                            if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out section))
-                                            {
-                                                GD.Print("Section is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                section = 0;
-                                            }
-                                            double x = 0.0, y = 0.0;
-                                            if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out x))
-                                            {
-                                                GD.Print("X is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                x = 0.0;
-                                            }
-                                            if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], unitOfLength, out y))
-                                            {
-                                                GD.Print("Y is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                y = 0.0;
-                                            }
-                                            double yaw = 0.0, pitch = 0.0, roll = 0.0;
-                                            if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out yaw))
-                                            {
-                                                GD.Print("Yaw is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                yaw = 0.0;
-                                            }
-                                            if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out pitch))
-                                            {
-                                                GD.Print("Pitch is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                pitch = 0.0;
-                                            }
-                                            if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[6], out roll))
-                                            {
-                                                GD.Print("Roll is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                roll = 0.0;
-                                            }
-                                            int n = routeData.Blocks[blockIndex].Signal.Length;
-                                            Array.Resize<Signal>(ref routeData.Blocks[blockIndex].Signal, n + 1);
-                                            routeData.Blocks[blockIndex].Signal[n].TrackPosition = routeData.TrackPosition;
-                                            routeData.Blocks[blockIndex].Signal[n].Section = currentSection + section;
-                                            routeData.Blocks[blockIndex].Signal[n].SignalCompatibilityObjectIndex = -1;
-                                            routeData.Blocks[blockIndex].Signal[n].SignalObjectIndex = objidx;
-                                            routeData.Blocks[blockIndex].Signal[n].X = x;
-                                            routeData.Blocks[blockIndex].Signal[n].Y = y < 0.0 ? 4.8 : y;
-                                            routeData.Blocks[blockIndex].Signal[n].Yaw = 0.0174532925199433 * yaw;
-                                            routeData.Blocks[blockIndex].Signal[n].Pitch = 0.0174532925199433 * pitch;
-                                            routeData.Blocks[blockIndex].Signal[n].Roll = 0.0174532925199433 * roll;
-                                            routeData.Blocks[blockIndex].Signal[n].ShowObject = true;
-                                            routeData.Blocks[blockIndex].Signal[n].ShowPost = y < 0.0;
-                                            routeData.Blocks[blockIndex].Signal[n].GameSignalIndex = -1;
-                                        }
-                                        else
-                                        {
-                                            GD.Print("SignalIndex references a signal object not loaded in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                    }
+                                    // if (!previewOnly)
+                                    // {
+                                    //     int objidx = 0;
+                                    //     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out objidx))
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "SignalIndex is invalid in Track.SigF at line " + command + "at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //         objidx = 0;
+                                    //     }
+
+                                    //     if (objidx >= 0 & routeData.Signals.ContainsKey(objidx))
+                                    //     {
+                                    //         int section = 0;
+                                    //         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out section))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Section is invalid in Track.SigF at line " + command + "at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             section = 0;
+                                    //         }
+
+                                    //         float x = 0.0f, y = 0.0f;
+                                    //         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseFloatVb6(arguments[2], unitOfLength, out x))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "X is invalid in Track.SigF at line " + command + "at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             x = 0.0f;
+                                    //         }
+
+                                    //         if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseFloatVb6(arguments[3], unitOfLength, out y))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Y is invalid in Track.SigF at line " + command + "at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             y = 0.0f;
+                                    //         }
+
+                                    //         float yaw = 0.0f, pitch = 0.0f, roll = 0.0f;
+                                    //         if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseFloatVb6(arguments[4], out yaw))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Yaw is invalid in Track.SigF at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             yaw = 0.0f;
+                                    //         }
+
+                                    //         if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseFloatVb6(arguments[5], out pitch))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Pitch is invalid in Track.SigF at line "+ expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             pitch = 0.0f;
+                                    //         }
+
+                                    //         if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseFloatVb6(arguments[6], out roll))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Roll is invalid in Track.SigF at line "+ expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             roll = 0.0f;
+                                    //         }
+
+                                    //         int n = routeData.Blocks[BlockIndex].Signals.Length;
+                                    //         Array.Resize(ref routeData.Blocks[BlockIndex].Signals, n + 1);
+                                    //         routeData.Blocks[BlockIndex].Signals[n] = new Signal(routeData.TrackPosition, CurrentSection + section, routeData.Signals[objidx], new Vector2(x, y < 0.0f ? 4.8 : y), yaw.ToRadians(), pitch.ToRadians(), roll.ToRadians(), true, y < 0.0f);
+                                    //     }
+                                    //     else
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "SignalIndex " + objidx + " references a signal object not loaded in Track.SigF at line " + Expression.Line.ToString(Culture) + ", column " + Expression.Column.ToString(Culture) + " in file " + Expression.File);
+                                    //     }
+                                    // }
+                                    
                                 }
                                 break;
                             case "track.signal":
@@ -3807,39 +3830,39 @@ public static class CsvRwRouteParser
                                         int num = -2;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out num))
                                         {
-                                            GD.Print("Aspects is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Aspects is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             num = -2;
                                         }
                                         if (num != -2 & num != 2 & num != 3 & num != -4 & num != 4 & num != -5 & num != 5 & num != 6)
                                         {
-                                            GD.Print("Aspects has an unsupported value in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Aspects has an unsupported value in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             num = num == -3 | num == -6 ? -num : -4;
                                         }
-                                        double x = 0.0, y = 0.0;
-                                        if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out x))
+                                        float x = 0.0f, y = 0.0f;
+                                        if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseFloatVb6(arguments[2], unitOfLength, out x))
                                         {
-                                            GD.Print("X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            x = 0.0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "X is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            x = 0.0f;
                                         }
-                                        if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], unitOfLength, out y))
+                                        if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseFloatVb6(arguments[3], unitOfLength, out y))
                                         {
-                                            GD.Print("Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            y = 0.0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Y is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            y = 0.0f;
                                         }
                                         double yaw = 0.0, pitch = 0.0, roll = 0.0;
                                         if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out yaw))
                                         {
-                                            GD.Print("Yaw is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Yaw is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             yaw = 0.0;
                                         }
                                         if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out pitch))
                                         {
-                                            GD.Print("Pitch is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Pitch is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             pitch = 0.0;
                                         }
                                         if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[6], out roll))
                                         {
-                                            GD.Print("Roll is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Roll is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             roll = 0.0;
                                         }
                                         int[] aspects; int comp;
@@ -3855,36 +3878,25 @@ public static class CsvRwRouteParser
                                             case 6: aspects = new int[] { 0, 1, 2, 3, 4, 5 }; comp = 7; break;
                                             default: aspects = new int[] { 0, 2 }; comp = 0; break;
                                         }
-                                        int n = routeData.Blocks[blockIndex].Section.Length;
-                                        Array.Resize<Section>(ref routeData.Blocks[blockIndex].Section, n + 1);
-                                        routeData.Blocks[blockIndex].Section[n].TrackPosition = routeData.TrackPosition;
-                                        routeData.Blocks[blockIndex].Section[n].Aspects = aspects;
-                                        routeData.Blocks[blockIndex].Section[n].DepartureStationIndex = -1;
-                                        routeData.Blocks[blockIndex].Section[n].Invisible = x == 0.0;
-                                        //data.Blocks[blockIndex].Section[n].Type = Game.SectionType.ValueBased;
-                                        //if (currentStation >= 0 && Game.Stations[currentStation].ForceStopSignal)
-                                        //{
-                                        //    if (currentStation >= 0 & currentStop >= 0 & !departureSignalUsed)
-                                        //    {
-                                        //        data.Blocks[blockIndex].Section[n].DepartureStationIndex = currentStation;
-                                        //        departureSignalUsed = true;
-                                        //    }
-                                        //}
+                                        int n = routeData.Blocks[blockIndex].Sections.Length;
+                                        Array.Resize<Section>(ref routeData.Blocks[blockIndex].Sections, n + 1);
+
+                                        int departureStationIndex = -1;
+                                        // if (CurrentStation >= 0 && CurrentRoute.Stations[CurrentStation].ForceStopSignal)
+                                        // {
+                                        //     if (CurrentStation >= 0 & CurrentStop >= 0 & !DepartureSignalUsed)
+                                        //     {
+                                        //         departureStationIndex = CurrentStation;
+                                        //         DepartureSignalUsed = true;
+                                        //     }
+                                        // }
+
+                                        routeData.Blocks[blockIndex].Sections[n] = new Section(routeData.TrackPosition, aspects, departureStationIndex, SectionType.ValueBased, x == 0.0);
                                         currentSection++;
-                                        n = routeData.Blocks[blockIndex].Signal.Length;
-                                        Array.Resize<Signal>(ref routeData.Blocks[blockIndex].Signal, n + 1);
-                                        routeData.Blocks[blockIndex].Signal[n].TrackPosition = routeData.TrackPosition;
-                                        routeData.Blocks[blockIndex].Signal[n].Section = currentSection;
-                                        routeData.Blocks[blockIndex].Signal[n].SignalCompatibilityObjectIndex = comp;
-                                        routeData.Blocks[blockIndex].Signal[n].SignalObjectIndex = -1;
-                                        routeData.Blocks[blockIndex].Signal[n].X = x;
-                                        routeData.Blocks[blockIndex].Signal[n].Y = y < 0.0 ? 4.8 : y;
-                                        routeData.Blocks[blockIndex].Signal[n].Yaw = 0.0174532925199433 * yaw;
-                                        routeData.Blocks[blockIndex].Signal[n].Pitch = 0.0174532925199433 * pitch;
-                                        routeData.Blocks[blockIndex].Signal[n].Roll = 0.0174532925199433 * roll;
-                                        routeData.Blocks[blockIndex].Signal[n].ShowObject = x != 0.0;
-                                        routeData.Blocks[blockIndex].Signal[n].ShowPost = x != 0.0 & y < 0.0;
-                                        routeData.Blocks[blockIndex].Signal[n].GameSignalIndex = -1;
+                                        // TODO: compatibility signal(s)
+                                        // n = routeData.Blocks[blockIndex].Signals.Length;
+                                        // Array.Resize(ref routeData.Blocks[blockIndex].Signals, n + 1);
+                                        // routeData.Blocks[blockIndex].Signals[n] = new Signal(routeData.TrackPosition, currentSection, routeData.CompatibilitySignals[comp], new Vector2(x, y < 0.0 ? 4.8 : y), yaw.ToRadians(), pitch.ToRadians(), roll.ToRadians(), x != 0.0, x != 0.0 & y < 0.0);
                                     }
                                 }
                                 break;
@@ -3892,146 +3904,146 @@ public static class CsvRwRouteParser
                                 {
                                     if (!previewOnly)
                                     {
-                                        double x = 0.0, y = 0.0;
-                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], unitOfLength, out x))
+                                        float x = 0.0f, y = 0.0f;
+                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], unitOfLength, out x))
                                         {
-                                            GD.Print("X is invalid in Track.Relay at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            x = 0.0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "X is invalid in Track.Relay at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            x = 0.0f;
                                         }
-                                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out y))
+                                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseFloatVb6(arguments[1], unitOfLength, out y))
                                         {
-                                            GD.Print("Y is invalid in Track.Relay at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            y = 0.0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Y is invalid in Track.Relay at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            y = 0.0f;
                                         }
                                         double yaw = 0.0, pitch = 0.0, roll = 0.0;
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], out yaw))
                                         {
-                                            GD.Print("Yaw is invalid in Track.Relay at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Yaw is invalid in Track.Relay at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             yaw = 0.0;
                                         }
                                         if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], out pitch))
                                         {
-                                            GD.Print("Pitch is invalid in Track.Relay at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Pitch is invalid in Track.Relay at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             pitch = 0.0;
                                         }
                                         if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out roll))
                                         {
-                                            GD.Print("Roll is invalid in Track.Relay at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Roll is invalid in Track.Relay at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             roll = 0.0;
                                         }
-                                        int n = routeData.Blocks[blockIndex].Signal.Length;
-                                        Array.Resize<Signal>(ref routeData.Blocks[blockIndex].Signal, n + 1);
-                                        routeData.Blocks[blockIndex].Signal[n].TrackPosition = routeData.TrackPosition;
-                                        routeData.Blocks[blockIndex].Signal[n].Section = currentSection + 1;
-                                        routeData.Blocks[blockIndex].Signal[n].SignalCompatibilityObjectIndex = 8;
-                                        routeData.Blocks[blockIndex].Signal[n].SignalObjectIndex = -1;
-                                        routeData.Blocks[blockIndex].Signal[n].X = x;
-                                        routeData.Blocks[blockIndex].Signal[n].Y = y < 0.0 ? 4.8 : y;
-                                        routeData.Blocks[blockIndex].Signal[n].Yaw = yaw * 0.0174532925199433;
-                                        routeData.Blocks[blockIndex].Signal[n].Pitch = pitch * 0.0174532925199433;
-                                        routeData.Blocks[blockIndex].Signal[n].Roll = roll * 0.0174532925199433;
-                                        routeData.Blocks[blockIndex].Signal[n].ShowObject = x != 0.0;
-                                        routeData.Blocks[blockIndex].Signal[n].ShowPost = x != 0.0 & y < 0.0;
+                                        int n = routeData.Blocks[blockIndex].Signals.Length;
+                                        Array.Resize<Signal>(ref routeData.Blocks[blockIndex].Signals, n + 1);
+                                        routeData.Blocks[blockIndex].Signals[n].TrackPosition = routeData.TrackPosition;
+                                        routeData.Blocks[blockIndex].Signals[n].Section = currentSection + 1;
+                                        routeData.Blocks[blockIndex].Signals[n].SignalCompatibilityObjectIndex = 8;
+                                        routeData.Blocks[blockIndex].Signals[n].SignalObjectIndex = -1;
+                                        routeData.Blocks[blockIndex].Signals[n].X = x;
+                                        routeData.Blocks[blockIndex].Signals[n].Y = y < 0.0 ? 4.8 : y;
+                                        routeData.Blocks[blockIndex].Signals[n].Yaw = yaw * 0.0174532925199433;
+                                        routeData.Blocks[blockIndex].Signals[n].Pitch = pitch * 0.0174532925199433;
+                                        routeData.Blocks[blockIndex].Signals[n].Roll = roll * 0.0174532925199433;
+                                        routeData.Blocks[blockIndex].Signals[n].ShowObject = x != 0.0;
+                                        routeData.Blocks[blockIndex].Signals[n].ShowPost = x != 0.0 & y < 0.0;
                                     }
                                 }
                                 break;
                             case "track.beacon":
                                 {
-                                    if (!previewOnly)
-                                    {
-                                        int type = 0;
-                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out type))
-                                        {
-                                            GD.Print("Type is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            type = 0;
-                                        }
-                                        if (type < 0)
-                                        {
-                                            GD.Print("Type is expected to be non-positive in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else
-                                        {
-                                            int structure = 0, section = 0, optional = 0;
-                                            if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out structure))
-                                            {
-                                                GD.Print("BeaconStructureIndex is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                structure = 0;
-                                            }
-                                            if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out section))
-                                            {
-                                                GD.Print("Section is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                section = 0;
-                                            }
-                                            if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out optional))
-                                            {
-                                                GD.Print("Data is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                optional = 0;
-                                            }
-                                            if (structure < -1)
-                                            {
-                                                GD.Print("BeaconStructureIndex is expected to be non-negative or -1 in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                structure = -1;
-                                            }
-                                            else if (structure >= 0 && (structure >= routeData.Structure.Beacon.Length || routeData.Structure.Beacon[structure] == null))
-                                            {
-                                                GD.Print("BeaconStructureIndex references an object not loaded in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                structure = -1;
-                                            }
-                                            if (section == -1)
-                                            {
-                                                //section = (int)TrackManager.TransponderSpecialSection.NextRedSection;
-                                            }
-                                            else if (section < 0)
-                                            {
-                                                GD.Print("Section is expected to be non-negative or -1 in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                section = currentSection + 1;
-                                            }
-                                            else
-                                            {
-                                                section += currentSection;
-                                            }
-                                            double x = 0.0, y = 0.0;
-                                            double yaw = 0.0, pitch = 0.0, roll = 0.0;
-                                            if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], unitOfLength, out x))
-                                            {
-                                                GD.Print("X is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                x = 0.0;
-                                            }
-                                            if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], unitOfLength, out y))
-                                            {
-                                                GD.Print("Y is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                y = 0.0;
-                                            }
-                                            if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[6], out yaw))
-                                            {
-                                                GD.Print("Yaw is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                yaw = 0.0;
-                                            }
-                                            if (arguments.Length >= 8 && arguments[7].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[7], out pitch))
-                                            {
-                                                GD.Print("Pitch is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                pitch = 0.0;
-                                            }
-                                            if (arguments.Length >= 9 && arguments[8].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[8], out roll))
-                                            {
-                                                GD.Print("Roll is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                roll = 0.0;
-                                            }
-                                            int n = routeData.Blocks[blockIndex].Transponder.Length;
-                                            Array.Resize<Transponder>(ref routeData.Blocks[blockIndex].Transponder, n + 1);
-                                            routeData.Blocks[blockIndex].Transponder[n].TrackPosition = routeData.TrackPosition;
-                                            routeData.Blocks[blockIndex].Transponder[n].Type = type;
-                                            routeData.Blocks[blockIndex].Transponder[n].Data = optional;
-                                            routeData.Blocks[blockIndex].Transponder[n].BeaconStructureIndex = structure;
-                                            routeData.Blocks[blockIndex].Transponder[n].Section = section;
-                                            routeData.Blocks[blockIndex].Transponder[n].ShowDefaultObject = false;
-                                            routeData.Blocks[blockIndex].Transponder[n].X = x;
-                                            routeData.Blocks[blockIndex].Transponder[n].Y = y;
-                                            routeData.Blocks[blockIndex].Transponder[n].Yaw = yaw * 0.0174532925199433;
-                                            routeData.Blocks[blockIndex].Transponder[n].Pitch = pitch * 0.0174532925199433;
-                                            routeData.Blocks[blockIndex].Transponder[n].Roll = roll * 0.0174532925199433;
-                                        }
-                                    }
+                                    // if (!previewOnly)
+                                    // {
+                                    //     int type = 0;
+                                    //     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out type))
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Type is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //         type = 0;
+                                    //     }
+                                    //     if (type < 0)
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Type is expected to be non-positive in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //     }
+                                    //     else
+                                    //     {
+                                    //         int structure = 0, sec = 0, optional = 0;
+                                    //         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out structure))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BeaconStructureIndex is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             structure = 0;
+                                    //         }
+                                    //         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out sec))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "sec is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             sec = 0;
+                                    //         }
+                                    //         if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out optional))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Data is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             optional = 0;
+                                    //         }
+                                    //         if (structure < -1)
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BeaconStructureIndex is expected to be non-negative or -1 in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             structure = -1;
+                                    //         }
+                                    //         else if (structure >= 0 && (structure >= routeData.Structure.Beacon.Count || routeData.Structure.Beacon[structure] == null))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BeaconStructureIndex references an object not loaded in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             structure = -1;
+                                    //         }
+                                    //         if (sec == -1)
+                                    //         {
+                                    //             //sec = (int)TrackManager.TransponderSpecialsec.NextRedsec;
+                                    //         }
+                                    //         else if (sec < 0)
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "sec is expected to be non-negative or -1 in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             sec = currentsection + 1;
+                                    //         }
+                                    //         else
+                                    //         {
+                                    //             sec += currentsection;
+                                    //         }
+                                    //         float x = 0.0f, y = 0.0f;
+                                    //         float yaw = 0.0f, pitch = 0.0f, roll = 0.0f;
+                                    //         if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseFloatVb6(arguments[4], unitOfLength, out x))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "X is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             x = 0.0f;
+                                    //         }
+                                    //         if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseFloatVb6(arguments[5], unitOfLength, out y))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Y is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             y = 0.0f;
+                                    //         }
+                                    //         if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseFloatVb6(arguments[6], out yaw))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Yaw is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             yaw = 0.0f;
+                                    //         }
+                                    //         if (arguments.Length >= 8 && arguments[7].Length > 0 && !Conversions.TryParseFloatVb6(arguments[7], out pitch))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Pitch is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             pitch = 0.0f;
+                                    //         }
+                                    //         if (arguments.Length >= 9 && arguments[8].Length > 0 && !Conversions.TryParseFloatVb6(arguments[8], out roll))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Roll is invalid in Track.Beacon at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             roll = 0.0f;
+                                    //         }
+                                    //         int n = routeData.Blocks[blockIndex].Transponders.Length;
+                                    //         Array.Resize<Transponder>(ref routeData.Blocks[blockIndex].Transponders, n + 1);
+                                    //         routeData.Blocks[blockIndex].Transponders[n].TrackPosition = routeData.TrackPosition;
+                                    //         routeData.Blocks[blockIndex].Transponders[n].Type = type;
+                                    //         routeData.Blocks[blockIndex].Transponders[n].Data = optional;
+                                    //         routeData.Blocks[blockIndex].Transponders[n].BeaconStructureIndex = structure;
+                                    //         routeData.Blocks[blockIndex].Transponders[n].sec = sec;
+                                    //         routeData.Blocks[blockIndex].Transponders[n].ShowDefaultObject = false;
+                                    //         routeData.Blocks[blockIndex].Transponders[n].X = x;
+                                    //         routeData.Blocks[blockIndex].Transponders[n].Y = y;
+                                    //         routeData.Blocks[blockIndex].Transponders[n].Yaw = yaw * 0.0174532925199433;
+                                    //         routeData.Blocks[blockIndex].Transponders[n].Pitch = pitch * 0.0174532925199433;
+                                    //         routeData.Blocks[blockIndex].Transponders[n].Roll = roll * 0.0174532925199433;
+                                    //     }
+                                    // }
                                 }
                                 break;
                             case "track.transponder":
@@ -4042,65 +4054,68 @@ public static class CsvRwRouteParser
                                         int type = 0, oversig = 0, work = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out type))
                                         {
-                                            GD.Print("Type is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Type is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             type = 0;
                                         }
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out oversig))
                                         {
-                                            GD.Print("Signals is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Signals is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             oversig = 0;
                                         }
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out work))
                                         {
-                                            GD.Print("SwitchSystems is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "SwitchSystems is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             work = 0;
                                         }
                                         if (oversig < 0)
                                         {
-                                            GD.Print("Signals is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Signals is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             oversig = 0;
                                         }
-                                        double x = 0.0, y = 0.0;
-                                        if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], unitOfLength, out x))
+
+                                        float x = 0.0f, y = 0.0f;
+                                        if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseFloatVb6(arguments[3], unitOfLength, out x))
                                         {
-                                            GD.Print("X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            x = 0.0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "X is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            x = 0.0f;
                                         }
-                                        if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], unitOfLength, out y))
+                                        if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseFloatVb6(arguments[4], unitOfLength, out y))
                                         {
-                                            GD.Print("Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            y = 0.0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Y is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            y = 0.0f;
                                         }
+
                                         double yaw = 0.0, pitch = 0.0, roll = 0.0;
                                         if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out yaw))
                                         {
-                                            GD.Print("Yaw is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Yaw is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             yaw = 0.0;
                                         }
                                         if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[6], out pitch))
                                         {
-                                            GD.Print("Pitch is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Pitch is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             pitch = 0.0;
                                         }
                                         if (arguments.Length >= 8 && arguments[7].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[7], out roll))
                                         {
-                                            GD.Print("Roll is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Roll is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             roll = 0.0;
                                         }
-                                        int n = routeData.Blocks[blockIndex].Transponder.Length;
-                                        Array.Resize<Transponder>(ref routeData.Blocks[blockIndex].Transponder, n + 1);
-                                        routeData.Blocks[blockIndex].Transponder[n].TrackPosition = routeData.TrackPosition;
-                                        routeData.Blocks[blockIndex].Transponder[n].Type = type;
-                                        routeData.Blocks[blockIndex].Transponder[n].Data = work;
-                                        routeData.Blocks[blockIndex].Transponder[n].ShowDefaultObject = true;
-                                        routeData.Blocks[blockIndex].Transponder[n].BeaconStructureIndex = -1;
-                                        routeData.Blocks[blockIndex].Transponder[n].X = x;
-                                        routeData.Blocks[blockIndex].Transponder[n].Y = y;
-                                        routeData.Blocks[blockIndex].Transponder[n].Yaw = yaw * 0.0174532925199433;
-                                        routeData.Blocks[blockIndex].Transponder[n].Pitch = pitch * 0.0174532925199433;
-                                        routeData.Blocks[blockIndex].Transponder[n].Roll = roll * 0.0174532925199433;
-                                        routeData.Blocks[blockIndex].Transponder[n].Section = currentSection + oversig + 1;
-                                        routeData.Blocks[blockIndex].Transponder[n].ClipToFirstRedSection = true;
+
+                                        int n = routeData.Blocks[blockIndex].Transponders.Length;
+                                        Array.Resize<Transponder>(ref routeData.Blocks[blockIndex].Transponders, n + 1);
+                                        routeData.Blocks[blockIndex].Transponders[n].TrackPosition = routeData.TrackPosition;
+                                        routeData.Blocks[blockIndex].Transponders[n].Type = type;
+                                        routeData.Blocks[blockIndex].Transponders[n].Data = work;
+                                        routeData.Blocks[blockIndex].Transponders[n].ShowDefaultObject = true;
+                                        routeData.Blocks[blockIndex].Transponders[n].BeaconStructureIndex = -1;
+                                        routeData.Blocks[blockIndex].Transponders[n].X = x;
+                                        routeData.Blocks[blockIndex].Transponders[n].Y = y;
+                                        routeData.Blocks[blockIndex].Transponders[n].Yaw = yaw * 0.0174532925199433;
+                                        routeData.Blocks[blockIndex].Transponders[n].Pitch = pitch * 0.0174532925199433;
+                                        routeData.Blocks[blockIndex].Transponders[n].Roll = roll * 0.0174532925199433;
+                                        routeData.Blocks[blockIndex].Transponders[n].Section = currentSection + oversig + 1;
+                                        routeData.Blocks[blockIndex].Transponders[n].ClipToFirstRedSection = true;
                                     }
                                 }
                                 break;
@@ -4108,15 +4123,15 @@ public static class CsvRwRouteParser
                                 {
                                     if (!previewOnly)
                                     {
-                                        int n = routeData.Blocks[blockIndex].Transponder.Length;
-                                        Array.Resize<Transponder>(ref routeData.Blocks[blockIndex].Transponder, n + 1);
-                                        routeData.Blocks[blockIndex].Transponder[n].TrackPosition = routeData.TrackPosition;
-                                        routeData.Blocks[blockIndex].Transponder[n].Type = 0;
-                                        routeData.Blocks[blockIndex].Transponder[n].Data = 0;
-                                        routeData.Blocks[blockIndex].Transponder[n].ShowDefaultObject = true;
-                                        routeData.Blocks[blockIndex].Transponder[n].BeaconStructureIndex = -1;
-                                        routeData.Blocks[blockIndex].Transponder[n].Section = currentSection + 1;
-                                        routeData.Blocks[blockIndex].Transponder[n].ClipToFirstRedSection = true;
+                                        int n = routeData.Blocks[blockIndex].Transponders.Length;
+                                        Array.Resize<Transponder>(ref routeData.Blocks[blockIndex].Transponders, n + 1);
+                                        routeData.Blocks[blockIndex].Transponders[n].TrackPosition = routeData.TrackPosition;
+                                        routeData.Blocks[blockIndex].Transponders[n].Type = 0;
+                                        routeData.Blocks[blockIndex].Transponders[n].Data = 0;
+                                        routeData.Blocks[blockIndex].Transponders[n].ShowDefaultObject = true;
+                                        routeData.Blocks[blockIndex].Transponders[n].BeaconStructureIndex = -1;
+                                        routeData.Blocks[blockIndex].Transponders[n].Section = currentSection + 1;
+                                        routeData.Blocks[blockIndex].Transponders[n].ClipToFirstRedSection = true;
                                     }
                                 }
                                 break;
@@ -4124,15 +4139,15 @@ public static class CsvRwRouteParser
                                 {
                                     if (!previewOnly)
                                     {
-                                        int n = routeData.Blocks[blockIndex].Transponder.Length;
-                                        Array.Resize<Transponder>(ref routeData.Blocks[blockIndex].Transponder, n + 1);
-                                        routeData.Blocks[blockIndex].Transponder[n].TrackPosition = routeData.TrackPosition;
-                                        routeData.Blocks[blockIndex].Transponder[n].Type = 3;
-                                        routeData.Blocks[blockIndex].Transponder[n].Data = 0;
-                                        routeData.Blocks[blockIndex].Transponder[n].ShowDefaultObject = true;
-                                        routeData.Blocks[blockIndex].Transponder[n].BeaconStructureIndex = -1;
-                                        routeData.Blocks[blockIndex].Transponder[n].Section = currentSection + 1;
-                                        routeData.Blocks[blockIndex].Transponder[n].ClipToFirstRedSection = true;
+                                        int n = routeData.Blocks[blockIndex].Transponders.Length;
+                                        Array.Resize<Transponder>(ref routeData.Blocks[blockIndex].Transponders, n + 1);
+                                        routeData.Blocks[blockIndex].Transponders[n].TrackPosition = routeData.TrackPosition;
+                                        routeData.Blocks[blockIndex].Transponders[n].Type = 3;
+                                        routeData.Blocks[blockIndex].Transponders[n].Data = 0;
+                                        routeData.Blocks[blockIndex].Transponders[n].ShowDefaultObject = true;
+                                        routeData.Blocks[blockIndex].Transponders[n].BeaconStructureIndex = -1;
+                                        routeData.Blocks[blockIndex].Transponders[n].Section = currentSection + 1;
+                                        routeData.Blocks[blockIndex].Transponders[n].ClipToFirstRedSection = true;
                                     }
                                 }
                                 break;
@@ -4143,18 +4158,18 @@ public static class CsvRwRouteParser
                                         int type = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out type))
                                         {
-                                            GD.Print("Type is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Type is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             type = 0;
                                         }
                                         double speed = 0.0;
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out speed))
                                         {
-                                            GD.Print("Speed is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Speed is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             speed = 0.0;
                                         }
-                                        int n = routeData.Blocks[blockIndex].Transponder.Length;
-                                        Array.Resize<Transponder>(ref routeData.Blocks[blockIndex].Transponder, n + 1);
-                                        routeData.Blocks[blockIndex].Transponder[n].TrackPosition = routeData.TrackPosition;
+                                        int n = routeData.Blocks[blockIndex].Transponders.Length;
+                                        Array.Resize<Transponder>(ref routeData.Blocks[blockIndex].Transponders, n + 1);
+                                        routeData.Blocks[blockIndex].Transponders[n].TrackPosition = routeData.TrackPosition;
                                         //if (type == 0)
                                         //{
                                         //    data.Blocks[blockIndex].Transponder[n].Type = TrackManager.SpecialTransponderTypes.InternalAtsPTemporarySpeedLimit;
@@ -4165,8 +4180,8 @@ public static class CsvRwRouteParser
                                         //    data.Blocks[blockIndex].Transponder[n].Type = TrackManager.SpecialTransponderTypes.AtsPPermanentSpeedLimit;
                                         //    data.Blocks[blockIndex].Transponder[n].Data = speed == 0.0 ? int.MaxValue : (int)Math.Round(speed * data.UnitOfSpeed * 3.6);
                                         //}
-                                        routeData.Blocks[blockIndex].Transponder[n].Section = -1;
-                                        routeData.Blocks[blockIndex].Transponder[n].BeaconStructureIndex = -1;
+                                        routeData.Blocks[blockIndex].Transponders[n].Section = -1;
+                                        routeData.Blocks[blockIndex].Transponders[n].BeaconStructureIndex = -1;
                                     }
                                 }
                                 break;
@@ -4177,7 +4192,7 @@ public static class CsvRwRouteParser
                                     //    double speed = 0.0;
                                     //    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out speed))
                                     //    {
-                                    //         GD.Print("Speed is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Speed is invalid in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                                     //        speed = 0.0;
                                     //    }
                                     //    int n = data.Blocks[blockIndex].Transponder.Length;
@@ -4196,75 +4211,75 @@ public static class CsvRwRouteParser
                                     int direction = 0, cource = 0;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out limit))
                                     {
-                                        GD.Print("Speed is invalid in Track.Limit at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Speed is invalid in Track.Limit at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         limit = 0.0;
                                     }
                                     if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out direction))
                                     {
-                                        GD.Print("Direction is invalid in Track.Limit at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Direction is invalid in Track.Limit at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         direction = 0;
                                     }
                                     if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out cource))
                                     {
-                                        GD.Print("Cource is invalid in Track.Limit at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Cource is invalid in Track.Limit at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         cource = 0;
                                     }
-                                    int n = routeData.Blocks[blockIndex].Limit.Length;
-                                    Array.Resize<Limit>(ref routeData.Blocks[blockIndex].Limit, n + 1);
-                                    routeData.Blocks[blockIndex].Limit[n].TrackPosition = routeData.TrackPosition;
-                                    routeData.Blocks[blockIndex].Limit[n].Speed = limit <= 0.0 ? double.PositiveInfinity : routeData.UnitOfSpeed * limit;
-                                    routeData.Blocks[blockIndex].Limit[n].Direction = direction;
-                                    routeData.Blocks[blockIndex].Limit[n].Cource = cource;
+                                    int n = routeData.Blocks[blockIndex].Limits.Length;
+                                    Array.Resize<Limit>(ref routeData.Blocks[blockIndex].Limits, n + 1);
+                                    routeData.Blocks[blockIndex].Limits[n].TrackPosition = routeData.TrackPosition;
+                                    routeData.Blocks[blockIndex].Limits[n].Speed = limit <= 0.0 ? double.PositiveInfinity : routeData.UnitOfSpeed * limit;
+                                    routeData.Blocks[blockIndex].Limits[n].Direction = direction;
+                                    routeData.Blocks[blockIndex].Limits[n].Cource = cource;
                                 }
                                 break;
                             case "track.stop":
                                 if (currentStation == -1)
                                 {
-                                    GD.Print("A stop without a station is invalid in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "A stop without a station is invalid in Track.Stop at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                 }
                                 else
                                 {
                                     int dir = 0;
                                     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out dir))
                                     {
-                                        GD.Print("Direction is invalid in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Direction is invalid in Track.Stop at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         dir = 0;
                                     }
-                                    double backw = 5.0, forw = 5.0;
-                                    if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out backw))
+                                    float backw = 5.0f, forw = 5.0f;
+                                    if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseFloatVb6(arguments[1], unitOfLength, out backw))
                                     {
-                                        GD.Print("BackwardTolerance is invalid in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        backw = 5.0;
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BackwardTolerance is invalid in Track.Stop at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        backw = 5.0f;
                                     }
                                     else if (backw <= 0.0)
                                     {
-                                        GD.Print("BackwardTolerance is expected to be positive in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        backw = 5.0;
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BackwardTolerance is expected to be positive in Track.Stop at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        backw = 5.0f;
                                     }
-                                    if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out forw))
+                                    if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseFloatVb6(arguments[2], unitOfLength, out forw))
                                     {
-                                        GD.Print("ForwardTolerance is invalid in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        forw = 5.0;
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ForwardTolerance is invalid in Track.Stop at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        forw = 5.0f;
                                     }
                                     else if (forw <= 0.0)
                                     {
-                                        GD.Print("ForwardTolerance is expected to be positive in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        forw = 5.0;
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ForwardTolerance is expected to be positive in Track.Stop at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        forw = 5.0f;
                                     }
                                     int cars = 0;
                                     if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out cars))
                                     {
-                                        GD.Print("Cars is invalid in Track.Stop at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Cars is invalid in Track.Stop at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         cars = 0;
                                     }
-                                    int n = routeData.Blocks[blockIndex].Stop.Length;
-                                    Array.Resize<Stop>(ref routeData.Blocks[blockIndex].Stop, n + 1);
-                                    routeData.Blocks[blockIndex].Stop[n].TrackPosition = routeData.TrackPosition;
-                                    routeData.Blocks[blockIndex].Stop[n].Station = currentStation;
-                                    routeData.Blocks[blockIndex].Stop[n].Direction = dir;
-                                    routeData.Blocks[blockIndex].Stop[n].ForwardTolerance = forw;
-                                    routeData.Blocks[blockIndex].Stop[n].BackwardTolerance = backw;
-                                    routeData.Blocks[blockIndex].Stop[n].Cars = cars;
+                                    int n = routeData.Blocks[blockIndex].StopPositions.Length;
+                                    Array.Resize<Stop>(ref routeData.Blocks[blockIndex].StopPositions, n + 1);
+                                    routeData.Blocks[blockIndex].StopPositions[n].TrackPosition = routeData.TrackPosition;
+                                    routeData.Blocks[blockIndex].StopPositions[n].Station = currentStation;
+                                    routeData.Blocks[blockIndex].StopPositions[n].Direction = dir;
+                                    routeData.Blocks[blockIndex].StopPositions[n].ForwardTolerance = forw;
+                                    routeData.Blocks[blockIndex].StopPositions[n].BackwardTolerance = backw;
+                                    routeData.Blocks[blockIndex].StopPositions[n].Cars = cars;
                                     currentStop = cars;
                                 }
                                 break;
@@ -4295,7 +4310,7 @@ public static class CsvRwRouteParser
                             //            Game.Stations[currentStation].StopMode = Game.StationStopMode.PlayerPass;
                             //            if (!Conversions.TryParseTime(arguments[1].Substring(2).TrimStart(), out arr))
                             //            {
-                            //                 GD.Print("ArrivalTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ArrivalTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                arr = -1.0;
                             //            }
                             //        }
@@ -4308,13 +4323,13 @@ public static class CsvRwRouteParser
                             //            Game.Stations[currentStation].StopMode = Game.StationStopMode.PlayerStop;
                             //            if (!Conversions.TryParseTime(arguments[1].Substring(2).TrimStart(), out arr))
                             //            {
-                            //                 GD.Print("ArrivalTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ArrivalTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                arr = -1.0;
                             //            }
                             //        }
                             //        else if (!Conversions.TryParseTime(arguments[1], out arr))
                             //        {
-                            //             GD.Print("ArrivalTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ArrivalTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //            arr = -1.0;
                             //        }
                             //    }
@@ -4329,7 +4344,7 @@ public static class CsvRwRouteParser
                             //            Game.Stations[currentStation].StationType = Game.StationType.Terminal;
                             //            if (!Conversions.TryParseTime(arguments[2].Substring(2).TrimStart(), out dep))
                             //            {
-                            //                 GD.Print("DepartureTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DepartureTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                dep = -1.0;
                             //            }
                             //        }
@@ -4342,20 +4357,20 @@ public static class CsvRwRouteParser
                             //            Game.Stations[currentStation].StationType = Game.StationType.ChangeEnds;
                             //            if (!Conversions.TryParseTime(arguments[2].Substring(2).TrimStart(), out dep))
                             //            {
-                            //                 GD.Print("DepartureTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DepartureTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                dep = -1.0;
                             //            }
                             //        }
                             //        else if (!Conversions.TryParseTime(arguments[2], out dep))
                             //        {
-                            //             GD.Print("DepartureTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DepartureTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //            dep = -1.0;
                             //        }
                             //    }
                             //    int passalarm = 0;
                             //    if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out passalarm))
                             //    {
-                            //         GD.Print("PassAlarm is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "PassAlarm is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //        passalarm = 0;
                             //    }
                             //    int door = 0;
@@ -4379,7 +4394,7 @@ public static class CsvRwRouteParser
                             //            default:
                             //                if (!Conversions.TryParseIntVb6(arguments[4], out door))
                             //                {
-                            //                     GD.Print("Doors is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Doors is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                    door = 0;
                             //                }
                             //                break;
@@ -4388,7 +4403,7 @@ public static class CsvRwRouteParser
                             //    int stop = 0;
                             //    if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseIntVb6(arguments[5], out stop))
                             //    {
-                            //         GD.Print("ForcedRedSignal is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ForcedRedSignal is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //        stop = 0;
                             //    }
                             //    int device = 0;
@@ -4404,12 +4419,12 @@ public static class CsvRwRouteParser
                             //        }
                             //        else if (!Conversions.TryParseIntVb6(arguments[6], out device))
                             //        {
-                            //             GD.Print("System is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "System is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //            device = 0;
                             //        }
                             //        if (device != 0 & device != 1)
                             //        {
-                            //             GD.Print("System is not supported in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "System is not supported in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //            device = 0;
                             //        }
                             //    }
@@ -4421,14 +4436,14 @@ public static class CsvRwRouteParser
                             //        {
                             //            if (arguments[7].LastIndexOfAny(Path.GetInvalidPathChars()) >= 0)
                             //            {
-                            //                 GD.Print("ArrivalSound contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ArrivalSound contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //            }
                             //            else
                             //            {
                             //                string f = System.IO.Path.Combine(soundPath, arguments[7]);
                             //                if (!File.Exists(f))
                             //                {
-                            //                     GD.Print("ArrivalSound " + f + " not found in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ArrivalSound " + f + " not found in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                }
                             //                else
                             //                {
@@ -4441,7 +4456,7 @@ public static class CsvRwRouteParser
                             //    double halt = 15.0;
                             //    if (arguments.Length >= 9 && arguments[8].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[8], out halt))
                             //    {
-                            //         GD.Print("StopDuration is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "StopDuration is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //        halt = 15.0;
                             //    }
                             //    else if (halt < 5.0)
@@ -4453,12 +4468,12 @@ public static class CsvRwRouteParser
                             //    {
                             //        if (arguments.Length >= 10 && arguments[9].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[9], out jam))
                             //        {
-                            //             GD.Print("PassengerRatio is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "PassengerRatio is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //            jam = 100.0;
                             //        }
                             //        else if (jam < 0.0)
                             //        {
-                            //             GD.Print("PassengerRatio is expected to be non-negative in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "PassengerRatio is expected to be non-negative in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //            jam = 100.0;
                             //        }
                             //    }
@@ -4468,14 +4483,14 @@ public static class CsvRwRouteParser
                             //        {
                             //            if (arguments[10].LastIndexOfAny(Path.GetInvalidPathChars()) >= 0)
                             //            {
-                            //                 GD.Print("DepartureSound contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DepartureSound contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //            }
                             //            else
                             //            {
                             //                string f = System.IO.Path.Combine(soundPath, arguments[10]);
                             //                if (!File.Exists(f))
                             //                {
-                            //                     GD.Print("DepartureSound " + f + " not found in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DepartureSound " + f + " not found in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                }
                             //                else
                             //                {
@@ -4499,12 +4514,12 @@ public static class CsvRwRouteParser
                             //            {
                             //                if (ttidx < 0)
                             //                {
-                            //                     GD.Print("TimetableIndex is expected to be non-negative in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "TimetableIndex is expected to be non-negative in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                    ttidx = -1;
                             //                }
                             //                else if (ttidx >= data.TimetableDaytime.Length & ttidx >= data.TimetableNighttime.Length)
                             //                {
-                            //                     GD.Print("TimetableIndex references textures not loaded in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "TimetableIndex references textures not loaded in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                    ttidx = -1;
                             //                }
                             //                tdt = ttidx >= 0 & ttidx < data.TimetableDaytime.Length ? data.TimetableDaytime[ttidx] : null;
@@ -4586,7 +4601,7 @@ public static class CsvRwRouteParser
                             //                Game.Stations[currentStation].StopMode = Game.StationStopMode.PlayerPass;
                             //                if (!Conversions.TryParseTime(arguments[1].Substring(2).TrimStart(), out arr))
                             //                {
-                            //                     GD.Print("ArrivalTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ArrivalTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                    arr = -1.0;
                             //                }
                             //            }
@@ -4599,13 +4614,13 @@ public static class CsvRwRouteParser
                             //                Game.Stations[currentStation].StopMode = Game.StationStopMode.PlayerStop;
                             //                if (!Conversions.TryParseTime(arguments[1].Substring(2).TrimStart(), out arr))
                             //                {
-                            //                     GD.Print("ArrivalTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ArrivalTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                    arr = -1.0;
                             //                }
                             //            }
                             //            else if (!Conversions.TryParseTime(arguments[1], out arr))
                             //            {
-                            //                 GD.Print("ArrivalTime is invalid in Track.Station at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ArrivalTime is invalid in Track.Station at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                arr = -1.0;
                             //            }
                             //        }
@@ -4620,7 +4635,7 @@ public static class CsvRwRouteParser
                             //                Game.Stations[currentStation].StationType = Game.StationType.Terminal;
                             //                if (!Conversions.TryParseTime(arguments[2].Substring(2).TrimStart(), out dep))
                             //                {
-                            //                     GD.Print("DepartureTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DepartureTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                    dep = -1.0;
                             //                }
                             //            }
@@ -4633,20 +4648,20 @@ public static class CsvRwRouteParser
                             //                Game.Stations[currentStation].StationType = Game.StationType.ChangeEnds;
                             //                if (!Conversions.TryParseTime(arguments[2].Substring(2).TrimStart(), out dep))
                             //                {
-                            //                     GD.Print("DepartureTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DepartureTime is invalid in Track.Sta at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                    dep = -1.0;
                             //                }
                             //            }
                             //            else if (!Conversions.TryParseTime(arguments[2], out dep))
                             //            {
-                            //                 GD.Print("DepartureTime is invalid in Track.Station at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DepartureTime is invalid in Track.Station at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                dep = -1.0;
                             //            }
                             //        }
                             //        int stop = 0;
                             //        if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out stop))
                             //        {
-                            //             GD.Print("ForcedRedSignal is invalid in Track.Station at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "ForcedRedSignal is invalid in Track.Station at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //            stop = 0;
                             //        }
                             //        int device = 0;
@@ -4662,12 +4677,12 @@ public static class CsvRwRouteParser
                             //            }
                             //            else if (!Conversions.TryParseIntVb6(arguments[4], out device))
                             //            {
-                            //                 GD.Print("System is invalid in Track.Station at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "System is invalid in Track.Station at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                device = 0;
                             //            }
                             //            else if (device != 0 & device != 1)
                             //            {
-                            //                 GD.Print("System is not supported in Track.Station at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "System is not supported in Track.Station at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                device = 0;
                             //            }
                             //        }
@@ -4678,14 +4693,14 @@ public static class CsvRwRouteParser
                             //            {
                             //                if (arguments[5].LastIndexOfAny(Path.GetInvalidPathChars()) >= 0)
                             //                {
-                            //                     GD.Print("DepartureSound contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DepartureSound contains illegal characters in " + command + " at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                }
                             //                else
                             //                {
                             //                    string f = System.IO.Path.Combine(soundPath, arguments[5]);
                             //                    if (!File.Exists(f))
                             //                    {
-                            //                         GD.Print("DepartureSound " + f + " not found in Track.Station at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                            //                         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DepartureSound " + f + " not found in Track.Station at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
                             //                    }
                             //                    else
                             //                    {
@@ -4736,7 +4751,7 @@ public static class CsvRwRouteParser
                                         int idx1 = 0, idx2 = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx1))
                                         {
-                                            GD.Print("RailIndex1 is invalid in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex1 is invalid in Track.Form at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             idx1 = 0;
                                         }
                                         if (arguments.Length >= 2 && arguments[1].Length > 0)
@@ -4755,7 +4770,7 @@ public static class CsvRwRouteParser
                                             }
                                             else if (!Conversions.TryParseIntVb6(arguments[1], out idx2))
                                             {
-                                                GD.Print("RailIndex2 is invalid in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex2 is invalid in Track.Form at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 idx2 = 0;
                                             }
                                         }
@@ -4776,50 +4791,50 @@ public static class CsvRwRouteParser
                                         }
                                         if (idx1 < 0)
                                         {
-                                            GD.Print("RailIndex1 is expected to be non-negative in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex1 is expected to be non-negative in Track.Form at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else if (idx2 < 0 & idx2 != Form.SecondaryRailStub & idx2 != Form.SecondaryRailL & idx2 != Form.SecondaryRailR)
                                         {
-                                            GD.Print("RailIndex2 is expected to be greater or equal to -2 in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex2 is expected to be greater or equal to -2 in Track.Form at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
-                                            if (idx1 >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx1].RailStart)
+                                           if (!routeData.Blocks[blockIndex].Rails.ContainsKey(idx1) || !routeData.Blocks[blockIndex].Rails[idx1].RailStarted)
                                             {
-                                                GD.Print("RailIndex1 could be out of range in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "RailIndex1 could be out of range in Track.Form at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
-                                            if (idx2 != Form.SecondaryRailStub & idx2 != Form.SecondaryRailL & idx2 != Form.SecondaryRailR && (idx2 >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx2].RailStart))
+
+                                            if (idx2 != Form.SecondaryRailStub & idx2 != Form.SecondaryRailL & idx2 != Form.SecondaryRailR && (!routeData.Blocks[blockIndex].Rails.ContainsKey(idx2) || !routeData.Blocks[blockIndex].Rails[idx2].RailStarted))
                                             {
-                                                GD.Print("RailIndex2 could be out of range in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "RailIndex2 could be out of range in Track.Form at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
+
                                             int roof = 0, pf = 0;
                                             if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out roof))
                                             {
-                                                GD.Print("RoofStructureIndex is invalid in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex is invalid in Track.Form at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 roof = 0;
                                             }
+
                                             if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseIntVb6(arguments[3], out pf))
                                             {
-                                                GD.Print("FormStructureIndex is invalid in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FormStructureIndex is invalid in Track.Form at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 pf = 0;
                                             }
-                                            if (roof != 0 & (roof < 0 || (roof >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[roof] == null) || (roof >= routeData.Structure.RoofR.Length || routeData.Structure.RoofR[roof] == null)))
+
+                                            if (roof != 0 & (roof < 0 || (!routeData.Structure.RoofL.ContainsKey(roof) && !routeData.Structure.RoofR.ContainsKey(roof))))
                                             {
-                                                GD.Print("RoofStructureIndex references an object not loaded in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RoofStructureIndex " + roof + " references an object not loaded in Track.Form at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
-                                            else
+
+                                            if (pf < 0 | (!routeData.Structure.FormL.ContainsKey(pf) & !routeData.Structure.FormR.ContainsKey(pf)))
                                             {
-                                                if (pf < 0 | (pf >= routeData.Structure.FormL.Length || routeData.Structure.FormL[pf] == null) & (pf >= routeData.Structure.FormR.Length || routeData.Structure.FormR[pf] == null))
-                                                {
-                                                    GD.Print("FormStructureIndex references an object not loaded in Track.Form at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                }
-                                                int n = routeData.Blocks[blockIndex].Form.Length;
-                                                Array.Resize<Form>(ref routeData.Blocks[blockIndex].Form, n + 1);
-                                                routeData.Blocks[blockIndex].Form[n].PrimaryRail = idx1;
-                                                routeData.Blocks[blockIndex].Form[n].SecondaryRail = idx2;
-                                                routeData.Blocks[blockIndex].Form[n].FormType = pf;
-                                                routeData.Blocks[blockIndex].Form[n].RoofType = roof;
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FormStructureIndex " + pf + " references an object not loaded in Track.Form at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
+
+                                            int n = routeData.Blocks[blockIndex].Forms.Length;
+                                            Array.Resize(ref routeData.Blocks[blockIndex].Forms, n + 1);
+                                            routeData.Blocks[blockIndex].Forms[n] = new Form(idx1, idx2, pf, roof, routeData.Structure);
                                         }
                                     }
                                 }
@@ -4831,72 +4846,81 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            // Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is invalid in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx < 0)
                                         {
-                                            GD.Print("RailIndex is expected to be non-negative in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            // Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is expected to be non-negative in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
                                         }
                                         else
                                         {
-                                            if (idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart)
+                                            if (!routeData.Blocks[blockIndex].Rails.ContainsKey(idx) || !routeData.Blocks[blockIndex].Rails[idx].RailStarted)
                                             {
-                                                GD.Print("RailIndex could be out of range in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                // Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "RailIndex " + idx + " could be out of range in Track.Pole at line " + Expression.Line.ToString(Culture) + ", column " + Expression.Column.ToString(Culture) + " in file " + Expression.File);
                                             }
+
                                             if (idx >= routeData.Blocks[blockIndex].RailPole.Length)
                                             {
-                                                Array.Resize<Pole>(ref routeData.Blocks[blockIndex].RailPole, idx + 1);
+                                                Array.Resize(ref routeData.Blocks[blockIndex].RailPole, idx + 1);
+                                                routeData.Blocks[blockIndex].RailPole[idx] = new Pole();
                                                 routeData.Blocks[blockIndex].RailPole[idx].Mode = 0;
                                                 routeData.Blocks[blockIndex].RailPole[idx].Location = 0;
-                                                routeData.Blocks[blockIndex].RailPole[idx].Interval = 2.0 * routeData.BlockInterval;
+                                                routeData.Blocks[blockIndex].RailPole[idx].Interval = 2.0f * routeData.BlockInterval;
                                                 routeData.Blocks[blockIndex].RailPole[idx].Type = 0;
                                             }
+
                                             int typ = routeData.Blocks[blockIndex].RailPole[idx].Mode;
                                             int sttype = routeData.Blocks[blockIndex].RailPole[idx].Type;
                                             if (arguments.Length >= 2 && arguments[1].Length > 0)
                                             {
                                                 if (!Conversions.TryParseIntVb6(arguments[1], out typ))
                                                 {
-                                                    GD.Print("AdditionalRailsCovered is invalid in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+//                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "AdditionalRailsCovered is invalid in Track.Pole at line " + Expression.Line.ToString(Culture) + ", column " + Expression.Column.ToString(Culture) + " in file " + Expression.File);
                                                     typ = 0;
                                                 }
                                             }
+
                                             if (arguments.Length >= 3 && arguments[2].Length > 0)
                                             {
-                                                double loc;
-                                                if (!Conversions.TryParseDoubleVb6(arguments[2], out loc))
+                                                float loc;
+                                                if (!Conversions.TryParseFloatVb6(arguments[2], out loc))
                                                 {
-                                                    GD.Print("Location is invalid in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                    loc = 0.0;
+                                                    // Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Location is invalid in Track.Pole at line " + Expression.Line.ToString(Culture) + ", column " + Expression.Column.ToString(Culture) + " in file " + Expression.File);
+                                                    loc = 0.0f;
                                                 }
+
                                                 routeData.Blocks[blockIndex].RailPole[idx].Location = loc;
                                             }
+
                                             if (arguments.Length >= 4 && arguments[3].Length > 0)
                                             {
-                                                double dist;
-                                                if (!Conversions.TryParseDoubleVb6(arguments[3], unitOfLength, out dist))
+                                                float dist;
+                                                if (!Conversions.TryParseFloatVb6(arguments[3], unitOfLength, out dist))
                                                 {
-                                                    GD.Print("Interval is invalid in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    // Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Interval is invalid in Track.Pole at line " + Expression.Line.ToString(Culture) + ", column " + Expression.Column.ToString(Culture) + " in file " + Expression.File);
                                                     dist = routeData.BlockInterval;
                                                 }
+
                                                 routeData.Blocks[blockIndex].RailPole[idx].Interval = dist;
                                             }
+
                                             if (arguments.Length >= 5 && arguments[4].Length > 0)
                                             {
                                                 if (!Conversions.TryParseIntVb6(arguments[4], out sttype))
                                                 {
-                                                    GD.Print("PoleStructureIndex is invalid in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    // Plugin.CurrentHost.AddMessage(MessageType.Error, false, "PoleStructureIndex is invalid in Track.Pole at line " + Expression.Line.ToString(Culture) + ", column " + Expression.Column.ToString(Culture) + " in file " + Expression.File);
                                                     sttype = 0;
                                                 }
                                             }
-                                            if (typ < 0 || typ >= routeData.Structure.Poles.Length || routeData.Structure.Poles[typ] == null)
+
+                                            if (typ < 0 || !routeData.Structure.Poles.ContainsKey(typ) || routeData.Structure.Poles[typ] == null)
                                             {
-                                                GD.Print("PoleStructureIndex references an object not loaded in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                // Plugin.CurrentHost.AddMessage(MessageType.Error, false, "PoleStructureIndex " + typ + " references an object not loaded in Track.Pole at line " + Expression.Line.ToString(Culture) + ", column " + Expression.Column.ToString(Culture) + " in file " + Expression.File);
                                             }
-                                            else if (sttype < 0 || sttype >= routeData.Structure.Poles[typ].Length || routeData.Structure.Poles[typ][sttype] == null)
+                                            else if (sttype < 0 || !routeData.Structure.Poles[typ].ContainsKey(sttype) || routeData.Structure.Poles[typ][sttype] == null)
                                             {
-                                                GD.Print("PoleStructureIndex references an object not loaded in Track.Pole at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                // Plugin.CurrentHost.AddMessage(MessageType.Error, false, "PoleStructureIndex " + typ + " references an object not loaded in Track.Pole at line " + Expression.Line.ToString(Culture) + ", column " + Expression.Column.ToString(Culture) + " in file " + Expression.File);
                                             }
                                             else
                                             {
@@ -4915,18 +4939,18 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.PoleEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is invalid in Track.PoleEnd at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx < 0 | idx >= routeData.Blocks[blockIndex].RailPole.Length)
                                         {
-                                            GD.Print("RailIndex does not reference an existing pole in Track.PoleEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex does not reference an existing pole in Track.PoleEnd at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
-                                            if (idx >= routeData.Blocks[blockIndex].Rail.Length || (!routeData.Blocks[blockIndex].Rail[idx].RailStart & !routeData.Blocks[blockIndex].Rail[idx].RailEnd))
+                                            if (idx >= routeData.Blocks[blockIndex].Rails.Count || (!routeData.Blocks[blockIndex].Rails[idx].RailStarted & !routeData.Blocks[blockIndex].Rails[idx].RailEnded))
                                             {
-                                                GD.Print("RailIndex could be out of range in Track.PoleEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex could be out of range in Track.PoleEnd at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             routeData.Blocks[blockIndex].RailPole[idx].Exists = false;
                                         }
@@ -4940,55 +4964,82 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is invalid in Track.Wall at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             idx = 0;
                                         }
+
                                         if (idx < 0)
                                         {
-                                            GD.Print("RailIndex is expected to be a non-negative integer in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is expected to be a non-negative integer in Track.Wall at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             idx = 0;
                                         }
-                                        int dir = 0;
-                                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out dir))
+
+                                        Direction dir = Direction.Invalid;
+                                        if (arguments.Length >= 2 && arguments[1].Length > 0)
                                         {
-                                            GD.Print("Direction is invalid in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            dir = 0;
+                                            dir = FindDirection(arguments[1], "Track.Wall", true, routeExpressions[j].Line, routeExpressions[j].File);
+                                        }
+                                        if (dir == Direction.Invalid || dir == Direction.None)
+                                        {
+                                            break;
                                         }
                                         int sttype = 0;
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out sttype))
                                         {
-                                            GD.Print("WallStructureIndex is invalid in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "WallStructureIndex is invalid in Track.Wall at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             sttype = 0;
                                         }
+
                                         if (sttype < 0)
                                         {
-                                            GD.Print("WallStructureIndex is expected to be a non-negative integer in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "WallStructureIndex is expected to be a non-negative integer in Track.Wall at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             sttype = 0;
                                         }
-                                        if (dir <= 0 && (sttype >= routeData.Structure.WallL.Length || routeData.Structure.WallL[sttype] == null) ||
-                                            dir >= 0 && (sttype >= routeData.Structure.WallR.Length || routeData.Structure.WallR[sttype] == null))
+
+                                        if (dir < 0 && !routeData.Structure.WallL.ContainsKey(sttype) || dir > 0 && !routeData.Structure.WallR.ContainsKey(sttype) || dir == 0 && (!routeData.Structure.WallL.ContainsKey(sttype) && !routeData.Structure.WallR.ContainsKey(sttype)))
                                         {
-                                            GD.Print("WallStructureIndex references an object not loaded in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else
-                                        {
-                                            if (idx < 0)
+                                            if (dir < 0)
                                             {
-                                                GD.Print("RailIndex is expected to be non-negative in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "WallStructureIndex " + sttype + " references an object not loaded in Track.WallL at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            }
+                                            else if (dir > 0)
+                                            {
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "WallStructureIndex " + sttype + " references an object not loaded in Track.WallR at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart)
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "WallStructureIndex " + sttype + " references an object not loaded in Track.WallBothSides at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            if (dir == Direction.Both)
+                                            {
+                                                if (!routeData.Structure.WallL.ContainsKey(sttype))
                                                 {
-                                                    GD.Print("RailIndex could be out of range in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "LeftWallStructureIndex " + sttype + " references an object not loaded in Track.WallBothSides at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                    dir = Direction.Right;
                                                 }
-                                                if (idx >= routeData.Blocks[blockIndex].RailWall.Length)
+
+                                                if (!routeData.Structure.WallR.ContainsKey(sttype))
                                                 {
-                                                    Array.Resize<WallDike>(ref routeData.Blocks[blockIndex].RailWall, idx + 1);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RightWallStructureIndex " + sttype + " references an object not loaded in Track.WallBothSides at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                    dir = Direction.Left;
                                                 }
-                                                routeData.Blocks[blockIndex].RailWall[idx].Exists = true;
-                                                routeData.Blocks[blockIndex].RailWall[idx].Type = sttype;
-                                                routeData.Blocks[blockIndex].RailWall[idx].Direction = dir;
+                                            }
+
+                                            if (!routeData.Blocks[blockIndex].Rails.ContainsKey(idx) || !routeData.Blocks[blockIndex].Rails[idx].RailStarted)
+                                            {
+                                                Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "RailIndex " + idx + " could be out of range in Track.Wall at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            }
+
+                                            if (routeData.Blocks[blockIndex].RailWall.ContainsKey(idx))
+                                            {
+                                                routeData.Blocks[blockIndex].RailWall[idx] = new WallDike(sttype, dir, routeData.Structure.WallL, routeData.Structure.WallR);
+                                            }
+                                            else
+                                            {
+                                                routeData.Blocks[blockIndex].RailWall.Add(idx, new WallDike(sttype, dir, routeData.Structure.WallL, routeData.Structure.WallR));
                                             }
                                         }
                                     }
@@ -5001,20 +5052,25 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.WallEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is invalid in Track.WallEnd at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             idx = 0;
                                         }
-                                        if (idx < 0 | idx >= routeData.Blocks[blockIndex].RailWall.Length)
+
+                                        if (!routeData.Blocks[blockIndex].RailWall.ContainsKey(idx))
                                         {
-                                            GD.Print("RailIndex does not reference an existing wall in Track.WallEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex " + idx + " does not reference an existing wall in Track.WallEnd at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " +  routeExpressions[j].File);
                                         }
                                         else
                                         {
-                                            if (idx >= routeData.Blocks[blockIndex].Rail.Length || (!routeData.Blocks[blockIndex].Rail[idx].RailStart & !routeData.Blocks[blockIndex].Rail[idx].RailEnd))
+                                            if (!routeData.Blocks[blockIndex].Rails.ContainsKey(idx) || (!routeData.Blocks[blockIndex].Rails[idx].RailStarted & !routeData.Blocks[blockIndex].Rails[idx].RailEnded))
                                             {
-                                                GD.Print("RailIndex could be out of range in Track.WallEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "RailIndex " + idx + " could be out of range in Track.WallEnd at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " +  routeExpressions[j].File);
                                             }
-                                            routeData.Blocks[blockIndex].RailWall[idx].Exists = false;
+
+                                            if (routeData.Blocks[blockIndex].RailWall.ContainsKey(idx))
+                                            {
+                                                routeData.Blocks[blockIndex].RailWall[idx].Exists = false;
+                                            }
                                         }
                                     }
                                 }
@@ -5023,60 +5079,91 @@ public static class CsvRwRouteParser
                                 {
                                     if (!previewOnly)
                                     {
-                                        int idx = 0;
-                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
+                                        int railIdx = 0;
+                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out railIdx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            idx = 0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is invalid in Track.Dike at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            railIdx = 0;
                                         }
-                                        if (idx < 0)
+
+                                        if (railIdx < 0)
                                         {
-                                            GD.Print("RailIndex is expected to be a non-negative integer in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            idx = 0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is expected to be a non-negative integer in Track.Dike at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            railIdx = 0;
                                         }
-                                        int dir = 0;
-                                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out dir))
+
+                                        Direction dir = Direction.Invalid;
+
+                                        if (arguments.Length >= 2 && arguments[1].Length > 0)
                                         {
-                                            GD.Print("Direction is invalid in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            dir = 0;
+                                            dir = FindDirection(arguments[1], "Track.Dike", true, routeExpressions[j].Line, routeExpressions[j].File);
+                                        }
+                                        if (dir == Direction.Invalid || dir == Direction.None)
+                                        {
+                                            break;
                                         }
                                         int sttype = 0;
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out sttype))
                                         {
-                                            GD.Print("DikeStructureIndex is invalid in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DikeStructureIndex is invalid in Track.Dike at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             sttype = 0;
                                         }
+
                                         if (sttype < 0)
                                         {
-                                            GD.Print("DikeStructureIndex is expected to be a non-negative integer in Track.Wall at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DikeStructureIndex is expected to be a non-negative integer in Track.DikeL at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             sttype = 0;
                                         }
-                                        if (dir <= 0 && (sttype >= routeData.Structure.DikeL.Length || routeData.Structure.DikeL[sttype] == null) ||
-                                            dir >= 0 && (sttype >= routeData.Structure.DikeR.Length || routeData.Structure.DikeR[sttype] == null))
+
+                                        if (dir < 0 && !routeData.Structure.DikeL.ContainsKey(sttype) || dir > 0 && !routeData.Structure.DikeR.ContainsKey(sttype) || dir == 0 && (!routeData.Structure.DikeL.ContainsKey(sttype) && !routeData.Structure.DikeR.ContainsKey(sttype)))
                                         {
-                                            GD.Print("DikeStructureIndex references an object not loaded in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else
-                                        {
-                                            if (idx < 0)
+                                            if (dir > 0)
                                             {
-                                                GD.Print("RailIndex is expected to be non-negative in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DikeStructureIndex " + sttype + " references an object not loaded in Track.DikeL at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            }
+                                            else if (dir < 0)
+                                            {
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DikeStructureIndex " + sttype + " references an object not loaded in Track.DikeR at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart)
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DikeStructureIndex " + sttype + " references an object not loaded in Track.DikeBothSides at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            }
+
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "DikeStructureIndex " + sttype + " references an object not loaded in Track.Dike at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                        }
+                                        else
+                                        {
+                                            if (dir == Direction.Both)
+                                            {
+                                                if (!routeData.Structure.DikeL.ContainsKey(sttype))
                                                 {
-                                                    GD.Print("RailIndex could be out of range in Track.Dike at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "LeftDikeStructureIndex " + sttype + " references an object not loaded in Track.DikeBothSides at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                    dir = Direction.Right;
                                                 }
-                                                if (idx >= routeData.Blocks[blockIndex].RailDike.Length)
+
+                                                if (!routeData.Structure.DikeR.ContainsKey(sttype))
                                                 {
-                                                    Array.Resize<WallDike>(ref routeData.Blocks[blockIndex].RailDike, idx + 1);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RightDikeStructureIndex " + sttype + " references an object not loaded in Track.DikeBothSides at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                    dir = Direction.Left;
                                                 }
-                                                routeData.Blocks[blockIndex].RailDike[idx].Exists = true;
-                                                routeData.Blocks[blockIndex].RailDike[idx].Type = sttype;
-                                                routeData.Blocks[blockIndex].RailDike[idx].Direction = dir;
+                                            }
+
+                                            if (!routeData.Blocks[blockIndex].Rails.ContainsKey(railIdx) || !routeData.Blocks[blockIndex].Rails[railIdx].RailStarted)
+                                            {
+                                                Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "RailIndex " + railIdx + " could be out of range in Track.Dike at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            }
+
+                                            if (routeData.Blocks[blockIndex].RailDike.ContainsKey(railIdx))
+                                            {
+                                                routeData.Blocks[blockIndex].RailDike[railIdx] = new WallDike(sttype, dir, routeData.Structure.DikeL, routeData.Structure.DikeR);
+                                            }
+                                            else
+                                            {
+                                                routeData.Blocks[blockIndex].RailDike.Add(railIdx, new WallDike(sttype, dir, routeData.Structure.DikeL, routeData.Structure.DikeR));
                                             }
                                         }
+
                                     }
                                 }
                                 break;
@@ -5084,23 +5171,28 @@ public static class CsvRwRouteParser
                                 {
                                     if (!previewOnly)
                                     {
-                                        int idx = 0;
-                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
+                                        int railIdx = 0;
+                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out railIdx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.DikeEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            idx = 0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is invalid in Track.DikeEnd at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            railIdx = 0;
                                         }
-                                        if (idx < 0 | idx >= routeData.Blocks[blockIndex].RailDike.Length)
+                                        
+                                        if (!routeData.Blocks[blockIndex].RailDike.ContainsKey(railIdx))
                                         {
-                                            GD.Print("RailIndex does not reference an existing dike in Track.DikeEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex does not reference an existing dike in Track.DikeEnd at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
-                                            if (idx >= routeData.Blocks[blockIndex].Rail.Length || (!routeData.Blocks[blockIndex].Rail[idx].RailStart & !routeData.Blocks[blockIndex].Rail[idx].RailEnd))
+                                            if (!routeData.Blocks[blockIndex].Rails.ContainsKey(railIdx) || (!routeData.Blocks[blockIndex].Rails[railIdx].RailStarted & !routeData.Blocks[blockIndex].Rails[railIdx].RailEnded))
                                             {
-                                                GD.Print("RailIndex could be out of range in Track.DikeEnd at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex could be out of range in Track.DikeEnd at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
-                                            routeData.Blocks[blockIndex].RailDike[idx].Exists = false;
+
+                                            if (routeData.Blocks[blockIndex].RailDike.ContainsKey(railIdx))
+                                            {
+                                                routeData.Blocks[blockIndex].RailDike[railIdx].Exists = false;
+                                            }
                                         }
                                     }
                                 }
@@ -5111,25 +5203,25 @@ public static class CsvRwRouteParser
                                     {
                                         if (arguments.Length < 1)
                                         {
-                                            GD.Print("Track.Marker is expected to have at least one argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Track.Marker is expected to have at least one argument at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
                                         {
-                                            GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             string f = System.IO.Path.Combine(objectPath, arguments[0]);
                                             if (!System.IO.File.Exists(f))
                                             {
-                                                GD.Print("FileName " + f + " not found in Track.Marker at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName " + f + " not found in Track.Marker at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                double dist = routeData.BlockInterval;
-                                                if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out dist))
+                                                float dist = routeData.BlockInterval;
+                                                if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseFloatVb6(arguments[1], unitOfLength, out dist))
                                                 {
-                                                    GD.Print("Distance is invalid in Track.Marker at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Distance is invalid in Track.Marker at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                     dist = routeData.BlockInterval;
                                                 }
                                                 double start, end;
@@ -5160,13 +5252,13 @@ public static class CsvRwRouteParser
                                 {
                                     if (!previewOnly)
                                     {
-                                        double h = 0.0;
-                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], unitOfLength, out h))
+                                        float h = 0.0f;
+                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], unitOfLength, out h))
                                         {
-                                            GD.Print("Height is invalid in Track.Height at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            h = 0.0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Height is invalid in Track.Height at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            h = 0.0f;
                                         }
-                                        routeData.Blocks[blockIndex].Height = isRW ? h + 0.3 : h;
+                                        routeData.Blocks[blockIndex].Height = isRW ? h + 0.3f : h;
                                     }
                                 }
                                 break;
@@ -5177,22 +5269,23 @@ public static class CsvRwRouteParser
                                         int cytype = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out cytype))
                                         {
-                                            GD.Print("CycleIndex is invalid in Track.Ground at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "CycleIndex is invalid in Track.Ground at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             cytype = 0;
                                         }
-                                        if (cytype < routeData.Structure.Cycle.Length && routeData.Structure.Cycle[cytype] != null)
+
+                                        if (cytype < routeData.Structure.GroundCycles.Length && routeData.Structure.GroundCycles[cytype] != null)
                                         {
-                                            routeData.Blocks[blockIndex].Cycle = routeData.Structure.Cycle[cytype];
+                                            routeData.Blocks[blockIndex].GroundCycles = routeData.Structure.GroundCycles[cytype];
                                         }
                                         else
                                         {
-                                            if (cytype >= routeData.Structure.Ground.Length || routeData.Structure.Ground[cytype] == null)
+                                            if (!routeData.Structure.Ground.ContainsKey(cytype))
                                             {
-                                                GD.Print("CycleIndex references an object not loaded in Track.Ground at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "CycleIndex " + cytype + " references an object not loaded in Track.Ground at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                routeData.Blocks[blockIndex].Cycle = new int[] { cytype };
+                                                routeData.Blocks[blockIndex].GroundCycles = new[] { cytype };
                                             }
                                         }
                                     }
@@ -5205,53 +5298,53 @@ public static class CsvRwRouteParser
                                         int idx1 = 0, idx2 = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx1))
                                         {
-                                            GD.Print("RailIndex1 is invalid in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex1 is invalid in Track.Crack at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             idx1 = 0;
                                         }
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out idx2))
                                         {
-                                            GD.Print("RailIndex2 is invalid in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex2 is invalid in Track.Crack at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             idx2 = 0;
                                         }
                                         int sttype = 0;
                                         if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseIntVb6(arguments[2], out sttype))
                                         {
-                                            GD.Print("CrackStructureIndex is invalid in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "CrackStructureIndex is invalid in Track.Crack at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             sttype = 0;
                                         }
-                                        if (sttype < 0 || (sttype >= routeData.Structure.CrackL.Length || routeData.Structure.CrackL[sttype] == null) || (sttype >= routeData.Structure.CrackR.Length || routeData.Structure.CrackR[sttype] == null))
+                                        if (sttype < 0 || (sttype >= routeData.Structure.CrackL.Count || routeData.Structure.CrackL[sttype] == null) || (sttype >= routeData.Structure.CrackR.Count || routeData.Structure.CrackR[sttype] == null))
                                         {
-                                            GD.Print("CrackStructureIndex references an object not loaded in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "CrackStructureIndex references an object not loaded in Track.Crack at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
                                             if (idx1 < 0)
                                             {
-                                                GD.Print("RailIndex1 is expected to be non-negative in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex1 is expected to be non-negative in Track.Crack at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (idx2 < 0)
                                             {
-                                                GD.Print("RailIndex2 is expected to be non-negative in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex2 is expected to be non-negative in Track.Crack at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else if (idx1 == idx2)
                                             {
-                                                GD.Print("RailIndex1 is expected to be unequal to Index2 in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex1 is expected to be unequal to Index2 in Track.Crack at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                if (idx1 >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx1].RailStart)
+                                                if (idx1 >= routeData.Blocks[blockIndex].Rails.Count || !routeData.Blocks[blockIndex].Rails[idx1].RailStarted)
                                                 {
-                                                    GD.Print("RailIndex1 could be out of range in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex1 could be out of range in Track.Crack at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
-                                                if (idx2 >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx2].RailStart)
+                                                if (idx2 >= routeData.Blocks[blockIndex].Rails.Count || !routeData.Blocks[blockIndex].Rails[idx2].RailStarted)
                                                 {
-                                                    GD.Print("RailIndex2 could be out of range in Track.Crack at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex2 could be out of range in Track.Crack at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
-                                                int n = routeData.Blocks[blockIndex].Crack.Length;
-                                                Array.Resize<Crack>(ref routeData.Blocks[blockIndex].Crack, n + 1);
-                                                routeData.Blocks[blockIndex].Crack[n].PrimaryRail = idx1;
-                                                routeData.Blocks[blockIndex].Crack[n].SecondaryRail = idx2;
-                                                routeData.Blocks[blockIndex].Crack[n].Type = sttype;
+                                                int n = routeData.Blocks[blockIndex].Cracks.Length;
+                                                Array.Resize<Crack>(ref routeData.Blocks[blockIndex].Cracks, n + 1);
+                                                routeData.Blocks[blockIndex].Cracks[n].PrimaryRail = idx1;
+                                                routeData.Blocks[blockIndex].Cracks[n].SecondaryRail = idx2;
+                                                routeData.Blocks[blockIndex].Cracks[n].Type = sttype;
                                             }
                                         }
                                     }
@@ -5261,101 +5354,108 @@ public static class CsvRwRouteParser
                                 {
                                     if (!previewOnly)
                                     {
+                                        if (arguments.Length < 2)
+                                        {
+                                            /*
+                                             * If no / one arguments are supplied, this previously produced FreeObject 0 dropped on either
+                                             * Rail 0 (no arguments) or on the rail specified by the first argument.
+                                             *
+                                             * BVE4 ignores these, and we should too.
+                                             */
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "An insufficient number of arguments was supplied in Track.FreeObj at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            return;
+                                        }
+
                                         int idx = 0, sttype = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is invalid in Track.FreeObj at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             idx = 0;
                                         }
+
                                         if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out sttype))
                                         {
-                                            GD.Print("FreeObjStructureIndex is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FreeObjStructureIndex is invalid in Track.FreeObj at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             sttype = 0;
                                         }
+
                                         if (idx < -1)
                                         {
-                                            GD.Print("RailIndex is expected to be non-negative or -1 in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is expected to be non-negative or -1 in Track.FreeObj at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else if (sttype < 0)
                                         {
-                                            GD.Print("FreeObjStructureIndex is expected to be non-negative in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FreeObjStructureIndex is expected to be non-negative in Track.FreeObj at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
                                         else
                                         {
-                                            if (idx >= 0 && (idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart))
+                                            if (idx >= 0 && (!routeData.Blocks[blockIndex].Rails.ContainsKey(idx) || !routeData.Blocks[blockIndex].Rails[idx].RailStarted))
                                             {
-                                                GD.Print("RailIndex could be out of range in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Warning, false, "RailIndex " + idx + " could be out of range in Track.FreeObj at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
-                                            if (sttype >= routeData.Structure.FreeObj.Length || routeData.Structure.FreeObj[sttype] == null || routeData.Structure.FreeObj[sttype] == null)
+
+                                            if (!routeData.Structure.FreeObjects.ContainsKey(sttype))
                                             {
-                                                GD.Print("FreeObjStructureIndex references an object not loaded in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FreeObjStructureIndex " + sttype + " references an object not loaded in Track.FreeObj at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             }
                                             else
                                             {
-                                                double x = 0.0, y = 0.0;
-                                                double yaw = 0.0, pitch = 0.0, roll = 0.0;
-                                                if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out x))
+                                                Vector2 objectPosition = new Vector2();
+                                                float yaw = 0.0f, pitch = 0.0f, roll = 0.0f;
+                                                if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseFloatVb6(arguments[2], unitOfLength, out objectPosition.x))
                                                 {
-                                                    GD.Print("X is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                    x = 0.0;
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "X is invalid in Track.FreeObj at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
-                                                if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], unitOfLength, out y))
+
+                                                if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseFloatVb6(arguments[3], unitOfLength, out objectPosition.y))
                                                 {
-                                                    GD.Print("Y is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                    y = 0.0;
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Y is invalid in Track.FreeObj at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                                 }
-                                                if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out yaw))
+
+                                                if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseFloatVb6(arguments[4], out yaw))
                                                 {
-                                                    GD.Print("Yaw is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                    yaw = 0.0;
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Yaw is invalid in Track.FreeObj at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                    yaw = 0.0f;
                                                 }
-                                                if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out pitch))
+
+                                                if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseFloatVb6(arguments[5], out pitch))
                                                 {
-                                                    GD.Print("Pitch is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                    pitch = 0.0;
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Pitch is invalid in Track.FreeObj at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                    pitch = 0.0f;
                                                 }
-                                                if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[6], out roll))
+
+                                                if (arguments.Length >= 7 && arguments[6].Length > 0 && !Conversions.TryParseFloatVb6(arguments[6], out roll))
                                                 {
-                                                    GD.Print("Roll is invalid in Track.FreeObj at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                    roll = 0.0;
+                                                    Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Roll is invalid in Track.FreeObj at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                                    roll = 0.0f;
                                                 }
+
                                                 if (idx == -1)
                                                 {
-                                                    int n;
-                                                    n = routeData.Blocks[blockIndex].GroundFreeObj.Length;
-                                                    Array.Resize<FreeObj>(ref routeData.Blocks[blockIndex].GroundFreeObj, n + 1);
-                                                    routeData.Blocks[blockIndex].GroundFreeObj[n].TrackPosition = routeData.TrackPosition;
-                                                    routeData.Blocks[blockIndex].GroundFreeObj[n].Type = sttype;
-                                                    routeData.Blocks[blockIndex].GroundFreeObj[n].X = x;
-                                                    routeData.Blocks[blockIndex].GroundFreeObj[n].Y = y;
-                                                    routeData.Blocks[blockIndex].GroundFreeObj[n].Yaw = yaw * 0.0174532925199433;
-                                                    routeData.Blocks[blockIndex].GroundFreeObj[n].Pitch = pitch * 0.0174532925199433;
-                                                    routeData.Blocks[blockIndex].GroundFreeObj[n].Roll = roll * 0.0174532925199433;
-                                                }
-                                                else
-                                                {
-                                                    if (idx >= routeData.Blocks[blockIndex].RailFreeObj.Length)
+
+                                                    if (!routeData.IgnorePitchRoll)
                                                     {
-                                                        Array.Resize<FreeObj[]>(ref routeData.Blocks[blockIndex].RailFreeObj, idx + 1);
-                                                    }
-                                                    int n;
-                                                    if (routeData.Blocks[blockIndex].RailFreeObj[idx] == null)
-                                                    {
-                                                        routeData.Blocks[blockIndex].RailFreeObj[idx] = new FreeObj[1];
-                                                        n = 0;
+                                                        routeData.Blocks[blockIndex].GroundFreeObj.Add(new FreeObj(routeData.TrackPosition, sttype, objectPosition, Godot.Mathf.Deg2Rad(yaw), Godot.Mathf.Deg2Rad(pitch), Godot.Mathf.Deg2Rad(roll)));
                                                     }
                                                     else
                                                     {
-                                                        n = routeData.Blocks[blockIndex].RailFreeObj[idx].Length;
-                                                        Array.Resize<FreeObj>(ref routeData.Blocks[blockIndex].RailFreeObj[idx], n + 1);
+                                                        routeData.Blocks[blockIndex].GroundFreeObj.Add(new FreeObj(routeData.TrackPosition, sttype, objectPosition, Godot.Mathf.Deg2Rad(yaw)));
                                                     }
-                                                    routeData.Blocks[blockIndex].RailFreeObj[idx][n].TrackPosition = routeData.TrackPosition;
-                                                    routeData.Blocks[blockIndex].RailFreeObj[idx][n].Type = sttype;
-                                                    routeData.Blocks[blockIndex].RailFreeObj[idx][n].X = x;
-                                                    routeData.Blocks[blockIndex].RailFreeObj[idx][n].Y = y;
-                                                    routeData.Blocks[blockIndex].RailFreeObj[idx][n].Yaw = yaw * 0.0174532925199433;        // TODO degrees to radians 
-                                                    routeData.Blocks[blockIndex].RailFreeObj[idx][n].Pitch = pitch * 0.0174532925199433;
-                                                    routeData.Blocks[blockIndex].RailFreeObj[idx][n].Roll = roll * 0.0174532925199433;
+                                                }
+                                                else
+                                                {
+                                                    if (!routeData.Blocks[blockIndex].RailFreeObj.ContainsKey(idx))
+                                                    {
+                                                        routeData.Blocks[blockIndex].RailFreeObj.Add(idx, new List<FreeObj>());
+                                                    }
+                                                    if (!routeData.IgnorePitchRoll)
+                                                    {
+                                                        routeData.Blocks[blockIndex].RailFreeObj[idx].Add(new FreeObj(routeData.TrackPosition, sttype, objectPosition, Godot.Mathf.Deg2Rad(yaw), Godot.Mathf.Deg2Rad(pitch), Godot.Mathf.Deg2Rad(roll)));
+                                                    }
+                                                    else
+                                                    {
+                                                        routeData.Blocks[blockIndex].RailFreeObj[idx].Add(new FreeObj(routeData.TrackPosition, sttype, objectPosition, Godot.Mathf.Deg2Rad(yaw)));
+                                                    }
                                                 }
                                             }
                                         }
@@ -5364,146 +5464,146 @@ public static class CsvRwRouteParser
                                 break;
                             case "track.back":
                                 {
-                                    if (!previewOnly)
-                                    {
-                                        int typ = 0;
-                                        if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out typ))
-                                        {
-                                            GD.Print("BackgroundTextureIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            typ = 0;
-                                        }
-                                        if (typ < 0 | typ >= routeData.Backgrounds.Length)
-                                        {
-                                            GD.Print("BackgroundTextureIndex references a texture not loaded in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else if (routeData.Backgrounds[typ] == null)
-                                        {
-                                            GD.Print("BackgroundTextureIndex has not been loaded via Texture.Background in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else
-                                        {
-                                            routeData.Blocks[blockIndex].Background = typ;
-                                        }
-                                    }
+                                    // if (!previewOnly)
+                                    // {
+                                    //     int typ = 0;
+                                    //     if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out typ))
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BackgroundTextureIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //         typ = 0;
+                                    //     }
+                                    //     if (typ < 0 | typ >= routeData.Backgrounds.Length)
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BackgroundTextureIndex references a texture not loaded in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //     }
+                                    //     else if (routeData.Backgrounds[typ] == null)
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "BackgroundTextureIndex has not been loaded via Texture.Background in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //     }
+                                    //     else
+                                    //     {
+                                    //         routeData.Blocks[blockIndex].Background = typ;
+                                    //     }
+                                    // }
                                 }
                                 break;
                             case "track.announce":
                                 {
                                     if (!previewOnly)
                                     {
-                                        if (arguments.Length == 0)
-                                        {
-                                            GD.Print(command + " is expected to have between 1 and 2 arguments at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else
-                                        {
-                                            if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
-                                            {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            }
-                                            else
-                                            {
-                                                string f = System.IO.Path.Combine(soundPath, arguments[0]);
-                                                if (!System.IO.File.Exists(f))
-                                                {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                }
-                                                else
-                                                {
-                                                    double speed = 0.0;
-                                                    if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out speed))
-                                                    {
-                                                        GD.Print("Speed is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                        speed = 0.0;
-                                                    }
-                                                    int n = routeData.Blocks[blockIndex].Sound.Length;
-                                                    Array.Resize<Sound>(ref routeData.Blocks[blockIndex].Sound, n + 1);
-                                                    routeData.Blocks[blockIndex].Sound[n].TrackPosition = routeData.TrackPosition;
-                                                    const double radius = 15.0;
-                                                    //data.Blocks[blockIndex].Sound[n].SoundBuffer = Sounds.RegisterBuffer(f, radius);
-                                                    routeData.Blocks[blockIndex].Sound[n].Type = speed == 0.0 ? SoundType.TrainStatic : SoundType.TrainDynamic;
-                                                    routeData.Blocks[blockIndex].Sound[n].Speed = speed * routeData.UnitOfSpeed;
-                                                }
-                                            }
-                                        }
+                                        //     if (arguments.Length == 0)
+                                        //     {
+                                        //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have between 1 and 2 arguments at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        //     }
+                                        //     else
+                                        //     {
+                                        //         if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
+                                        //         {
+                                        //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        //         }
+                                        //         else
+                                        //         {
+                                        //             string f = System.IO.Path.Combine(soundPath, arguments[0]);
+                                        //             if (!System.IO.File.Exists(f))
+                                        //             {
+                                        //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        //             }
+                                        //             else
+                                        //             {
+                                        //                 double speed = 0.0;
+                                        //                 if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], out speed))
+                                        //                 {
+                                        //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Speed is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                        //                     speed = 0.0;
+                                        //                 }
+                                        //                 int n = routeData.Blocks[blockIndex].SoundEvents.Length;
+                                        //                 Array.Resize<Sound>(ref routeData.Blocks[blockIndex].SoundEvents, n + 1);
+                                        //                 routeData.Blocks[blockIndex].SoundEvents[n].TrackPosition = routeData.TrackPosition;
+                                        //                 const double radius = 15.0;
+                                        //                 //data.Blocks[blockIndex].Sound[n].SoundBuffer = Sounds.RegisterBuffer(f, radius);
+                                        //                 routeData.Blocks[blockIndex].SoundEvents[n].Type = speed == 0.0 ? SoundType.TrainStatic : SoundType.TrainDynamic;
+                                        //                 routeData.Blocks[blockIndex].SoundEvents[n].Speed = speed * routeData.UnitOfSpeed;
+                                        //             }
+                                        //         }
+                                        //     }
                                     }
                                 }
                                 break;
                             case "track.doppler":
                                 {
-                                    if (!previewOnly)
-                                    {
-                                        if (arguments.Length == 0)
-                                        {
-                                            GD.Print(command + " is expected to have between 1 and 3 arguments at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else
-                                        {
-                                            if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
-                                            {
-                                                GD.Print("FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            }
-                                            else
-                                            {
-                                                string f = System.IO.Path.Combine(soundPath, arguments[0]);
-                                                if (!System.IO.File.Exists(f))
-                                                {
-                                                    GD.Print("FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                }
-                                                else
-                                                {
-                                                    double x = 0.0, y = 0.0;
-                                                    if (arguments.Length >= 2 && arguments[1].Length > 0 & !Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out x))
-                                                    {
-                                                        GD.Print("X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                        x = 0.0;
-                                                    }
-                                                    if (arguments.Length >= 3 && arguments[2].Length > 0 & !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out y))
-                                                    {
-                                                        GD.Print("Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                        y = 0.0;
-                                                    }
-                                                    int n = routeData.Blocks[blockIndex].Sound.Length;
-                                                    Array.Resize<Sound>(ref routeData.Blocks[blockIndex].Sound, n + 1);
-                                                    routeData.Blocks[blockIndex].Sound[n].TrackPosition = routeData.TrackPosition;
-                                                    const double radius = 15.0;
-                                                    //data.Blocks[blockIndex].Sound[n].SoundBuffer = Sounds.RegisterBuffer(f, radius);
-                                                    routeData.Blocks[blockIndex].Sound[n].Type = SoundType.World;
-                                                    routeData.Blocks[blockIndex].Sound[n].X = x;
-                                                    routeData.Blocks[blockIndex].Sound[n].Y = y;
-                                                    routeData.Blocks[blockIndex].Sound[n].Radius = radius;
-                                                }
-                                            }
-                                        }
-                                    }
+                                    // if (!previewOnly)
+                                    // {
+                                    //     if (arguments.Length == 0)
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have between 1 and 3 arguments at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //     }
+                                    //     else
+                                    //     {
+                                    //         if (arguments[0].LastIndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0)
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName contains illegal characters in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //         }
+                                    //         else
+                                    //         {
+                                    //             string f = System.IO.Path.Combine(soundPath, arguments[0]);
+                                    //             if (!System.IO.File.Exists(f))
+                                    //             {
+                                    //                 Plugin.CurrentHost.AddMessage(MessageType.Error, false, "FileName " + f + " not found in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             }
+                                    //             else
+                                    //             {
+                                    //                 double x = 0.0, y = 0.0;
+                                    //                 if (arguments.Length >= 2 && arguments[1].Length > 0 & !Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out x))
+                                    //                 {
+                                    //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //                     x = 0.0;
+                                    //                 }
+                                    //                 if (arguments.Length >= 3 && arguments[2].Length > 0 & !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out y))
+                                    //                 {
+                                    //                     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //                     y = 0.0;
+                                    //                 }
+                                    //                 int n = routeData.Blocks[blockIndex].SoundEvents.Length;
+                                    //                 Array.Resize<Sound>(ref routeData.Blocks[blockIndex].SoundEvents, n + 1);
+                                    //                 routeData.Blocks[blockIndex].SoundEvents[n].TrackPosition = routeData.TrackPosition;
+                                    //                 const double radius = 15.0;
+                                    //                 //data.Blocks[blockIndex].Sound[n].SoundBuffer = Sounds.RegisterBuffer(f, radius);
+                                    //                 routeData.Blocks[blockIndex].SoundEvents[n].Type = SoundType.World;
+                                    //                 routeData.Blocks[blockIndex].SoundEvents[n].X = x;
+                                    //                 routeData.Blocks[blockIndex].SoundEvents[n].Y = y;
+                                    //                 routeData.Blocks[blockIndex].SoundEvents[n].Radius = radius;
+                                    //             }
+                                    //         }
+                                    //     }
+                                    // }
                                 }
                                 break;
                             case "track.pretrain":
                                 {
-                                    if (!previewOnly)
-                                    {
-                                        if (arguments.Length == 0)
-                                        {
-                                            GD.Print(command + " is expected to have exactly 1 argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                        }
-                                        else
-                                        {
-                                            double time = 0.0;
-                                            if (arguments[0].Length > 0 & !Conversions.TryParseTime(arguments[0], out time))
-                                            {
-                                                GD.Print("Time is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                                time = 0.0;
-                                            }
-                                            //int n = Game.BogusPretrainInstructions.Length;
-                                            //if (n != 0 && Game.BogusPretrainInstructions[n - 1].Time >= time)
-                                            //{
-                                            //     GD.Print("Time is expected to be in ascending order between successive " + command + " commands at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
-                                            //}
-                                            //Array.Resize<Game.BogusPretrainInstruction>(ref Game.BogusPretrainInstructions, n + 1);
-                                            //Game.BogusPretrainInstructions[n].TrackPosition = data.TrackPosition;
-                                            //Game.BogusPretrainInstructions[n].Time = time;
-                                        }
-                                    }
+                                    // if (!previewOnly)
+                                    // {
+                                    //     if (arguments.Length == 0)
+                                    //     {
+                                    //         Plugin.CurrentHost.AddMessage(MessageType.Error, false, command + " is expected to have exactly 1 argument at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //     }
+                                    //     else
+                                    //     {
+                                    //         double time = 0.0;
+                                    //         if (arguments[0].Length > 0 & !Conversions.TryParseTime(arguments[0], out time))
+                                    //         {
+                                    //             Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Time is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                    //             time = 0.0;
+                                    //         }
+                                    //         //int n = Game.BogusPretrainInstructions.Length;
+                                    //         //if (n != 0 && Game.BogusPretrainInstructions[n - 1].Time >= time)
+                                    //         //{
+                                    //         //     Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Time is expected to be in ascending order between successive " + command + " commands at line " + expressions[j].line.ToString(culture) + ", column " + expressions[j].column.ToString(culture) + " in file " + expressions[j].file);
+                                    //         //}
+                                    //         //Array.Resize<Game.BogusPretrainInstruction>(ref Game.BogusPretrainInstructions, n + 1);
+                                    //         //Game.BogusPretrainInstructions[n].TrackPosition = data.TrackPosition;
+                                    //         //Game.BogusPretrainInstructions[n].Time = time;
+                                    //     }
+                                    // }
                                 }
                                 break;
                             case "track.pointofinterest":
@@ -5514,71 +5614,66 @@ public static class CsvRwRouteParser
                                         int idx = 0;
                                         if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseIntVb6(arguments[0], out idx))
                                         {
-                                            GD.Print("RailIndex is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             idx = 0;
                                         }
                                         if (idx < 0)
                                         {
-                                            GD.Print("RailIndex is expected to be non-negative in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex is expected to be non-negative in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                             idx = 0;
                                         }
-                                        if (idx >= 0 && (idx >= routeData.Blocks[blockIndex].Rail.Length || !routeData.Blocks[blockIndex].Rail[idx].RailStart))
+                                        if (idx >= 0 && (idx >= routeData.Blocks[blockIndex].Rails.Count || !routeData.Blocks[blockIndex].Rails[idx].RailStarted))
                                         {
-                                            GD.Print("RailIndex references a non-existing rail in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "RailIndex references a non-existing rail in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         }
-                                        double x = 0.0, y = 0.0;
-                                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[1], unitOfLength, out x))
+                                        float x = 0.0f, y = 0.0f;
+                                        if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseFloatVb6(arguments[1], unitOfLength, out x))
                                         {
-                                            GD.Print("X is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            x = 0.0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "X is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            x = 0.0f;
                                         }
-                                        if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[2], unitOfLength, out y))
+                                        if (arguments.Length >= 3 && arguments[2].Length > 0 && !Conversions.TryParseFloatVb6(arguments[2], unitOfLength, out y))
                                         {
-                                            GD.Print("Y is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            y = 0.0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Y is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            y = 0.0f;
                                         }
-                                        double yaw = 0.0, pitch = 0.0, roll = 0.0;
-                                        if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[3], out yaw))
+                                        float yaw = 0.0f, pitch = 0.0f, roll = 0.0f;
+                                        if (arguments.Length >= 4 && arguments[3].Length > 0 && !Conversions.TryParseFloatVb6(arguments[3], out yaw))
                                         {
-                                            GD.Print("Yaw is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            yaw = 0.0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Yaw is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            yaw = 0.0f;
                                         }
-                                        if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[4], out pitch))
+                                        if (arguments.Length >= 5 && arguments[4].Length > 0 && !Conversions.TryParseFloatVb6(arguments[4], out pitch))
                                         {
-                                            GD.Print("Pitch is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            pitch = 0.0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Pitch is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            pitch = 0.0f;
                                         }
-                                        if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[5], out roll))
+                                        if (arguments.Length >= 6 && arguments[5].Length > 0 && !Conversions.TryParseFloatVb6(arguments[5], out roll))
                                         {
-                                            GD.Print("Roll is invalid in " + command + " at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
-                                            roll = 0.0;
+                                            Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Roll is invalid in " + command + " at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
+                                            roll = 0.0f;
                                         }
                                         string text = null;
                                         if (arguments.Length >= 7 && arguments[6].Length != 0)
                                         {
                                             text = arguments[6];
                                         }
+
                                         int n = routeData.Blocks[blockIndex].PointsOfInterest.Length;
-                                        Array.Resize<PointOfInterest>(ref routeData.Blocks[blockIndex].PointsOfInterest, n + 1);
-                                        routeData.Blocks[blockIndex].PointsOfInterest[n].TrackPosition = routeData.TrackPosition;
-                                        routeData.Blocks[blockIndex].PointsOfInterest[n].RailIndex = idx;
-                                        routeData.Blocks[blockIndex].PointsOfInterest[n].X = x;
-                                        routeData.Blocks[blockIndex].PointsOfInterest[n].Y = y;
-                                        routeData.Blocks[blockIndex].PointsOfInterest[n].Yaw = 0.0174532925199433 * yaw;
-                                        routeData.Blocks[blockIndex].PointsOfInterest[n].Pitch = 0.0174532925199433 * pitch;
-                                        routeData.Blocks[blockIndex].PointsOfInterest[n].Roll = 0.0174532925199433 * roll;
-                                        routeData.Blocks[blockIndex].PointsOfInterest[n].Text = text;
+                                        Array.Resize(ref routeData.Blocks[blockIndex].PointsOfInterest, n + 1);
+                                        routeData.Blocks[blockIndex].PointsOfInterest[n] = new POI(routeData.TrackPosition, idx, text, new Vector2(x, y), Godot.Mathf.Deg2Rad(yaw), Godot.Mathf.Deg2Rad(pitch), Godot.Mathf.Deg2Rad(roll));
                                     }
                                 }
                                 break;
                             default:
-                                GD.Print("The command " + command + " is not supported at line " + expressions[j].Line.ToString(culture) + ", column " + expressions[j].Column.ToString(culture) + " in file " + expressions[j].File);
+                                Plugin.CurrentHost.AddMessage(MessageType.Error, false, "The command " + command + " is not supported at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                 break;
                         }
                     }
                 }
             }
         }
+        
         if (!previewOnly)
         {
             // timetable
@@ -5603,2295 +5698,11 @@ public static class CsvRwRouteParser
             //Array.Resize<Textures.texture>(ref Timetable.CustomTextures, n);
         }
         // blocks
-        Array.Resize<Block>(ref routeData.Blocks, blocksUsed);
+        // Array.Resize<Block>(ref routeData.Blocks, blocksUsed);
     }
+    
 
-    private static void InterpolateHeight(Block[] blocks)
-    {
-        int z = 0;
-        for (int i = 0; i < blocks.Length; i++)
-        {
-            if (!double.IsNaN(blocks[i].Height))
-            {
-                for (int j = i - 1; j >= 0; j--)
-                {
-                    if (!double.IsNaN(blocks[j].Height))
-                    {
-                        double a = blocks[j].Height;
-                        double b = blocks[i].Height;
-                        double d = (b - a) / (double)(i - j);
-                        for (int k = j + 1; k < i; k++)
-                        {
-                            a += d;
-                            blocks[k].Height = a;
-                        }
-                        break;
-                    }
-                }
-                z = i;
-            }
-        }
-        for (int i = z + 1; i < blocks.Length; i++)
-        {
-            blocks[i].Height = blocks[z].Height;
-        }
-    }
-
+    
     #endregion
-
-    #region Apply Route Data (CsvRwRouteParser.RouteData.cs)
-
-    private static void ApplyRouteData(Node routeRootNode, string fileName, string compatibilityFolder, Encoding fileEncoding, ref RouteData routeData, bool previewOnly)
-    {
-        string signalPath, limitPath, limitGraphicsPath, transponderPath;
-        UnifiedObject signalPost, limitPostStraight, limitPostLeft, limitPostRight, limitPostInfinite;
-        UnifiedObject limitOneDigit, limitTwoDigits, limitThreeDigits, stopPost;
-        UnifiedObject transponderS, transponderSN, transponderFalseStart, transponderPOrigin, transponderPStop;
-
-        if (!previewOnly)
-        {
-            // load compatibility objects
-            Node rootForCompatObjects = new Node();//("Compatibility");
-            rootForCompatObjects.Name = "Compatibility";
-
-            signalPath = System.IO.Path.Combine(compatibilityFolder, @"Signals\Japanese");
-            signalPost = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(signalPath, "signal_post.csv"), fileEncoding, false, false, false);
-            limitPath = System.IO.Path.Combine(compatibilityFolder, "Limits");
-            limitGraphicsPath = System.IO.Path.Combine(limitPath, "Graphics");
-            limitPostStraight = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(limitPath, "limit_straight.csv"), fileEncoding, false, false, false);
-            limitPostLeft = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(limitPath, "limit_left.csv"), fileEncoding, false, false, false);
-            limitPostRight = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(limitPath, "limit_right.csv"), fileEncoding, false, false, false);
-            limitPostInfinite = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(limitPath, "limit_infinite.csv"), fileEncoding, false, false, false);
-            limitOneDigit = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(limitPath, "limit_1_digit.csv"), fileEncoding, false, false, false);
-            limitTwoDigits = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(limitPath, "limit_2_digits.csv"), fileEncoding, false, false, false);
-            limitThreeDigits = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(limitPath, "limit_3_digits.csv"), fileEncoding, false, false, false);
-            stopPost = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(compatibilityFolder, "stop.csv"), fileEncoding, false, false, false);
-            transponderPath = System.IO.Path.Combine(compatibilityFolder, "Transponders");
-            transponderS = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(transponderPath, "s.csv"), fileEncoding, false, false, false);
-            transponderSN = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(transponderPath, "sn.csv"), fileEncoding, false, false, false);
-            transponderFalseStart = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(transponderPath, "falsestart.csv"), fileEncoding, false, false, false);
-            transponderPOrigin = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(transponderPath, "porigin.csv"), fileEncoding, false, false, false);
-            transponderPStop = ObjectManager.Instance.LoadStaticObject(rootForCompatObjects, System.IO.Path.Combine(transponderPath, "pstop.csv"), fileEncoding, false, false, false);
-        }
-        else
-        {
-            signalPath = null;
-            limitPath = null;
-            limitGraphicsPath = null;
-            transponderPath = null;
-            signalPost = null;
-            limitPostStraight = null;
-            limitPostLeft = null;
-            limitPostRight = null;
-            limitPostInfinite = null;
-            limitOneDigit = null;
-            limitTwoDigits = null;
-            limitThreeDigits = null;
-            stopPost = null;
-            transponderS = null;
-            transponderSN = null;
-            transponderFalseStart = null;
-            transponderPOrigin = null;
-            transponderPStop = null;
-        }
-
-        // initialize
-        System.Globalization.CultureInfo Culture = System.Globalization.CultureInfo.InvariantCulture;
-        int lastBlock = (int)Math.Floor((routeData.TrackPosition + 600.0) / routeData.BlockInterval + 0.001) + 1;
-        int blocksUsed = routeData.Blocks.Length;
-        CreateMissingBlocks(ref routeData, ref blocksUsed, lastBlock, previewOnly);
-        Array.Resize<Block>(ref routeData.Blocks, blocksUsed);
-
-
-        if (!previewOnly)
-        {
-            // interpolate height
-            InterpolateHeight(routeData.Blocks);
-        }
-
-        // background
-        if (!previewOnly)
-        {
-            if (routeData.Blocks[0].Background >= 0 & routeData.Blocks[0].Background < routeData.Backgrounds.Length)
-            {
-                //RenderSettings.skybox.mainTexture = routeData.Backgrounds[routeData.Blocks[0].Background];
-
-                // Material material = CreateSkyboxMaterial(routeData.Backgrounds[routeData.Blocks[0].Background]);
-                // Node camera = Camera.main.Node;
-                // Skybox skybox = camera.GetComponent<Skybox>();
-                // if (skybox == null) skybox = camera.AddComponent<Skybox>();
-                // skybox.material = material;
-            }
-            else
-            {
-                //World.CurrentBackground = new World.Background(null, 6, false);
-            }
-            //World.TargetBackground = World.CurrentBackground;
-        }
-
-        // brightness
-        int currentBrightnessElement = -1;
-        int currentBrightnessEvent = -1;
-        float currentBrightnessValue = 1.0f;
-        double currentBrightnessTrackPosition = (double)routeData.FirstUsedBlock * routeData.BlockInterval;
-        if (!previewOnly)
-        {
-            for (int i = routeData.FirstUsedBlock; i < routeData.Blocks.Length; i++)
-            {
-                if (routeData.Blocks[i].Brightness != null && routeData.Blocks[i].Brightness.Length != 0)
-                {
-                    currentBrightnessValue = routeData.Blocks[i].Brightness[0].Value;
-                    currentBrightnessTrackPosition = routeData.Blocks[i].Brightness[0].Value;
-                    break;
-                }
-            }
-        }
-
-
-        // create objects and track
-        Vector3 playerRailPos = new Vector3(0.0f, 0.0f, 0.0f);
-        Vector2 playerRailDir = new Vector2(0.0f, 1.0f);
-        TrackManager.CurrentTrack = new TrackManager.Track();
-        TrackManager.CurrentTrack.Elements = new TrackManager.TrackElement[] { };
-        double currentSpeedLimit = double.PositiveInfinity;
-        int currentRunIndex = 0;
-        int currentFlangeIndex = 0;
-        if (routeData.FirstUsedBlock < 0) routeData.FirstUsedBlock = 0;
-        TrackManager.CurrentTrack.Elements = new TrackManager.TrackElement[256];
-        int currentTrackLength = 0;
-        int previousFogElement = -1;
-        int previousFogEvent = -1;
-        //Game.Fog PreviousFog = new Game.Fog(Game.NoFogStart, Game.NoFogEnd, new Color24(128, 128, 128), -Data.BlockInterval);
-        //Game.Fog CurrentFog = new Game.Fog(Game.NoFogStart, Game.NoFogEnd, new Color24(128, 128, 128), 0.0);
-
-        // process blocks
-        double progressFactor = routeData.Blocks.Length - routeData.FirstUsedBlock == 0 ? 0.5 : 0.5 / (double)(routeData.Blocks.Length - routeData.FirstUsedBlock);
-        for (int blockIdx = routeData.FirstUsedBlock; blockIdx < routeData.Blocks.Length; blockIdx++)
-        {
-            double startingDistance = (double)blockIdx * routeData.BlockInterval;
-            double endingDistance = startingDistance + routeData.BlockInterval;
-
-            playerRailDir = playerRailDir.Normalized();
-
-            // track
-            if (!previewOnly)
-            {
-                if (routeData.Blocks[blockIdx].Cycle.Length == 1 && routeData.Blocks[blockIdx].Cycle[0] == -1)
-                {
-                    if (routeData.Structure.Cycle.Length == 0 || routeData.Structure.Cycle[0] == null)
-                    {
-                        routeData.Blocks[blockIdx].Cycle = new int[] { 0 };
-                    }
-                    else
-                    {
-                        routeData.Blocks[blockIdx].Cycle = routeData.Structure.Cycle[0];
-                    }
-                }
-            }
-
-            TrackManager.TrackElement worldTrackElement = routeData.Blocks[blockIdx].CurrentTrackState;
-            int n = currentTrackLength;
-            if (n >= TrackManager.CurrentTrack.Elements.Length)
-            {
-                Array.Resize<TrackManager.TrackElement>(ref TrackManager.CurrentTrack.Elements, TrackManager.CurrentTrack.Elements.Length << 1);
-            }
-
-            currentTrackLength++;
-            TrackManager.CurrentTrack.Elements[n] = worldTrackElement;
-            TrackManager.CurrentTrack.Elements[n].WorldPosition = playerRailPos;
-            TrackManager.CurrentTrack.Elements[n].WorldDirection = Calc.GetNormalizedVector3(playerRailDir, routeData.Blocks[blockIdx].Pitch);
-            TrackManager.CurrentTrack.Elements[n].WorldSide = new Vector3(playerRailDir.y, 0.0f, -playerRailDir.x);
-            // World.Cross(TrackManager.CurrentTrack.Elements[n].WorldDirection.X, 
-            //             TrackManager.CurrentTrack.Elements[n].WorldDirection.Y, 
-            //             TrackManager.CurrentTrack.Elements[n].WorldDirection.Z, 
-            //             TrackManager.CurrentTrack.Elements[n].WorldSide.X, 
-            //             TrackManager.CurrentTrack.Elements[n].WorldSide.Y, 
-            //             TrackManager.CurrentTrack.Elements[n].WorldSide.Z, 
-            //             out TrackManager.CurrentTrack.Elements[n].WorldUp.X, 
-            //             out TrackManager.CurrentTrack.Elements[n].WorldUp.Y, 
-            //             out TrackManager.CurrentTrack.Elements[n].WorldUp.Z);
-            TrackManager.CurrentTrack.Elements[n].StartingTrackPosition = startingDistance;
-            TrackManager.CurrentTrack.Elements[n].Events = new TrackManager.GeneralEvent[] { };
-            TrackManager.CurrentTrack.Elements[n].AdhesionMultiplier = routeData.Blocks[blockIdx].AdhesionMultiplier;
-            TrackManager.CurrentTrack.Elements[n].CsvRwAccuracyLevel = routeData.Blocks[blockIdx].Accuracy;
-
-            // background
-            //if (!PreviewOnly)
-            //{
-            //    if (Data.Blocks[i].Background >= 0)
-            //    {
-            //        int typ;
-            //        if (i == Data.FirstUsedBlock)
-            //        {
-            //            typ = Data.Blocks[i].Background;
-            //        }
-            //        else
-            //        {
-            //            typ = Data.Backgrounds.Length > 0 ? 0 : -1;
-            //            for (int j = i - 1; j >= Data.FirstUsedBlock; j--)
-            //            {
-            //                if (Data.Blocks[j].Background >= 0)
-            //                {
-            //                    typ = Data.Blocks[j].Background;
-            //                    break;
-            //                }
-            //            }
-            //        }
-            //        if (typ >= 0 & typ < Data.Backgrounds.Length)
-            //        {
-            //            int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-            //            Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-            //            TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.BackgroundChangeEvent(0.0, Data.Backgrounds[typ], Data.Backgrounds[Data.Blocks[i].Background]);
-            //        }
-            //    }
-            //}
-
-            // brightness
-            //if (!PreviewOnly)
-            //{
-            //    for (int j = 0; j < Data.Blocks[i].Brightness.Length; j++)
-            //    {
-            //        int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-            //        Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-            //        double d = Data.Blocks[i].Brightness[j].TrackPosition - StartingDistance;
-            //        TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.BrightnessChangeEvent(d, Data.Blocks[i].Brightness[j].Value, CurrentBrightnessValue, Data.Blocks[i].Brightness[j].TrackPosition - CurrentBrightnessTrackPosition, Data.Blocks[i].Brightness[j].Value, 0.0);
-            //        if (CurrentBrightnessElement >= 0 & CurrentBrightnessEvent >= 0)
-            //        {
-            //            TrackManager.BrightnessChangeEvent bce = (TrackManager.BrightnessChangeEvent)TrackManager.CurrentTrack.Elements[CurrentBrightnessElement].Events[CurrentBrightnessEvent];
-            //            bce.NextBrightness = Data.Blocks[i].Brightness[j].Value;
-            //            bce.NextDistance = Data.Blocks[i].Brightness[j].TrackPosition - CurrentBrightnessTrackPosition;
-            //        }
-            //        CurrentBrightnessElement = n;
-            //        CurrentBrightnessEvent = m;
-            //        CurrentBrightnessValue = Data.Blocks[i].Brightness[j].Value;
-            //        CurrentBrightnessTrackPosition = Data.Blocks[i].Brightness[j].TrackPosition;
-            //    }
-            //}
-
-            // fog
-            //if (!PreviewOnly)
-            //{
-            //    if (Data.FogTransitionMode)
-            //    {
-            //        if (Data.Blocks[i].FogDefined)
-            //        {
-            //            Data.Blocks[i].Fog.TrackPosition = StartingDistance;
-            //            int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-            //            Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-            //            TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.FogChangeEvent(0.0, PreviousFog, Data.Blocks[i].Fog, Data.Blocks[i].Fog);
-            //            if (PreviousFogElement >= 0 & PreviousFogEvent >= 0)
-            //            {
-            //                TrackManager.FogChangeEvent e = (TrackManager.FogChangeEvent)TrackManager.CurrentTrack.Elements[PreviousFogElement].Events[PreviousFogEvent];
-            //                e.NextFog = Data.Blocks[i].Fog;
-            //            }
-            //            else
-            //            {
-            //                Game.PreviousFog = PreviousFog;
-            //                Game.CurrentFog = PreviousFog;
-            //                Game.NextFog = Data.Blocks[i].Fog;
-            //            }
-            //            PreviousFog = Data.Blocks[i].Fog;
-            //            PreviousFogElement = n;
-            //            PreviousFogEvent = m;
-            //        }
-            //    }
-            //    else
-            //    {
-            //        Data.Blocks[i].Fog.TrackPosition = StartingDistance + Data.BlockInterval;
-            //        int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-            //        Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-            //        TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.FogChangeEvent(0.0, PreviousFog, CurrentFog, Data.Blocks[i].Fog);
-            //        PreviousFog = CurrentFog;
-            //        CurrentFog = Data.Blocks[i].Fog;
-            //    }
-            //}
-
-            // rail sounds
-            //if (!PreviewOnly)
-            //{
-            //    int j = Data.Blocks[i].RailType[0];
-            //    int r = j < Data.Structure.Run.Length ? Data.Structure.Run[j] : 0;
-            //    int f = j < Data.Structure.Flange.Length ? Data.Structure.Flange[j] : 0;
-            //    int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-            //    Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-            //    TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.RailSoundsChangeEvent(0.0, CurrentRunIndex, CurrentFlangeIndex, r, f);
-            //    CurrentRunIndex = r;
-            //    CurrentFlangeIndex = f;
-            //}
-
-            // point sound
-            //if (!PreviewOnly)
-            //{
-            //    if (i < Data.Blocks.Length - 1)
-            //    {
-            //        bool q = false;
-            //        for (int j = 0; j < Data.Blocks[i].Rail.Length; j++)
-            //        {
-            //            if (Data.Blocks[i].Rail[j].RailStart & Data.Blocks[i + 1].Rail.Length > j)
-            //            {
-            //                bool qx = Math.Sign(Data.Blocks[i].Rail[j].RailStartX) != Math.Sign(Data.Blocks[i + 1].Rail[j].RailEndX);
-            //                bool qy = Data.Blocks[i].Rail[j].RailStartY * Data.Blocks[i + 1].Rail[j].RailEndY <= 0.0;
-            //                if (qx & qy)
-            //                {
-            //                    q = true;
-            //                    break;
-            //                }
-            //            }
-            //        }
-            //        if (q)
-            //        {
-            //            int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-            //            Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-            //            TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.SoundEvent(0.0, null, false, false, true, new Vector3D(0.0, 0.0, 0.0), 12.5);
-            //        }
-            //    }
-            //}
-
-            // station
-            //if (Data.Blocks[i].Station >= 0)
-            //{
-            //    // station
-            //    int s = Data.Blocks[i].Station;
-            //    int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-            //    Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-            //    TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.StationStartEvent(0.0, s);
-            //    double dx, dy = 3.0;
-            //    if (Game.Stations[s].OpenLeftDoors & !Game.Stations[s].OpenRightDoors)
-            //    {
-            //        dx = -5.0;
-            //    }
-            //    else if (!Game.Stations[s].OpenLeftDoors & Game.Stations[s].OpenRightDoors)
-            //    {
-            //        dx = 5.0;
-            //    }
-            //    else
-            //    {
-            //        dx = 0.0;
-            //    }
-            //    Game.Stations[s].SoundOrigin.X = Position.X + dx * TrackManager.CurrentTrack.Elements[n].WorldSide.X + dy * TrackManager.CurrentTrack.Elements[n].WorldUp.X;
-            //    Game.Stations[s].SoundOrigin.Y = Position.Y + dx * TrackManager.CurrentTrack.Elements[n].WorldSide.Y + dy * TrackManager.CurrentTrack.Elements[n].WorldUp.Y;
-            //    Game.Stations[s].SoundOrigin.Z = Position.Z + dx * TrackManager.CurrentTrack.Elements[n].WorldSide.Z + dy * TrackManager.CurrentTrack.Elements[n].WorldUp.Z;
-            //    // passalarm
-            //    if (!PreviewOnly)
-            //    {
-            //        if (Data.Blocks[i].StationPassAlarm)
-            //        {
-            //            int b = i - 6;
-            //            if (b >= 0)
-            //            {
-            //                int j = b - Data.FirstUsedBlock;
-            //                if (j >= 0)
-            //                {
-            //                    m = TrackManager.CurrentTrack.Elements[j].Events.Length;
-            //                    Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[j].Events, m + 1);
-            //                    TrackManager.CurrentTrack.Elements[j].Events[m] = new TrackManager.StationPassAlarmEvent(0.0);
-            //                }
-            //            }
-            //        }
-            //    }
-            //}
-
-            // stop
-            //for (int j = 0; j < Data.Blocks[i].Stop.Length; j++)
-            //{
-            //    int s = Data.Blocks[i].Stop[j].Station;
-            //    int t = Game.Stations[s].Stops.Length;
-            //    Array.Resize<Game.StationStop>(ref Game.Stations[s].Stops, t + 1);
-            //    Game.Stations[s].Stops[t].TrackPosition = Data.Blocks[i].Stop[j].TrackPosition;
-            //    Game.Stations[s].Stops[t].ForwardTolerance = Data.Blocks[i].Stop[j].ForwardTolerance;
-            //    Game.Stations[s].Stops[t].BackwardTolerance = Data.Blocks[i].Stop[j].BackwardTolerance;
-            //    Game.Stations[s].Stops[t].Cars = Data.Blocks[i].Stop[j].Cars;
-            //    double dx, dy = 2.0;
-            //    if (Game.Stations[s].OpenLeftDoors & !Game.Stations[s].OpenRightDoors)
-            //    {
-            //        dx = -5.0;
-            //    }
-            //    else if (!Game.Stations[s].OpenLeftDoors & Game.Stations[s].OpenRightDoors)
-            //    {
-            //        dx = 5.0;
-            //    }
-            //    else
-            //    {
-            //        dx = 0.0;
-            //    }
-            //    Game.Stations[s].SoundOrigin.X = Position.X + dx * TrackManager.CurrentTrack.Elements[n].WorldSide.X + dy * TrackManager.CurrentTrack.Elements[n].WorldUp.X;
-            //    Game.Stations[s].SoundOrigin.Y = Position.Y + dx * TrackManager.CurrentTrack.Elements[n].WorldSide.Y + dy * TrackManager.CurrentTrack.Elements[n].WorldUp.Y;
-            //    Game.Stations[s].SoundOrigin.Z = Position.Z + dx * TrackManager.CurrentTrack.Elements[n].WorldSide.Z + dy * TrackManager.CurrentTrack.Elements[n].WorldUp.Z;
-            //}
-
-            // limit
-            //for (int j = 0; j < Data.Blocks[i].Limit.Length; j++)
-            //{
-            //    int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-            //    Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-            //    double d = Data.Blocks[i].Limit[j].TrackPosition - StartingDistance;
-            //    TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.LimitChangeEvent(d, CurrentSpeedLimit, Data.Blocks[i].Limit[j].Speed);
-            //    CurrentSpeedLimit = Data.Blocks[i].Limit[j].Speed;
-            //}
-
-            // marker
-            //if (!PreviewOnly)
-            //{
-            //    for (int j = 0; j < Data.Markers.Length; j++)
-            //    {
-            //        if (Data.Markers[j].StartingPosition >= StartingDistance & Data.Markers[j].StartingPosition < EndingDistance)
-            //        {
-            //            int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-            //            Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-            //            double d = Data.Markers[j].StartingPosition - StartingDistance;
-            //            TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.MarkerStartEvent(d, Data.Markers[j].Texture);
-            //        }
-            //        if (Data.Markers[j].EndingPosition >= StartingDistance & Data.Markers[j].EndingPosition < EndingDistance)
-            //        {
-            //            int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-            //            Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-            //            double d = Data.Markers[j].EndingPosition - StartingDistance;
-            //            TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.MarkerEndEvent(d, Data.Markers[j].Texture);
-            //        }
-            //    }
-            //}
-
-            // sound
-            //if (!PreviewOnly)
-            //{
-            //    for (int j = 0; j < Data.Blocks[i].Sound.Length; j++)
-            //    {
-            //        if (Data.Blocks[i].Sound[j].Type == SoundType.TrainStatic | Data.Blocks[i].Sound[j].Type == SoundType.TrainDynamic)
-            //        {
-            //            int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-            //            Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-            //            double d = Data.Blocks[i].Sound[j].TrackPosition - StartingDistance;
-            //            switch (Data.Blocks[i].Sound[j].Type)
-            //            {
-            //                case SoundType.TrainStatic:
-            //                    TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.SoundEvent(d, Data.Blocks[i].Sound[j].SoundBuffer, true, true, false, new Vector3D(0.0, 0.0, 0.0), 0.0);
-            //                    break;
-            //                case SoundType.TrainDynamic:
-            //                    TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.SoundEvent(d, Data.Blocks[i].Sound[j].SoundBuffer, false, false, true, new Vector3D(0.0, 0.0, 0.0), Data.Blocks[i].Sound[j].Speed);
-            //                    break;
-            //            }
-            //        }
-            //    }
-            //}
-
-            // Turn
-            if (routeData.Blocks[blockIdx].Turn != 0.0)
-            {
-                float ag = (float)Math.Atan(routeData.Blocks[blockIdx].Turn);
-                playerRailDir = playerRailDir.Rotated(-ag);
-
-                // World.RotatePlane(ref TrackManager.CurrentTrack.Elements[n].WorldDirection, cosag, sinag);
-                // World.RotatePlane(ref TrackManager.CurrentTrack.Elements[n].WorldSide, cosag, sinag);
-                // World.Cross(TrackManager.CurrentTrack.Elements[n].WorldDirection.X, TrackManager.CurrentTrack.Elements[n].WorldDirection.Y, TrackManager.CurrentTrack.Elements[n].WorldDirection.Z, TrackManager.CurrentTrack.Elements[n].WorldSide.X, TrackManager.CurrentTrack.Elements[n].WorldSide.Y, TrackManager.CurrentTrack.Elements[n].WorldSide.Z, out TrackManager.CurrentTrack.Elements[n].WorldUp.X, out TrackManager.CurrentTrack.Elements[n].WorldUp.Y, out TrackManager.CurrentTrack.Elements[n].WorldUp.Z);
-                TrackManager.CurrentTrack.Elements[n].WorldDirection = TrackManager.CurrentTrack.Elements[n].WorldDirection.Rotated(Vector3.Left, -ag);
-                TrackManager.CurrentTrack.Elements[n].WorldSide = TrackManager.CurrentTrack.Elements[n].WorldSide.Rotated(Vector3.Left, -ag);
-                TrackManager.CurrentTrack.Elements[n].WorldUp = TrackManager.CurrentTrack.Elements[n].WorldDirection.Cross(TrackManager.CurrentTrack.Elements[n].WorldSide);
-            }
-
-            // Pitch
-            if (routeData.Blocks[blockIdx].Pitch != 0.0)
-            {
-                TrackManager.CurrentTrack.Elements[n].Pitch = routeData.Blocks[blockIdx].Pitch;
-            }
-            else
-            {
-                TrackManager.CurrentTrack.Elements[n].Pitch = 0.0;
-            }
-
-            // Curves
-            double a = 0.0;
-            double c = routeData.BlockInterval;
-            double h = 0.0;
-            if (worldTrackElement.CurveRadius != 0.0 & routeData.Blocks[blockIdx].Pitch != 0.0)
-            {
-                double d = routeData.BlockInterval;
-                double p = routeData.Blocks[blockIdx].Pitch;
-                double r = worldTrackElement.CurveRadius;
-                double s = d / Math.Sqrt(1.0 + p * p);
-                h = s * p;
-                double b = s / Math.Abs(r);
-                c = Math.Sqrt(2.0 * r * r * (1.0 - Math.Cos(b)));
-                a = 0.5 * (double)Math.Sign(r) * b;
-                playerRailDir = playerRailDir.Rotated((float)-a);
-            }
-            else if (worldTrackElement.CurveRadius != 0.0)
-            {
-                double d = routeData.BlockInterval;
-                double r = worldTrackElement.CurveRadius;
-                double b = d / Math.Abs(r);
-                c = Math.Sqrt(2.0 * r * r * (1.0 - Math.Cos(b)));
-                a = 0.5 * (double)Math.Sign(r) * b;
-                playerRailDir = playerRailDir.Rotated((float)-a);
-            }
-            else if (routeData.Blocks[blockIdx].Pitch != 0.0)
-            {
-                double p = routeData.Blocks[blockIdx].Pitch;
-                double d = routeData.BlockInterval;
-                c = d / Math.Sqrt(1.0 + p * p);
-                h = c * p;
-            }
-
-            float trackYaw = (float)Math.Atan2(playerRailDir.x, playerRailDir.y);
-            float trackPitch = (float)Math.Atan(routeData.Blocks[blockIdx].Pitch);
-
-            Transform groundTransformation = new Transform(Basis.Identity, Vector3.Zero);
-            groundTransformation = groundTransformation.Rotated(Vector3.Up, -(float)trackYaw);
-
-            Transform trackTransformation = new Transform(Basis.Identity, Vector3.Zero);
-            trackTransformation = trackTransformation.Rotated(Vector3.Up, -(float)trackYaw);
-            trackTransformation = trackTransformation.Rotated(Vector3.Right, (float)trackPitch);
-
-            Transform nullTransformation = new Transform(Basis.Identity, Vector3.Zero);
-
-            // Ground
-            if (!previewOnly)
-            {
-                int cb = (int)Math.Floor((double)blockIdx + 0.001);
-                int ci = (cb % routeData.Blocks[blockIdx].Cycle.Length + routeData.Blocks[blockIdx].Cycle.Length) % routeData.Blocks[blockIdx].Cycle.Length;
-                int gi = routeData.Blocks[blockIdx].Cycle[ci];
-                if (gi >= 0 & gi < routeData.Structure.Ground.Length)
-                {
-                    if (routeData.Structure.Ground[gi] != null)
-                    {
-                        //ObjectManager.CreateObject(Data.Structure.Ground[Data.Blocks[i].Cycle[ci]], Position + new Vector3D(0.0, -Data.Blocks[i].Height, 0.0), GroundTransformation, NullTransformation, Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, StartingDistance);
-                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.Ground[routeData.Blocks[blockIdx].Cycle[ci]],
-                                                                    playerRailPos + new Vector3(0.0f, (float)-routeData.Blocks[blockIdx].Height, 0.0f),
-                                                                    groundTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance,
-                                                                    routeData.BlockInterval, startingDistance);
-                    }
-                }
-            }
-
-
-            // ground-aligned free objects
-            if (!previewOnly)
-            {
-                for (int j = 0; j < routeData.Blocks[blockIdx].GroundFreeObj.Length; j++)
-                {
-                    int sttype = routeData.Blocks[blockIdx].GroundFreeObj[j].Type;
-                    double d = routeData.Blocks[blockIdx].GroundFreeObj[j].TrackPosition - startingDistance;
-                    double dx = routeData.Blocks[blockIdx].GroundFreeObj[j].X;
-                    double dy = routeData.Blocks[blockIdx].GroundFreeObj[j].Y;
-
-                    Vector3 wpos = playerRailPos + new Vector3((float)(playerRailDir.x * d + playerRailDir.y * dx),
-                                                                (float)(dy - routeData.Blocks[blockIdx].Height),
-                                                                (float)(playerRailDir.y * d - playerRailDir.x * dx));
-                    double tpos = routeData.Blocks[blockIdx].GroundFreeObj[j].TrackPosition;
-
-                    Transform gafTran = new Transform(Basis.Identity, Vector3.Zero);
-                    gafTran = gafTran.Rotated(Vector3.Up, -(float)routeData.Blocks[blockIdx].GroundFreeObj[j].Yaw);
-                    gafTran = gafTran.Rotated(Vector3.Right, (float)routeData.Blocks[blockIdx].GroundFreeObj[j].Pitch);
-                    gafTran = gafTran.Rotated(Vector3.Forward, (float)routeData.Blocks[blockIdx].GroundFreeObj[j].Roll);
-
-                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FreeObj[sttype], wpos, groundTransformation, gafTran,
-                                                                routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, tpos);
-                }
-            }
-
-            // Rail-aligned objects
-            if (!previewOnly)
-            {
-                for (int railIdx = 0; railIdx < routeData.Blocks[blockIdx].Rail.Length; railIdx++)
-                {
-                    if (railIdx > 0 && !routeData.Blocks[blockIdx].Rail[railIdx].RailStart) continue;
-
-                    // Rail
-                    // RailIdx == 0 - player rail
-                    // RailIdx > 0  - auxiliary rails
-                    Vector3 railPosition;
-                    Transform railTransformation;// = new Transform(Basis.Identity, Vector3.Zero);
-                    double planar, updown;
-                    if (railIdx == 0)
-                    {
-                        // Rail 0 (player rail)
-                        planar = 0.0;
-                        updown = 0.0;
-                        railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);
-                        railTransformation = railTransformation.Rotated(Vector3.Up, -(float)planar);            // TODO: seems a waste, always rotating by 0.0 planar / updown ???
-                        railTransformation = railTransformation.Rotated(Vector3.Right, -(float)updown);
-                        railPosition = playerRailPos;
-                    }
-                    else
-                    {
-                        // Rails 1-infinity (auxiliary rails)
-                        double x = routeData.Blocks[blockIdx].Rail[railIdx].RailStartX;
-                        double y = routeData.Blocks[blockIdx].Rail[railIdx].RailStartY;
-                        Vector3 offset = new Vector3((float)(playerRailDir.y * x), (float)y, (float)(playerRailDir.x * x));
-                        railPosition = playerRailPos + offset;
-                        double dh;
-                        if (blockIdx < routeData.Blocks.Length - 1 && routeData.Blocks[blockIdx + 1].Rail.Length > railIdx)
-                        {
-                            // take orientation of upcoming block into account
-                            Vector2 direction2 = playerRailDir;
-                            Vector3 position2 = playerRailPos;
-                            position2.x += playerRailDir.x * (float)c;
-                            position2.y += (float)h;
-                            position2.z -= playerRailDir.y * (float)c;
-                            if (a != 0.0)
-                            {
-                                direction2 = direction2.Rotated(-(float)a);
-                            }
-                            if (routeData.Blocks[blockIdx + 1].Turn != 0.0)
-                            {
-                                double ag = Math.Atan(routeData.Blocks[blockIdx + 1].Turn);
-                                direction2 = direction2.Rotated(-(float)ag);
-                            }
-                            double a2 = 0.0;
-                            double c2 = routeData.BlockInterval;
-                            double h2 = 0.0;
-                            if (routeData.Blocks[blockIdx + 1].CurrentTrackState.CurveRadius != 0.0 & routeData.Blocks[blockIdx + 1].Pitch != 0.0)
-                            {
-                                double d2 = routeData.BlockInterval;
-                                double p2 = routeData.Blocks[blockIdx + 1].Pitch;
-                                double r2 = routeData.Blocks[blockIdx + 1].CurrentTrackState.CurveRadius;
-                                double s2 = d2 / Math.Sqrt(1.0 + p2 * p2);
-                                h2 = s2 * p2;
-                                double b2 = s2 / Math.Abs(r2);
-                                c2 = Math.Sqrt(2.0 * r2 * r2 * (1.0 - Math.Cos(b2)));
-                                a2 = 0.5 * (double)Math.Sign(r2) * b2;
-                                direction2 = direction2.Rotated(-(float)a2);
-                            }
-                            else if (routeData.Blocks[blockIdx + 1].CurrentTrackState.CurveRadius != 0.0)
-                            {
-                                double d2 = routeData.BlockInterval;
-                                double r2 = routeData.Blocks[blockIdx + 1].CurrentTrackState.CurveRadius;
-                                double b2 = d2 / Math.Abs(r2);
-                                c2 = Math.Sqrt(2.0 * r2 * r2 * (1.0 - Math.Cos(b2)));
-                                a2 = 0.5 * (double)Math.Sign(r2) * b2;
-                                direction2 = direction2.Rotated(-(float)a2);
-                            }
-                            else if (routeData.Blocks[blockIdx + 1].Pitch != 0.0)
-                            {
-                                double p2 = routeData.Blocks[blockIdx + 1].Pitch;
-                                double d2 = routeData.BlockInterval;
-                                c2 = d2 / Math.Sqrt(1.0 + p2 * p2);
-                                h2 = c2 * p2;
-                            }
-
-                            //These generate a compiler warning, as secondary tracks do not generate yaw, as they have no
-                            //concept of a curve, but rather are a straight line between two points
-                            //TODO: Revist the handling of secondary tracks ==> !!BACKWARDS INCOMPATIBLE!!
-                            /*
-                            double TrackYaw2 = Math.Atan2(Direction2.X, Direction2.Y);
-                            double TrackPitch2 = Math.Atan(Data.Blocks[i + 1].Pitch);
-                            World.Transformation GroundTransformation2 = new World.Transformation(TrackYaw2, 0.0, 0.0);
-                            World.Transformation TrackTransformation2 = new World.Transformation(TrackYaw2, TrackPitch2, 0.0);
-                             */
-                            // double x2 = routeData.Blocks[i + 1].Rail[j].RailEndX;
-                            // double y2 = routeData.Blocks[i + 1].Rail[j].RailEndY;
-                            // Vector3 offset2 = new Vector3((float)(direction2.y * x2), (float)y2, -(float)(direction2.x * x2));
-                            // Vector3 pos2 = position2 + offset2;
-                            // float rx = pos2.x - pos.x;
-                            // float ry = pos2.y - pos.y;
-                            // float rz = pos2.z - pos.z;
-                            // // World.Normalize(ref rx, ref ry, ref rz);
-                            // railTransformation.basis.z = new Vector3(rx, ry, rz).Normalized();
-                            // railTransformation.basis.x = new Vector3(rz, 0.0f, -rx);
-                            // //World.Normalize(ref RailTransformation.X.X, ref RailTransformation.X.Z);
-                            // railTransformation.basis.x = railTransformation.basis.x.Normalized();
-
-                            // railTransformation.basis.y = railTransformation.basis.z.Cross(railTransformation.basis.x);
-                            //railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);
-                            double dx = routeData.Blocks[blockIdx + 1].Rail[railIdx].RailEndX - routeData.Blocks[blockIdx].Rail[railIdx].RailStartX;
-                            double dy = routeData.Blocks[blockIdx + 1].Rail[railIdx].RailEndY - routeData.Blocks[blockIdx].Rail[railIdx].RailStartY;
-
-                            planar = Math.Atan(dx / c);
-                            dh = dy / c;
-                            updown = Math.Atan(dh);
-
-                            railTransformation = trackTransformation.Rotated(Vector3.Up, -(float)planar);
-                            railTransformation = railTransformation.Rotated(Vector3.Right, (float)updown);
-                        }
-                        else
-                        {
-                            planar = 0.0;
-                            dh = 0.0;
-                            updown = 0.0;
-                            railTransformation = new Transform(trackTransformation.basis, Vector3.Zero);
-                        }
-                    }
-
-                    // Place rail (either player rail or auxiliary rail)
-                    if (routeData.Blocks[blockIdx].RailType[railIdx] < routeData.Structure.Rail.Length)
-                    {
-                        if (routeData.Structure.Rail[routeData.Blocks[blockIdx].RailType[railIdx]] != null)
-                        {
-                            // ObjectManager.CreateObject(routeData.Structure.Rail[routeData.Blocks[i].RailType[j]], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.Rail[routeData.Blocks[blockIdx].RailType[railIdx]],
-                                                                        railPosition, railTransformation, nullTransformation,
-                                                                        routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                        }
-                    }
-
-                    // points of interest
-                    //for (int k = 0; k < Data.Blocks[i].PointsOfInterest.Length; k++)
-                    //{
-                    //    if (Data.Blocks[i].PointsOfInterest[k].RailIndex == j)
-                    //    {
-                    //        double d = Data.Blocks[i].PointsOfInterest[k].TrackPosition - StartingDistance;
-                    //        double x = Data.Blocks[i].PointsOfInterest[k].X;
-                    //        double y = Data.Blocks[i].PointsOfInterest[k].Y;
-                    //        int m = Game.PointsOfInterest.Length;
-                    //        Array.Resize<Game.PointOfInterest>(ref Game.PointsOfInterest, m + 1);
-                    //        Game.PointsOfInterest[m].TrackPosition = Data.Blocks[i].PointsOfInterest[k].TrackPosition;
-                    //        if (i < Data.Blocks.Length - 1 && Data.Blocks[i + 1].Rail.Length > j)
-                    //        {
-                    //            double dx = Data.Blocks[i + 1].Rail[j].RailEndX - Data.Blocks[i].Rail[j].RailStartX;
-                    //            double dy = Data.Blocks[i + 1].Rail[j].RailEndY - Data.Blocks[i].Rail[j].RailStartY;
-                    //            dx = Data.Blocks[i].Rail[j].RailStartX + d / Data.BlockInterval * dx;
-                    //            dy = Data.Blocks[i].Rail[j].RailStartY + d / Data.BlockInterval * dy;
-                    //            Game.PointsOfInterest[m].TrackOffset = new Vector3D(x + dx, y + dy, 0.0);
-                    //        }
-                    //        else
-                    //        {
-                    //            double dx = Data.Blocks[i].Rail[j].RailStartX;
-                    //            double dy = Data.Blocks[i].Rail[j].RailStartY;
-                    //            Game.PointsOfInterest[m].TrackOffset = new Vector3D(x + dx, y + dy, 0.0);
-                    //        }
-                    //        Game.PointsOfInterest[m].TrackYaw = Data.Blocks[i].PointsOfInterest[k].Yaw + planar;
-                    //        Game.PointsOfInterest[m].TrackPitch = Data.Blocks[i].PointsOfInterest[k].Pitch + updown;
-                    //        Game.PointsOfInterest[m].TrackRoll = Data.Blocks[i].PointsOfInterest[k].Roll;
-                    //        Game.PointsOfInterest[m].Text = Data.Blocks[i].PointsOfInterest[k].Text;
-                    //    }
-                    //}
-
-                    // poles
-                    if (routeData.Blocks[blockIdx].RailPole.Length > railIdx && routeData.Blocks[blockIdx].RailPole[railIdx].Exists)
-                    {
-                        double dz = startingDistance / routeData.Blocks[blockIdx].RailPole[railIdx].Interval;
-                        dz -= Math.Floor(dz + 0.5);
-                        if (dz >= -0.01 & dz <= 0.01)
-                        {
-                            if (routeData.Blocks[blockIdx].RailPole[railIdx].Mode == 0)
-                            {
-                                UnifiedObject poleObj = ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.Poles[0][routeData.Blocks[blockIdx].RailPole[railIdx].Type], railPosition, railTransformation, nullTransformation,
-                                                                                                    routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                if (routeData.Blocks[blockIdx].RailPole[railIdx].Location > 0)
-                                    poleObj.Mirror();
-                            }
-                            else
-                            {
-                                int m = routeData.Blocks[blockIdx].RailPole[railIdx].Mode;
-                                double dx = -routeData.Blocks[blockIdx].RailPole[railIdx].Location * 3.8;
-                                double wa = Math.Atan2(playerRailDir.y, playerRailDir.x) - planar;
-                                double wx = Math.Cos(wa);
-                                double wy = Math.Tan(updown);
-                                double wz = Math.Sin(wa);
-                                Calc.Normalize(ref wx, ref wy, ref wz);
-                                double sx = playerRailDir.y;
-                                double sy = 0.0;
-                                double sz = -playerRailDir.x;
-                                Vector3 wpos = railPosition + new Vector3((float)(sx * dx + wx * dz), (float)(sy * dx + wy * dz), (float)(sz * dx + wz * dz));
-                                int type = routeData.Blocks[blockIdx].RailPole[railIdx].Type;
-                                //ObjectManager.CreateObject(routeData.Structure.Poles[m][type], wpos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.Poles[m][type], railPosition, railTransformation, nullTransformation,
-                                                                            routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            }
-                        }
-                    }
-
-                    // walls
-                    if (routeData.Blocks[blockIdx].RailWall.Length > railIdx && routeData.Blocks[blockIdx].RailWall[railIdx].Exists)
-                    {
-                        if (routeData.Blocks[blockIdx].RailWall[railIdx].Direction <= 0)
-                        {
-                            //ObjectManager.CreateObject(routeData.Structure.WallL[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.WallL[routeData.Blocks[blockIdx].RailWall[railIdx].Type], railPosition, railTransformation, nullTransformation,
-                                                                        routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                        }
-                        if (routeData.Blocks[blockIdx].RailWall[railIdx].Direction >= 0)
-                        {
-                            //ObjectManager.CreateObject(routeData.Structure.WallR[routeData.Blocks[i].RailWall[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.WallR[routeData.Blocks[blockIdx].RailWall[railIdx].Type], railPosition, railTransformation, nullTransformation,
-                                                                        routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                        }
-                    }
-
-                    // dikes
-                    if (routeData.Blocks[blockIdx].RailDike.Length > railIdx && routeData.Blocks[blockIdx].RailDike[railIdx].Exists)
-                    {
-                        if (routeData.Blocks[blockIdx].RailDike[railIdx].Direction <= 0)
-                        {
-                            //ObjectManager.CreateObject(routeData.Structure.DikeL[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.blockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.DikeL[routeData.Blocks[blockIdx].RailDike[railIdx].Type], railPosition, railTransformation, nullTransformation,
-                                                                        routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                        }
-                        if (routeData.Blocks[blockIdx].RailDike[railIdx].Direction >= 0)
-                        {
-                            //ObjectManager.CreateObject(routeData.Structure.DikeR[routeData.Blocks[i].RailDike[j].Type], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.blockInterval, startingDistance);
-                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.DikeR[routeData.Blocks[blockIdx].RailDike[railIdx].Type], railPosition, railTransformation, nullTransformation,
-                                                                        routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                        }
-                    }
-
-                    // sounds
-                    //if (j == 0)
-                    //{
-                    //    for (int k = 0; k < Data.Blocks[i].Sound.Length; k++)
-                    //    {
-                    //        if (Data.Blocks[i].Sound[k].Type == SoundType.World)
-                    //        {
-                    //            if (Data.Blocks[i].Sound[k].SoundBuffer != null)
-                    //            {
-                    //                double d = Data.Blocks[i].Sound[k].TrackPosition - StartingDistance;
-                    //                double dx = Data.Blocks[i].Sound[k].X;
-                    //                double dy = Data.Blocks[i].Sound[k].Y;
-                    //                double wa = Math.Atan2(Direction.Y, Direction.X) - planar;
-                    //                double wx = Math.Cos(wa);
-                    //                double wy = Math.Tan(updown);
-                    //                double wz = Math.Sin(wa);
-                    //                World.Calc.Normalize(ref wx, ref wy, ref wz);
-                    //                double sx = Direction.Y;
-                    //                double sy = 0.0;
-                    //                double sz = -Direction.X;
-                    //                double ux, uy, uz;
-                    //                World.Cross(wx, wy, wz, sx, sy, sz, out ux, out uy, out uz);
-                    //                Vector3D wpos = pos + new Vector3D(sx * dx + ux * dy + wx * d, sy * dx + uy * dy + wy * d, sz * dx + uz * dy + wz * d);
-                    //                Sounds.PlaySound(Data.Blocks[i].Sound[k].SoundBuffer, 1.0, 1.0, wpos, true);
-                    //            }
-                    //        }
-                    //    }
-                    //}
-
-                    // forms
-                    for (int k = 0; k < routeData.Blocks[blockIdx].Form.Length; k++)
-                    {
-                        // primary rail
-                        if (routeData.Blocks[blockIdx].Form[k].PrimaryRail == railIdx)
-                        {
-                            if (routeData.Blocks[blockIdx].Form[k].SecondaryRail == Form.SecondaryRailStub)
-                            {
-                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormL.Length || routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
-                                {
-                                    GD.Print("FormStructureIndex references a FormL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                }
-                                else
-                                {
-                                    //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
-                                    {
-                                        if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
-                                        {
-                                            GD.Print("RoofStructureIndex references a RoofL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                        }
-                                        else
-                                        {
-                                            //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
-                                                                                        routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        }
-                                    }
-                                }
-                            }
-                            else if (routeData.Blocks[blockIdx].Form[k].SecondaryRail == Form.SecondaryRailL)
-                            {
-                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormL.Length || routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
-                                {
-                                    GD.Print("FormStructureIndex references a FormL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                }
-                                else
-                                {
-                                    //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
-                                                                                routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                }
-                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCL.Length || routeData.Structure.FormCL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
-                                {
-                                    GD.Print("FormStructureIndex references a FormCL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                }
-                                else
-                                {
-                                    //ObjectManager.CreateStaticObject(routeData.Structure.FormCL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormCL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
-                                                                                routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                }
-
-                                if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
-                                {
-                                    if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
-                                    {
-                                        GD.Print("RoofStructureIndex references a RoofL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                    }
-                                    else
-                                    {
-                                        //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
-                                                                                    routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    }
-                                    if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCL.Length || routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
-                                    {
-                                        GD.Print("RoofStructureIndex references a RoofCL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                    }
-                                    else
-                                    {
-                                        //ObjectManager.CreateStaticObject(routeData.Structure.RoofCL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
-                                                                                    routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    }
-                                }
-                            }
-                            else if (routeData.Blocks[blockIdx].Form[k].SecondaryRail == Form.SecondaryRailR)
-                            {
-                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormR.Length || routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
-                                {
-                                    GD.Print("FormStructureIndex references a FormR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                }
-                                else
-                                {
-                                    //ObjectManager.CreateObject(routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
-                                                                                routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                }
-                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCR.Length || routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
-                                {
-                                    GD.Print("FormStructureIndex references a FormCR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                }
-                                else
-                                {
-                                    //ObjectManager.CreateStaticObject(routeData.Structure.FormCR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
-                                                                                routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                }
-                                if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
-                                {
-                                    if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofR.Length || routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
-                                    {
-                                        GD.Print("RoofStructureIndex references a RoofR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                    }
-                                    else
-                                    {
-                                        //ObjectManager.CreateObject(routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
-                                                                                    routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    }
-                                    if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCR.Length || routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
-                                    {
-                                        GD.Print("RoofStructureIndex references a RoofCR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                    }
-                                    else
-                                    {
-                                        //ObjectManager.CreateStaticObject(routeData.Structure.RoofCR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
-                                                                                    routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    }
-                                }
-                            }
-                            else if (routeData.Blocks[blockIdx].Form[k].SecondaryRail > 0)
-                            {
-                                int p = routeData.Blocks[blockIdx].Form[k].PrimaryRail;
-                                double px0 = p > 0 ? routeData.Blocks[blockIdx].Rail[p].RailStartX : 0.0;
-                                double px1 = p > 0 ? routeData.Blocks[blockIdx + 1].Rail[p].RailEndX : 0.0;
-                                int s = routeData.Blocks[blockIdx].Form[k].SecondaryRail;
-                                if (s < 0 || s >= routeData.Blocks[blockIdx].Rail.Length || !routeData.Blocks[blockIdx].Rail[s].RailStart)
-                                {
-                                    GD.Print("RailIndex2 is out of range in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName);
-                                }
-                                else
-                                {
-                                    double sx0 = routeData.Blocks[blockIdx].Rail[s].RailStartX;
-                                    double sx1 = routeData.Blocks[blockIdx + 1].Rail[s].RailEndX;
-                                    double d0 = sx0 - px0;
-                                    double d1 = sx1 - px1;
-                                    if (d0 < 0.0)
-                                    {
-                                        if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormL.Length || routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
-                                        {
-                                            GD.Print("FormStructureIndex references a FormL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                        }
-                                        else
-                                        {
-                                            //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
-                                                                                        routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        }
-
-                                        if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCL.Length || routeData.Structure.FormCL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
-                                        {
-                                            GD.Print("FormStructureIndex references a FormCL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                        }
-                                        else
-                                        {
-                                            // TODO instantiate object
-                                            //ObjectManager.StaticObject FormC = GetTransformedStaticObject(routeData.Structure.FormCL[routeData.Blocks[i].Form[k].FormType], d0, d1);
-                                            //ObjectManager.CreateStaticObject(FormC, pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        }
-                                        if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
-                                        {
-                                            if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
-                                            {
-                                                GD.Print("RoofStructureIndex references a RoofL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                            }
-                                            else
-                                            {
-                                                //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                                ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
-                                                                                            routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            }
-                                            if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCL.Length || routeData.Structure.RoofCL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
-                                            {
-                                                GD.Print("RoofStructureIndex references a RoofCL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                            }
-                                            else
-                                            {
-                                                // TODO instantiate object
-                                                //ObjectManager.StaticObject RoofC = GetTransformedStaticObject(routeData.Structure.RoofCL[routeData.Blocks[i].Form[k].RoofType], d0, d1);
-                                                //ObjectManager.CreateStaticObject(RoofC, pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            }
-                                        }
-                                    }
-                                    else if (d0 > 0.0)
-                                    {
-                                        if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormR.Length || routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
-                                        {
-                                            GD.Print("FormStructureIndex references a FormR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                        }
-                                        else
-                                        {
-                                            //ObjectManager.CreateObject(routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
-                                                                                        routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        }
-                                        if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormCR.Length || routeData.Structure.FormCR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
-                                        {
-                                            GD.Print("FormStructureIndex references a FormCR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                        }
-                                        else
-                                        {
-                                            // TODO Instantiate object
-                                            //ObjectManager.StaticObject FormC = GetTransformedStaticObject(routeData.Structure.FormCR[routeData.Blocks[i].Form[k].FormType], d0, d1);
-                                            //ObjectManager.CreateStaticObject(FormC, pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        }
-                                        if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
-                                        {
-                                            if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofR.Length || routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
-                                            {
-                                                GD.Print("RoofStructureIndex references a RoofR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                            }
-                                            else
-                                            {
-                                                //ObjectManager.CreateObject(routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                                ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
-                                                                                            routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            }
-                                            if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofCR.Length || routeData.Structure.RoofCR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
-                                            {
-                                                GD.Print("RoofStructureIndex references a RoofCR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                            }
-                                            else
-                                            {
-                                                //ObjectManager.StaticObject RoofC = GetTransformedStaticObject(routeData.Structure.RoofCR[routeData.Blocks[i].Form[k].RoofType], d0, d1);
-                                                //ObjectManager.CreateStaticObject(RoofC, pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // secondary rail
-                        if (routeData.Blocks[blockIdx].Form[k].SecondaryRail == railIdx)
-                        {
-                            int p = routeData.Blocks[blockIdx].Form[k].PrimaryRail;
-                            double px = p > 0 ? routeData.Blocks[blockIdx].Rail[p].RailStartX : 0.0;
-                            int s = routeData.Blocks[blockIdx].Form[k].SecondaryRail;
-                            double sx = routeData.Blocks[blockIdx].Rail[s].RailStartX;
-                            double d = px - sx;
-                            if (d < 0.0)
-                            {
-                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormL.Length || routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType] == null)
-                                {
-                                    GD.Print("FormStructureIndex references a FormL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                }
-                                else
-                                {
-                                    //ObjectManager.CreateObject(routeData.Structure.FormL[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormL[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
-                                                                                routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                }
-                                if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
-                                {
-                                    if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofL.Length || routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
-                                    {
-                                        GD.Print("RoofStructureIndex references a RoofL not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                    }
-                                    else
-                                    {
-                                        //ObjectManager.CreateObject(routeData.Structure.RoofL[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofL[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
-                                                                                    routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                if (routeData.Blocks[blockIdx].Form[k].FormType >= routeData.Structure.FormR.Length || routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType] == null)
-                                {
-                                    GD.Print("FormStructureIndex references a FormR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                }
-                                else
-                                {
-                                    //ObjectManager.CreateObject(routeData.Structure.FormR[routeData.Blocks[i].Form[k].FormType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FormR[routeData.Blocks[blockIdx].Form[k].FormType], railPosition, railTransformation, nullTransformation,
-                                                                                routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                }
-                                if (routeData.Blocks[blockIdx].Form[k].RoofType > 0)
-                                {
-                                    if (routeData.Blocks[blockIdx].Form[k].RoofType >= routeData.Structure.RoofR.Length || routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType] == null)
-                                    {
-                                        GD.Print("RoofStructureIndex references a RoofR not loaded in Track.Form at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                    }
-                                    else
-                                    {
-                                        //ObjectManager.CreateObject(routeData.Structure.RoofR[routeData.Blocks[i].Form[k].RoofType], pos, railTransformation, nullTransformation, routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                        ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.RoofR[routeData.Blocks[blockIdx].Form[k].RoofType], railPosition, railTransformation, nullTransformation,
-                                                                                    routeData.AccurateObjectDisposal, startingDistance, endingDistance, routeData.BlockInterval, startingDistance);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // cracks
-                    for (int k = 0; k < routeData.Blocks[blockIdx].Crack.Length; k++)
-                    {
-                        if (routeData.Blocks[blockIdx].Crack[k].PrimaryRail == railIdx)
-                        {
-                            int p = routeData.Blocks[blockIdx].Crack[k].PrimaryRail;
-                            double px0 = p > 0 ? routeData.Blocks[blockIdx].Rail[p].RailStartX : 0.0;
-                            double px1 = p > 0 ? routeData.Blocks[blockIdx + 1].Rail[p].RailEndX : 0.0;
-                            int s = routeData.Blocks[blockIdx].Crack[k].SecondaryRail;
-                            if (s < 0 || s >= routeData.Blocks[blockIdx].Rail.Length || !routeData.Blocks[blockIdx].Rail[s].RailStart)
-                            {
-                                GD.Print("RailIndex2 is out of range in Track.Crack at track position " + startingDistance.ToString(Culture) + " in file " + fileName);
-                            }
-                            else
-                            {
-                                double sx0 = routeData.Blocks[blockIdx].Rail[s].RailStartX;
-                                double sx1 = routeData.Blocks[blockIdx + 1].Rail[s].RailEndX;
-                                double d0 = sx0 - px0;
-                                double d1 = sx1 - px1;
-                                if (d0 < 0.0)
-                                {
-                                    if (routeData.Blocks[blockIdx].Crack[k].Type >= routeData.Structure.CrackL.Length || routeData.Structure.CrackL[routeData.Blocks[blockIdx].Crack[k].Type] == null)
-                                    {
-                                        GD.Print("CrackStructureIndex references a CrackL not loaded in Track.Crack at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                    }
-                                    else
-                                    {
-                                        //ObjectManager.StaticObject Crack = GetTransformedStaticObject(routeData.Structure.CrackL[routeData.Blocks[i].Crack[k].Type], d0, d1);
-                                        //ObjectManager.CreateStaticObject(Crack, pos, RailTransformation, NullTransformation, routeData.AccurateObjectDisposal, StartingDistance, EndingDistance, routeData.BlockInterval, StartingDistance);
-                                    }
-                                }
-                                else if (d0 > 0.0)
-                                {
-                                    if (routeData.Blocks[blockIdx].Crack[k].Type >= routeData.Structure.CrackR.Length || routeData.Structure.CrackR[routeData.Blocks[blockIdx].Crack[k].Type] == null)
-                                    {
-                                        GD.Print("CrackStructureIndex references a CrackR not loaded in Track.Crack at track position " + startingDistance.ToString(Culture) + " in file " + fileName + ".");
-                                    }
-                                    else
-                                    {
-                                        //ObjectManager.StaticObject Crack = GetTransformedStaticObject(routeData.Structure.CrackR[routeData.Blocks[i].Crack[k].Type], d0, d1);
-                                        //ObjectManager.CreateStaticObject(Crack, pos, RailTransformation, NullTransformation, routeData.AccurateObjectDisposal, StartingDistance, EndingDistance, routeData.BlockInterval, StartingDistance);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // free objects
-                    if (routeData.Blocks[blockIdx].RailFreeObj.Length > railIdx && routeData.Blocks[blockIdx].RailFreeObj[railIdx] != null)
-                    {
-                        for (int k = 0; k < routeData.Blocks[blockIdx].RailFreeObj[railIdx].Length; k++)
-                        {
-                            int sttype = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Type;
-                            double dx = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].X;
-                            double dy = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Y;
-                            double dz = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].TrackPosition - startingDistance;
-                            Vector3 wpos = railPosition;
-                            wpos.x += (float)(dx * railTransformation.basis.x.x + dy * railTransformation.basis.y.x + dz * railTransformation.basis.z.x);
-                            wpos.y += (float)(dx * railTransformation.basis.x.y + dy * railTransformation.basis.y.y + dz * railTransformation.basis.z.y);
-                            wpos.z += (float)(dx * railTransformation.basis.x.z + dy * railTransformation.basis.y.z + dz * railTransformation.basis.z.z);
-                            double tpos = routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].TrackPosition;
-                            //ObjectManager.CreateObject(Data.Structure.FreeObj[sttype], wpos, RailTransformation, new World.Transformation(Data.Blocks[i].RailFreeObj[j][k].Yaw, Data.Blocks[i].RailFreeObj[j][k].Pitch, Data.Blocks[i].RailFreeObj[j][k].Roll), -1, Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, tpos, 1.0, false);
-
-                            // new Transformation((float)routeData.Blocks[i].RailFreeObj[j][k].Yaw, (float)routeData.Blocks[i].RailFreeObj[j][k].Pitch, (float)routeData.Blocks[i].RailFreeObj[j][k].Roll)
-                            Transform foTran = new Transform(Basis.Identity, new Vector3(0, 0, 0));
-                            foTran = foTran.Rotated(Vector3.Up, -(float)routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Yaw);
-                            foTran = foTran.Rotated(Vector3.Right, (float)routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Pitch);
-                            foTran = foTran.Rotated(Vector3.Forward, (float)routeData.Blocks[blockIdx].RailFreeObj[railIdx][k].Roll);
-
-                            ObjectManager.Instance.InstantiateObject(routeRootNode, routeData.Structure.FreeObj[sttype], wpos, railTransformation, foTran, false,
-                                                                        startingDistance, endingDistance, routeData.BlockInterval, tpos);
-                        }
-                    }
-
-                    // transponder objects
-                    //if (j == 0)
-                    //{
-                    //    for (int k = 0; k < Data.Blocks[i].Transponder.Length; k++)
-                    //    {
-                    //        ObjectManager.UnifiedObject obj = null;
-                    //        if (Data.Blocks[i].Transponder[k].ShowDefaultObject)
-                    //        {
-                    //            switch (Data.Blocks[i].Transponder[k].Type)
-                    //            {
-                    //                case 0: obj = TransponderS; break;
-                    //                case 1: obj = TransponderSN; break;
-                    //                case 2: obj = TransponderFalseStart; break;
-                    //                case 3: obj = TransponderPOrigin; break;
-                    //                case 4: obj = TransponderPStop; break;
-                    //            }
-                    //        }
-                    //        else
-                    //        {
-                    //            int b = Data.Blocks[i].Transponder[k].BeaconStructureIndex;
-                    //            if (b >= 0 & b < Data.Structure.Beacon.Length)
-                    //            {
-                    //                obj = Data.Structure.Beacon[b];
-                    //            }
-                    //        }
-                    //        if (obj != null)
-                    //        {
-                    //            double dx = Data.Blocks[i].Transponder[k].X;
-                    //            double dy = Data.Blocks[i].Transponder[k].Y;
-                    //            double dz = Data.Blocks[i].Transponder[k].TrackPosition - StartingDistance;
-                    //            Vector3D wpos = pos;
-                    //            wpos.X += dx * RailTransformation.X.X + dy * RailTransformation.Y.X + dz * RailTransformation.Z.X;
-                    //            wpos.Y += dx * RailTransformation.X.Y + dy * RailTransformation.Y.Y + dz * RailTransformation.Z.Y;
-                    //            wpos.Z += dx * RailTransformation.X.Z + dy * RailTransformation.Y.Z + dz * RailTransformation.Z.Z;
-                    //            double tpos = Data.Blocks[i].Transponder[k].TrackPosition;
-                    //            if (Data.Blocks[i].Transponder[k].ShowDefaultObject)
-                    //            {
-                    //                double b = 0.25 + 0.75 * GetBrightness(ref Data, tpos);
-                    //                ObjectManager.CreateObject(obj, wpos, RailTransformation, new World.Transformation(Data.Blocks[i].Transponder[k].Yaw, Data.Blocks[i].Transponder[k].Pitch, Data.Blocks[i].Transponder[k].Roll), -1, Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, tpos, b, false);
-                    //            }
-                    //            else
-                    //            {
-                    //                ObjectManager.CreateObject(obj, wpos, RailTransformation, new World.Transformation(Data.Blocks[i].Transponder[k].Yaw, Data.Blocks[i].Transponder[k].Pitch, Data.Blocks[i].Transponder[k].Roll), Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, tpos);
-                    //            }
-                    //        }
-                    //    }
-                    //}
-
-                    // sections/signals/transponders
-                    //if (j == 0)
-                    //{
-                    //    // signals
-                    //    for (int k = 0; k < Data.Blocks[i].Signal.Length; k++)
-                    //    {
-                    //        SignalData sd;
-                    //        if (Data.Blocks[i].Signal[k].SignalCompatibilityObjectIndex >= 0)
-                    //        {
-                    //            sd = Data.CompatibilitySignalData[Data.Blocks[i].Signal[k].SignalCompatibilityObjectIndex];
-                    //        }
-                    //        else
-                    //        {
-                    //            sd = Data.SignalData[Data.Blocks[i].Signal[k].SignalObjectIndex];
-                    //        }
-                    //        // objects
-                    //        double dz = Data.Blocks[i].Signal[k].TrackPosition - StartingDistance;
-                    //        if (Data.Blocks[i].Signal[k].ShowPost)
-                    //        {
-                    //            // post
-                    //            double dx = Data.Blocks[i].Signal[k].X;
-                    //            Vector3D wpos = pos;
-                    //            wpos.X += dx * RailTransformation.X.X + dz * RailTransformation.Z.X;
-                    //            wpos.Y += dx * RailTransformation.X.Y + dz * RailTransformation.Z.Y;
-                    //            wpos.Z += dx * RailTransformation.X.Z + dz * RailTransformation.Z.Z;
-                    //            double tpos = Data.Blocks[i].Signal[k].TrackPosition;
-                    //            double b = 0.25 + 0.75 * GetBrightness(ref Data, tpos);
-                    //            ObjectManager.CreateStaticObject(SignalPost, wpos, RailTransformation, NullTransformation, Data.AccurateObjectDisposal, 0.0, StartingDistance, EndingDistance, Data.BlockInterval, tpos, b, false);
-                    //        }
-                    //        if (Data.Blocks[i].Signal[k].ShowObject)
-                    //        {
-                    //            // signal object
-                    //            double dx = Data.Blocks[i].Signal[k].X;
-                    //            double dy = Data.Blocks[i].Signal[k].Y;
-                    //            Vector3D wpos = pos;
-                    //            wpos.X += dx * RailTransformation.X.X + dy * RailTransformation.Y.X + dz * RailTransformation.Z.X;
-                    //            wpos.Y += dx * RailTransformation.X.Y + dy * RailTransformation.Y.Y + dz * RailTransformation.Z.Y;
-                    //            wpos.Z += dx * RailTransformation.X.Z + dy * RailTransformation.Y.Z + dz * RailTransformation.Z.Z;
-                    //            double tpos = Data.Blocks[i].Signal[k].TrackPosition;
-                    //            if (sd is AnimatedObjectSignalData)
-                    //            {
-                    //                AnimatedObjectSignalData aosd = (AnimatedObjectSignalData)sd;
-                    //                ObjectManager.CreateObject(aosd.Objects, wpos, RailTransformation, new World.Transformation(Data.Blocks[i].Signal[k].Yaw, Data.Blocks[i].Signal[k].Pitch, Data.Blocks[i].Signal[k].Roll), Data.Blocks[i].Signal[k].Section, Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, tpos, 1.0, false);
-                    //            }
-                    //            else if (sd is CompatibilitySignalData)
-                    //            {
-                    //                CompatibilitySignalData csd = (CompatibilitySignalData)sd;
-                    //                if (csd.Numbers.Length != 0)
-                    //                {
-                    //                    double brightness = 0.25 + 0.75 * GetBrightness(ref Data, tpos);
-                    //                    ObjectManager.AnimatedObjectCollection aoc = new ObjectManager.AnimatedObjectCollection();
-                    //                    aoc.Objects = new ObjectManager.AnimatedObject[1];
-                    //                    aoc.Objects[0] = new ObjectManager.AnimatedObject();
-                    //                    aoc.Objects[0].States = new ObjectManager.AnimatedObjectState[csd.Numbers.Length];
-                    //                    for (int l = 0; l < csd.Numbers.Length; l++)
-                    //                    {
-                    //                        aoc.Objects[0].States[l].Object = ObjectManager.CloneObject(csd.Objects[l]);
-                    //                    }
-                    //                    string expr = "";
-                    //                    for (int l = 0; l < csd.Numbers.Length - 1; l++)
-                    //                    {
-                    //                        expr += "section " + csd.Numbers[l].ToString(Culture) + " <= " + l.ToString(Culture) + " ";
-                    //                    }
-                    //                    expr += (csd.Numbers.Length - 1).ToString(Culture);
-                    //                    for (int l = 0; l < csd.Numbers.Length - 1; l++)
-                    //                    {
-                    //                        expr += " ?";
-                    //                    }
-                    //                    aoc.Objects[0].StateFunction = FunctionScripts.GetFunctionScriptFromPostfixNotation(expr);
-                    //                    aoc.Objects[0].RefreshRate = 1.0 + 0.01 * Program.RandomNumberGenerator.NextDouble();
-                    //                    ObjectManager.CreateObject(aoc, wpos, RailTransformation, new World.Transformation(Data.Blocks[i].Signal[k].Yaw, Data.Blocks[i].Signal[k].Pitch, Data.Blocks[i].Signal[k].Roll), Data.Blocks[i].Signal[k].Section, Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, tpos, brightness, false);
-                    //                }
-                    //            }
-                    //            else if (sd is Bve4SignalData)
-                    //            {
-                    //                Bve4SignalData b4sd = (Bve4SignalData)sd;
-                    //                if (b4sd.SignalTextures.Length != 0)
-                    //                {
-                    //                    int m = Math.Max(b4sd.SignalTextures.Length, b4sd.GlowTextures.Length);
-                    //                    int zn = 0;
-                    //                    for (int l = 0; l < m; l++)
-                    //                    {
-                    //                        if (l < b4sd.SignalTextures.Length && b4sd.SignalTextures[l] != null || l < b4sd.GlowTextures.Length && b4sd.GlowTextures[l] != null)
-                    //                        {
-                    //                            zn++;
-                    //                        }
-                    //                    }
-                    //                    ObjectManager.AnimatedObjectCollection aoc = new ObjectManager.AnimatedObjectCollection();
-                    //                    aoc.Objects = new ObjectManager.AnimatedObject[1];
-                    //                    aoc.Objects[0] = new ObjectManager.AnimatedObject();
-                    //                    aoc.Objects[0].States = new ObjectManager.AnimatedObjectState[zn];
-                    //                    int zi = 0;
-                    //                    string expr = "";
-                    //                    for (int l = 0; l < m; l++)
-                    //                    {
-                    //                        bool qs = l < b4sd.SignalTextures.Length && b4sd.SignalTextures[l] != null;
-                    //                        bool qg = l < b4sd.GlowTextures.Length && b4sd.GlowTextures[l] != null;
-                    //                        if (qs & qg)
-                    //                        {
-                    //                            ObjectManager.StaticObject so = ObjectManager.CloneObject(b4sd.BaseObject, b4sd.SignalTextures[l], null);
-                    //                            ObjectManager.StaticObject go = ObjectManager.CloneObject(b4sd.GlowObject, b4sd.GlowTextures[l], null);
-                    //                            ObjectManager.JoinObjects(ref so, go);
-                    //                            aoc.Objects[0].States[zi].Object = so;
-                    //                        }
-                    //                        else if (qs)
-                    //                        {
-                    //                            ObjectManager.StaticObject so = ObjectManager.CloneObject(b4sd.BaseObject, b4sd.SignalTextures[l], null);
-                    //                            aoc.Objects[0].States[zi].Object = so;
-                    //                        }
-                    //                        else if (qg)
-                    //                        {
-                    //                            ObjectManager.StaticObject go = ObjectManager.CloneObject(b4sd.GlowObject, b4sd.GlowTextures[l], null);
-                    //                            aoc.Objects[0].States[zi].Object = go;
-                    //                        }
-                    //                        if (qs | qg)
-                    //                        {
-                    //                            if (zi < zn - 1)
-                    //                            {
-                    //                                expr += "section " + l.ToString(Culture) + " <= " + zi.ToString(Culture) + " ";
-                    //                            }
-                    //                            else
-                    //                            {
-                    //                                expr += zi.ToString(Culture);
-                    //                            }
-                    //                            zi++;
-                    //                        }
-                    //                    }
-                    //                    for (int l = 0; l < zn - 1; l++)
-                    //                    {
-                    //                        expr += " ?";
-                    //                    }
-                    //                    aoc.Objects[0].StateFunction = FunctionScripts.GetFunctionScriptFromPostfixNotation(expr);
-                    //                    aoc.Objects[0].RefreshRate = 1.0 + 0.01 * Program.RandomNumberGenerator.NextDouble();
-                    //                    ObjectManager.CreateObject(aoc, wpos, RailTransformation, new World.Transformation(Data.Blocks[i].Signal[k].Yaw, Data.Blocks[i].Signal[k].Pitch, Data.Blocks[i].Signal[k].Roll), Data.Blocks[i].Signal[k].Section, Data.AccurateObjectDisposal, StartingDistance, EndingDistance, Data.BlockInterval, tpos, 1.0, false);
-                    //                }
-                    //            }
-                    //        }
-                    //    }
-
-                    //    // sections
-                    //    for (int k = 0; k < Data.Blocks[i].Section.Length; k++)
-                    //    {
-                    //        int m = Game.Sections.Length;
-                    //        Array.Resize<Game.Section>(ref Game.Sections, m + 1);
-                    //        Game.Sections[m].SignalIndices = new int[] { };
-                    //        // create associated transponders
-                    //        for (int g = 0; g <= i; g++)
-                    //        {
-                    //            for (int l = 0; l < Data.Blocks[g].Transponder.Length; l++)
-                    //            {
-                    //                if (Data.Blocks[g].Transponder[l].Type != -1 & Data.Blocks[g].Transponder[l].Section == m)
-                    //                {
-                    //                    int o = TrackManager.CurrentTrack.Elements[n - i + g].Events.Length;
-                    //                    Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n - i + g].Events, o + 1);
-                    //                    double dt = Data.Blocks[g].Transponder[l].TrackPosition - StartingDistance + (double)(i - g) * Data.BlockInterval;
-                    //                    TrackManager.CurrentTrack.Elements[n - i + g].Events[o] = new TrackManager.TransponderEvent(dt, Data.Blocks[g].Transponder[l].Type, Data.Blocks[g].Transponder[l].Data, m, Data.Blocks[g].Transponder[l].ClipToFirstRedSection);
-                    //                    Data.Blocks[g].Transponder[l].Type = -1;
-                    //                }
-                    //            }
-                    //        }
-                    //        // create section
-                    //        Game.Sections[m].TrackPosition = Data.Blocks[i].Section[k].TrackPosition;
-                    //        Game.Sections[m].Aspects = new Game.SectionAspect[Data.Blocks[i].Section[k].Aspects.Length];
-                    //        for (int l = 0; l < Data.Blocks[i].Section[k].Aspects.Length; l++)
-                    //        {
-                    //            Game.Sections[m].Aspects[l].Number = Data.Blocks[i].Section[k].Aspects[l];
-                    //            if (Data.Blocks[i].Section[k].Aspects[l] >= 0 & Data.Blocks[i].Section[k].Aspects[l] < Data.SignalSpeeds.Length)
-                    //            {
-                    //                Game.Sections[m].Aspects[l].Speed = Data.SignalSpeeds[Data.Blocks[i].Section[k].Aspects[l]];
-                    //            }
-                    //            else
-                    //            {
-                    //                Game.Sections[m].Aspects[l].Speed = double.PositiveInfinity;
-                    //            }
-                    //        }
-                    //        Game.Sections[m].Type = Data.Blocks[i].Section[k].Type;
-                    //        Game.Sections[m].CurrentAspect = -1;
-                    //        if (m > 0)
-                    //        {
-                    //            Game.Sections[m].PreviousSection = m - 1;
-                    //            Game.Sections[m - 1].NextSection = m;
-                    //        }
-                    //        else
-                    //        {
-                    //            Game.Sections[m].PreviousSection = -1;
-                    //        }
-                    //        Game.Sections[m].NextSection = -1;
-                    //        Game.Sections[m].StationIndex = Data.Blocks[i].Section[k].DepartureStationIndex;
-                    //        Game.Sections[m].Invisible = Data.Blocks[i].Section[k].Invisible;
-                    //        Game.Sections[m].Trains = new TrainManager.Train[] { };
-                    //        // create section change event
-                    //        double d = Data.Blocks[i].Section[k].TrackPosition - StartingDistance;
-                    //        int p = TrackManager.CurrentTrack.Elements[n].Events.Length;
-                    //        Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, p + 1);
-                    //        TrackManager.CurrentTrack.Elements[n].Events[p] = new TrackManager.SectionChangeEvent(d, m - 1, m);
-                    //    }
-                    //    // transponders introduced after corresponding sections
-                    //    for (int l = 0; l < Data.Blocks[i].Transponder.Length; l++)
-                    //    {
-                    //        if (Data.Blocks[i].Transponder[l].Type != -1)
-                    //        {
-                    //            int t = Data.Blocks[i].Transponder[l].Section;
-                    //            if (t >= 0 & t < Game.Sections.Length)
-                    //            {
-                    //                int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-                    //                Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-                    //                double dt = Data.Blocks[i].Transponder[l].TrackPosition - StartingDistance;
-                    //                TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.TransponderEvent(dt, Data.Blocks[i].Transponder[l].Type, Data.Blocks[i].Transponder[l].Data, t, Data.Blocks[i].Transponder[l].ClipToFirstRedSection);
-                    //                Data.Blocks[i].Transponder[l].Type = -1;
-                    //            }
-                    //        }
-                    //    }
-                    //}
-
-                    // limit
-                    //if (j == 0)
-                    //{
-                    //    for (int k = 0; k < Data.Blocks[i].Limit.Length; k++)
-                    //    {
-                    //        if (Data.Blocks[i].Limit[k].Direction != 0)
-                    //        {
-                    //            double dx = 2.2 * (double)Data.Blocks[i].Limit[k].Direction;
-                    //            double dz = Data.Blocks[i].Limit[k].TrackPosition - StartingDistance;
-                    //            Vector3D wpos = pos;
-                    //            wpos.X += dx * RailTransformation.X.X + dz * RailTransformation.Z.X;
-                    //            wpos.Y += dx * RailTransformation.X.Y + dz * RailTransformation.Z.Y;
-                    //            wpos.Z += dx * RailTransformation.X.Z + dz * RailTransformation.Z.Z;
-                    //            double tpos = Data.Blocks[i].Limit[k].TrackPosition;
-                    //            double b = 0.25 + 0.75 * GetBrightness(ref Data, tpos);
-                    //            if (Data.Blocks[i].Limit[k].Speed <= 0.0 | Data.Blocks[i].Limit[k].Speed >= 1000.0)
-                    //            {
-                    //                ObjectManager.CreateStaticObject(LimitPostInfinite, wpos, RailTransformation, NullTransformation, Data.AccurateObjectDisposal, 0.0, StartingDistance, EndingDistance, Data.BlockInterval, tpos, b, false);
-                    //            }
-                    //            else
-                    //            {
-                    //                if (Data.Blocks[i].Limit[k].Cource < 0)
-                    //                {
-                    //                    ObjectManager.CreateStaticObject(LimitPostLeft, wpos, RailTransformation, NullTransformation, Data.AccurateObjectDisposal, 0.0, StartingDistance, EndingDistance, Data.BlockInterval, tpos, b, false);
-                    //                }
-                    //                else if (Data.Blocks[i].Limit[k].Cource > 0)
-                    //                {
-                    //                    ObjectManager.CreateStaticObject(LimitPostRight, wpos, RailTransformation, NullTransformation, Data.AccurateObjectDisposal, 0.0, StartingDistance, EndingDistance, Data.BlockInterval, tpos, b, false);
-                    //                }
-                    //                else
-                    //                {
-                    //                    ObjectManager.CreateStaticObject(LimitPostStraight, wpos, RailTransformation, NullTransformation, Data.AccurateObjectDisposal, 0.0, StartingDistance, EndingDistance, Data.BlockInterval, tpos, b, false);
-                    //                }
-                    //                double lim = Data.Blocks[i].Limit[k].Speed / Data.UnitOfSpeed;
-                    //                if (lim < 10.0)
-                    //                {
-                    //                    int d0 = (int)Math.Round(lim);
-                    //                    int o = ObjectManager.CreateStaticObject(LimitOneDigit, wpos, RailTransformation, NullTransformation, Data.AccurateObjectDisposal, 0.0, StartingDistance, EndingDistance, Data.BlockInterval, tpos, b, true);
-                    //                    if (ObjectManager.Objects[o].Mesh.Materials.Length >= 1)
-                    //                    {
-                    //                        Textures.RegisterTexture(Path.Combine(LimitGraphicsPath, "limit_" + d0 + ".png"), out ObjectManager.Objects[o].Mesh.Materials[0].DaytimeTexture);
-                    //                    }
-                    //                }
-                    //                else if (lim < 100.0)
-                    //                {
-                    //                    int d1 = (int)Math.Round(lim);
-                    //                    int d0 = d1 % 10;
-                    //                    d1 /= 10;
-                    //                    int o = ObjectManager.CreateStaticObject(LimitTwoDigits, wpos, RailTransformation, NullTransformation, Data.AccurateObjectDisposal, 0.0, StartingDistance, EndingDistance, Data.BlockInterval, tpos, b, true);
-                    //                    if (ObjectManager.Objects[o].Mesh.Materials.Length >= 1)
-                    //                    {
-                    //                        Textures.RegisterTexture(Path.Combine(LimitGraphicsPath, "limit_" + d1 + ".png"), out ObjectManager.Objects[o].Mesh.Materials[0].DaytimeTexture);
-                    //                    }
-                    //                    if (ObjectManager.Objects[o].Mesh.Materials.Length >= 2)
-                    //                    {
-                    //                        Textures.RegisterTexture(Path.Combine(LimitGraphicsPath, "limit_" + d0 + ".png"), out ObjectManager.Objects[o].Mesh.Materials[1].DaytimeTexture);
-                    //                    }
-                    //                }
-                    //                else
-                    //                {
-                    //                    int d2 = (int)Math.Round(lim);
-                    //                    int d0 = d2 % 10;
-                    //                    int d1 = (d2 / 10) % 10;
-                    //                    d2 /= 100;
-                    //                    int o = ObjectManager.CreateStaticObject(LimitThreeDigits, wpos, RailTransformation, NullTransformation, Data.AccurateObjectDisposal, 0.0, StartingDistance, EndingDistance, Data.BlockInterval, tpos, b, true);
-                    //                    if (ObjectManager.Objects[o].Mesh.Materials.Length >= 1)
-                    //                    {
-                    //                        Textures.RegisterTexture(Path.Combine(LimitGraphicsPath, "limit_" + d2 + ".png"), out ObjectManager.Objects[o].Mesh.Materials[0].DaytimeTexture);
-                    //                    }
-                    //                    if (ObjectManager.Objects[o].Mesh.Materials.Length >= 2)
-                    //                    {
-                    //                        Textures.RegisterTexture(Path.Combine(LimitGraphicsPath, "limit_" + d1 + ".png"), out ObjectManager.Objects[o].Mesh.Materials[1].DaytimeTexture);
-                    //                    }
-                    //                    if (ObjectManager.Objects[o].Mesh.Materials.Length >= 3)
-                    //                    {
-                    //                        Textures.RegisterTexture(Path.Combine(LimitGraphicsPath, "limit_" + d0 + ".png"), out ObjectManager.Objects[o].Mesh.Materials[2].DaytimeTexture);
-                    //                    }
-                    //                }
-                    //            }
-                    //        }
-                    //    }
-                    //}
-
-                    // stop
-                    //if (j == 0)
-                    //{
-                    //    for (int k = 0; k < Data.Blocks[i].Stop.Length; k++)
-                    //    {
-                    //        if (Data.Blocks[i].Stop[k].Direction != 0)
-                    //        {
-                    //            double dx = 1.8 * (double)Data.Blocks[i].Stop[k].Direction;
-                    //            double dz = Data.Blocks[i].Stop[k].TrackPosition - StartingDistance;
-                    //            Vector3D wpos = pos;
-                    //            wpos.X += dx * RailTransformation.X.X + dz * RailTransformation.Z.X;
-                    //            wpos.Y += dx * RailTransformation.X.Y + dz * RailTransformation.Z.Y;
-                    //            wpos.Z += dx * RailTransformation.X.Z + dz * RailTransformation.Z.Z;
-                    //            double tpos = Data.Blocks[i].Stop[k].TrackPosition;
-                    //            double b = 0.25 + 0.75 * GetBrightness(ref Data, tpos);
-                    //            ObjectManager.CreateStaticObject(StopPost, wpos, RailTransformation, NullTransformation, Data.AccurateObjectDisposal, 0.0, StartingDistance, EndingDistance, Data.BlockInterval, tpos, b, false);
-                    //        }
-                    //    }
-                    //}
-                }
-            }
-
-            // finalize block
-            playerRailPos.x += (float)(playerRailDir.x * c);
-            playerRailPos.y += (float)h;
-            playerRailPos.z -= (float)(playerRailDir.y * c);
-            if (a != 0.0)
-            {
-                // Calc.Rotate(ref direction, Math.Cos(-a), Math.Sin(-a));
-                playerRailDir = playerRailDir.Rotated(-(float)a);
-            }
-        }
-
-        // orphaned transponders
-        //if (!PreviewOnly)
-        //{
-        //    for (int i = Data.FirstUsedBlock; i < Data.Blocks.Length; i++)
-        //    {
-        //        for (int j = 0; j < Data.Blocks[i].Transponder.Length; j++)
-        //        {
-        //            if (Data.Blocks[i].Transponder[j].Type != -1)
-        //            {
-        //                int n = i - Data.FirstUsedBlock;
-        //                int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-        //                Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-        //                double d = Data.Blocks[i].Transponder[j].TrackPosition - TrackManager.CurrentTrack.Elements[n].StartingTrackPosition;
-        //                int s = Data.Blocks[i].Transponder[j].Section;
-        //                if (s >= 0) s = -1;
-        //                TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.TransponderEvent(d, Data.Blocks[i].Transponder[j].Type, Data.Blocks[i].Transponder[j].Data, s, Data.Blocks[i].Transponder[j].ClipToFirstRedSection);
-        //                Data.Blocks[i].Transponder[j].Type = -1;
-        //            }
-        //        }
-        //    }
-        //}
-
-        // insert station end events
-        //for (int i = 0; i < Game.Stations.Length; i++)
-        //{
-        //    int j = Game.Stations[i].Stops.Length - 1;
-        //    if (j >= 0)
-        //    {
-        //        double p = Game.Stations[i].Stops[j].TrackPosition + Game.Stations[i].Stops[j].ForwardTolerance + Data.BlockInterval;
-        //        int k = (int)Math.Floor(p / (double)Data.BlockInterval) - Data.FirstUsedBlock;
-        //        if (k >= 0 & k < Data.Blocks.Length)
-        //        {
-        //            double d = p - (double)(k + Data.FirstUsedBlock) * (double)Data.BlockInterval;
-        //            int m = TrackManager.CurrentTrack.Elements[k].Events.Length;
-        //            Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[k].Events, m + 1);
-        //            TrackManager.CurrentTrack.Elements[k].Events[m] = new TrackManager.StationEndEvent(d, i);
-        //        }
-        //    }
-        //}
-
-        // create default point of interests
-        //if (Game.PointsOfInterest.Length == 0)
-        //{
-        //    Game.PointsOfInterest = new OpenBve.Game.PointOfInterest[Game.Stations.Length];
-        //    int n = 0;
-        //    for (int i = 0; i < Game.Stations.Length; i++)
-        //    {
-        //        if (Game.Stations[i].Stops.Length != 0)
-        //        {
-        //            Game.PointsOfInterest[n].Text = Game.Stations[i].Name;
-        //            Game.PointsOfInterest[n].TrackPosition = Game.Stations[i].Stops[0].TrackPosition;
-        //            Game.PointsOfInterest[n].TrackOffset = new Vector3D(0.0, 2.8, 0.0);
-        //            if (Game.Stations[i].OpenLeftDoors & !Game.Stations[i].OpenRightDoors)
-        //            {
-        //                Game.PointsOfInterest[n].TrackOffset.X = -2.5;
-        //            }
-        //            else if (!Game.Stations[i].OpenLeftDoors & Game.Stations[i].OpenRightDoors)
-        //            {
-        //                Game.PointsOfInterest[n].TrackOffset.X = 2.5;
-        //            }
-        //            n++;
-        //        }
-        //    }
-        //    Array.Resize<Game.PointOfInterest>(ref Game.PointsOfInterest, n);
-        //}
-
-        // convert block-based cant into point-based cant
-        //for (int i = CurrentTrackLength - 1; i >= 1; i--)
-        //{
-        //    if (TrackManager.CurrentTrack.Elements[i].CurveCant == 0.0)
-        //    {
-        //        TrackManager.CurrentTrack.Elements[i].CurveCant = TrackManager.CurrentTrack.Elements[i - 1].CurveCant;
-        //    }
-        //    else if (TrackManager.CurrentTrack.Elements[i - 1].CurveCant != 0.0)
-        //    {
-        //        if (Math.Sign(TrackManager.CurrentTrack.Elements[i - 1].CurveCant) == Math.Sign(TrackManager.CurrentTrack.Elements[i].CurveCant))
-        //        {
-        //            if (Math.Abs(TrackManager.CurrentTrack.Elements[i - 1].CurveCant) > Math.Abs(TrackManager.CurrentTrack.Elements[i].CurveCant))
-        //            {
-        //                TrackManager.CurrentTrack.Elements[i].CurveCant = TrackManager.CurrentTrack.Elements[i - 1].CurveCant;
-        //            }
-        //        }
-        //        else
-        //        {
-        //            TrackManager.CurrentTrack.Elements[i].CurveCant = 0.5 * (TrackManager.CurrentTrack.Elements[i].CurveCant + TrackManager.CurrentTrack.Elements[i - 1].CurveCant);
-        //        }
-        //    }
-        //}
-
-        // finalize
-        //Array.Resize<TrackManager.TrackElement>(ref TrackManager.CurrentTrack.Elements, CurrentTrackLength);
-        //for (int i = 0; i < Game.Stations.Length; i++)
-        //{
-        //    if (Game.Stations[i].Stops.Length == 0 & Game.Stations[i].StopMode != Game.StationStopMode.AllPass)
-        //    {
-        //        GD.Print("Station " + Game.Stations[i].Name + " expects trains to stop but does not define stop points at track position " + Game.Stations[i].DefaultTrackPosition.ToString(Culture) + " in file " + FileName);
-        //        Game.Stations[i].StopMode = Game.StationStopMode.AllPass;
-        //    }
-        //    if (Game.Stations[i].StationType == Game.StationType.ChangeEnds)
-        //    {
-        //        if (i < Game.Stations.Length - 1)
-        //        {
-        //            if (Game.Stations[i + 1].StopMode != Game.StationStopMode.AllStop)
-        //            {
-        //                GD.Print("Station " + Game.Stations[i].Name + " is marked as \"change ends\" but the subsequent station does not expect all trains to stop in file " + FileName);
-        //                Game.Stations[i + 1].StopMode = Game.StationStopMode.AllStop;
-        //            }
-        //        }
-        //        else
-        //        {
-        //            GD.Print("Station " + Game.Stations[i].Name + " is marked as \"change ends\" but there is no subsequent station defined in file " + FileName);
-        //            Game.Stations[i].StationType = Game.StationType.Terminal;
-        //        }
-        //    }
-        //}
-        //if (Game.Stations.Length != 0)
-        //{
-        //    Game.Stations[Game.Stations.Length - 1].StationType = Game.StationType.Terminal;
-        //}
-        //if (TrackManager.CurrentTrack.Elements.Length != 0)
-        //{
-        //    int n = TrackManager.CurrentTrack.Elements.Length - 1;
-        //    int m = TrackManager.CurrentTrack.Elements[n].Events.Length;
-        //    Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[n].Events, m + 1);
-        //    TrackManager.CurrentTrack.Elements[n].Events[m] = new TrackManager.TrackEndEvent(Data.BlockInterval);
-        //}
-
-        // insert compatibility beacons
-        //if (!PreviewOnly)
-        //{
-        //    List<TrackManager.TransponderEvent> transponders = new List<TrackManager.TransponderEvent>();
-        //    bool atc = false;
-        //    for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length; i++)
-        //    {
-        //        for (int j = 0; j < TrackManager.CurrentTrack.Elements[i].Events.Length; j++)
-        //        {
-        //            if (!atc)
-        //            {
-        //                if (TrackManager.CurrentTrack.Elements[i].Events[j] is TrackManager.StationStartEvent)
-        //                {
-        //                    TrackManager.StationStartEvent station = (TrackManager.StationStartEvent)TrackManager.CurrentTrack.Elements[i].Events[j];
-        //                    if (Game.Stations[station.StationIndex].SafetySystem == Game.SafetySystem.Atc)
-        //                    {
-        //                        Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[i].Events, TrackManager.CurrentTrack.Elements[i].Events.Length + 2);
-        //                        TrackManager.CurrentTrack.Elements[i].Events[TrackManager.CurrentTrack.Elements[i].Events.Length - 2] = new TrackManager.TransponderEvent(0.0, TrackManager.SpecialTransponderTypes.AtcTrackStatus, 0, 0, false);
-        //                        TrackManager.CurrentTrack.Elements[i].Events[TrackManager.CurrentTrack.Elements[i].Events.Length - 1] = new TrackManager.TransponderEvent(0.0, TrackManager.SpecialTransponderTypes.AtcTrackStatus, 1, 0, false);
-        //                        atc = true;
-        //                    }
-        //                }
-        //            }
-        //            else
-        //            {
-        //                if (TrackManager.CurrentTrack.Elements[i].Events[j] is TrackManager.StationStartEvent)
-        //                {
-        //                    TrackManager.StationStartEvent station = (TrackManager.StationStartEvent)TrackManager.CurrentTrack.Elements[i].Events[j];
-        //                    if (Game.Stations[station.StationIndex].SafetySystem == Game.SafetySystem.Ats)
-        //                    {
-        //                        Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[i].Events, TrackManager.CurrentTrack.Elements[i].Events.Length + 2);
-        //                        TrackManager.CurrentTrack.Elements[i].Events[TrackManager.CurrentTrack.Elements[i].Events.Length - 2] = new TrackManager.TransponderEvent(0.0, TrackManager.SpecialTransponderTypes.AtcTrackStatus, 2, 0, false);
-        //                        TrackManager.CurrentTrack.Elements[i].Events[TrackManager.CurrentTrack.Elements[i].Events.Length - 1] = new TrackManager.TransponderEvent(0.0, TrackManager.SpecialTransponderTypes.AtcTrackStatus, 3, 0, false);
-        //                    }
-        //                }
-        //                else if (TrackManager.CurrentTrack.Elements[i].Events[j] is TrackManager.StationEndEvent)
-        //                {
-        //                    TrackManager.StationEndEvent station = (TrackManager.StationEndEvent)TrackManager.CurrentTrack.Elements[i].Events[j];
-        //                    if (Game.Stations[station.StationIndex].SafetySystem == Game.SafetySystem.Atc)
-        //                    {
-        //                        Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[i].Events, TrackManager.CurrentTrack.Elements[i].Events.Length + 2);
-        //                        TrackManager.CurrentTrack.Elements[i].Events[TrackManager.CurrentTrack.Elements[i].Events.Length - 2] = new TrackManager.TransponderEvent(0.0, TrackManager.SpecialTransponderTypes.AtcTrackStatus, 1, 0, false);
-        //                        TrackManager.CurrentTrack.Elements[i].Events[TrackManager.CurrentTrack.Elements[i].Events.Length - 1] = new TrackManager.TransponderEvent(0.0, TrackManager.SpecialTransponderTypes.AtcTrackStatus, 2, 0, false);
-        //                    }
-        //                    else if (Game.Stations[station.StationIndex].SafetySystem == Game.SafetySystem.Ats)
-        //                    {
-        //                        Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[i].Events, TrackManager.CurrentTrack.Elements[i].Events.Length + 2);
-        //                        TrackManager.CurrentTrack.Elements[i].Events[TrackManager.CurrentTrack.Elements[i].Events.Length - 2] = new TrackManager.TransponderEvent(0.0, TrackManager.SpecialTransponderTypes.AtcTrackStatus, 3, 0, false);
-        //                        TrackManager.CurrentTrack.Elements[i].Events[TrackManager.CurrentTrack.Elements[i].Events.Length - 1] = new TrackManager.TransponderEvent(0.0, TrackManager.SpecialTransponderTypes.AtcTrackStatus, 0, 0, false);
-        //                        atc = false;
-        //                    }
-        //                }
-        //                else if (TrackManager.CurrentTrack.Elements[i].Events[j] is TrackManager.LimitChangeEvent)
-        //                {
-        //                    TrackManager.LimitChangeEvent limit = (TrackManager.LimitChangeEvent)TrackManager.CurrentTrack.Elements[i].Events[j];
-        //                    int speed = (int)Math.Round(Math.Min(4095.0, 3.6 * limit.NextSpeedLimit));
-        //                    int distance = Math.Min(1048575, (int)Math.Round(TrackManager.CurrentTrack.Elements[i].StartingTrackPosition + limit.TrackPositionDelta));
-        //                    unchecked
-        //                    {
-        //                        int value = (int)((uint)speed | ((uint)distance << 12));
-        //                        transponders.Add(new TrackManager.TransponderEvent(0.0, TrackManager.SpecialTransponderTypes.AtcSpeedLimit, value, 0, false));
-        //                    }
-        //                }
-        //            }
-        //            if (TrackManager.CurrentTrack.Elements[i].Events[j] is TrackManager.TransponderEvent)
-        //            {
-        //                TrackManager.TransponderEvent transponder = TrackManager.CurrentTrack.Elements[i].Events[j] as TrackManager.TransponderEvent;
-        //                if (transponder.Type == TrackManager.SpecialTransponderTypes.InternalAtsPTemporarySpeedLimit)
-        //                {
-        //                    int speed = Math.Min(4095, transponder.Data);
-        //                    int distance = Math.Min(1048575, (int)Math.Round(TrackManager.CurrentTrack.Elements[i].StartingTrackPosition + transponder.TrackPositionDelta));
-        //                    unchecked
-        //                    {
-        //                        int value = (int)((uint)speed | ((uint)distance << 12));
-        //                        transponder.DontTriggerAnymore = true;
-        //                    }
-        //                }
-        //            }
-        //        }
-        //    }
-        //    int n = TrackManager.CurrentTrack.Elements[0].Events.Length;
-        //    Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[0].Events, n + transponders.Count);
-        //    for (int i = 0; i < transponders.Count; i++)
-        //    {
-        //        TrackManager.CurrentTrack.Elements[0].Events[n + i] = transponders[i];
-        //    }
-        //}
-
-        // cant
-        if (!previewOnly)
-        {
-            ComputeCantTangents();
-            int subdivisions = (int)Math.Floor(routeData.BlockInterval / 5.0);
-            if (subdivisions >= 2)
-            {
-                SmoothenOutTurns(subdivisions);
-                ComputeCantTangents();
-            }
-        }
-    }
-
-    #endregion
-
-
-    private static void ComputeCantTangents()
-    {
-        if (TrackManager.CurrentTrack.Elements.Length == 1)
-        {
-            TrackManager.CurrentTrack.Elements[0].CurveCantTangent = 0.0;
-        }
-        else if (TrackManager.CurrentTrack.Elements.Length != 0)
-        {
-            double[] deltas = new double[TrackManager.CurrentTrack.Elements.Length - 1];
-            for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length - 1; i++)
-            {
-                deltas[i] = TrackManager.CurrentTrack.Elements[i + 1].CurveCant - TrackManager.CurrentTrack.Elements[i].CurveCant;
-            }
-            double[] tangents = new double[TrackManager.CurrentTrack.Elements.Length];
-            tangents[0] = deltas[0];
-            tangents[TrackManager.CurrentTrack.Elements.Length - 1] = deltas[TrackManager.CurrentTrack.Elements.Length - 2];
-            for (int i = 1; i < TrackManager.CurrentTrack.Elements.Length - 1; i++)
-            {
-                tangents[i] = 0.5 * (deltas[i - 1] + deltas[i]);
-            }
-            for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length - 1; i++)
-            {
-                if (deltas[i] == 0.0)
-                {
-                    tangents[i] = 0.0;
-                    tangents[i + 1] = 0.0;
-                }
-                else
-                {
-                    double a = tangents[i] / deltas[i];
-                    double b = tangents[i + 1] / deltas[i];
-                    if (a * a + b * b > 9.0)
-                    {
-                        double t = 3.0 / Math.Sqrt(a * a + b * b);
-                        tangents[i] = t * a * deltas[i];
-                        tangents[i + 1] = t * b * deltas[i];
-                    }
-                }
-            }
-            for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length; i++)
-            {
-                TrackManager.CurrentTrack.Elements[i].CurveCantTangent = tangents[i];
-            }
-        }
-    }
-
-    private static void SmoothenOutTurns(int subdivisions)
-    {
-        if (subdivisions < 2)
-        {
-            throw new InvalidOperationException();
-        }
-
-        // subdivide track
-        int length = TrackManager.CurrentTrack.Elements.Length;
-        int newLength = (length - 1) * subdivisions + 1;
-        double[] midpointsTrackPositions = new double[newLength];
-        Vector3[] midpointsWorldPositions = new Vector3[newLength];
-        Vector3[] midpointsWorldDirections = new Vector3[newLength];
-        Vector3[] midpointsWorldUps = new Vector3[newLength];
-        Vector3[] midpointsWorldSides = new Vector3[newLength];
-        double[] midpointsCant = new double[newLength];
-        for (int i = 0; i < newLength; i++)
-        {
-            int m = i % subdivisions;
-            if (m != 0)
-            {
-                int q = i / subdivisions;
-                TrackManager.TrackFollower follower = new TrackManager.TrackFollower();
-                double r = (double)m / (double)subdivisions;
-                double p = (1.0 - r) * TrackManager.CurrentTrack.Elements[q].StartingTrackPosition + r * TrackManager.CurrentTrack.Elements[q + 1].StartingTrackPosition;
-                TrackManager.UpdateTrackFollower(ref follower, -1.0, true, false);
-                TrackManager.UpdateTrackFollower(ref follower, p, true, false);
-                midpointsTrackPositions[i] = p;
-                midpointsWorldPositions[i] = follower.WorldPosition;
-                midpointsWorldDirections[i] = follower.WorldDirection;
-                midpointsWorldUps[i] = follower.WorldUp;
-                midpointsWorldSides[i] = follower.WorldSide;
-                midpointsCant[i] = follower.CurveCant;
-            }
-        }
-        Array.Resize<TrackManager.TrackElement>(ref TrackManager.CurrentTrack.Elements, newLength);
-        for (int i = length - 1; i >= 1; i--)
-        {
-            TrackManager.CurrentTrack.Elements[subdivisions * i] = TrackManager.CurrentTrack.Elements[i];
-        }
-        for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length; i++)
-        {
-            int m = i % subdivisions;
-            if (m != 0)
-            {
-                int q = i / subdivisions;
-                int j = q * subdivisions;
-                TrackManager.CurrentTrack.Elements[i] = TrackManager.CurrentTrack.Elements[j];
-                TrackManager.CurrentTrack.Elements[i].Events = new TrackManager.GeneralEvent[] { };
-                TrackManager.CurrentTrack.Elements[i].StartingTrackPosition = midpointsTrackPositions[i];
-                TrackManager.CurrentTrack.Elements[i].WorldPosition = midpointsWorldPositions[i];
-                TrackManager.CurrentTrack.Elements[i].WorldDirection = midpointsWorldDirections[i];
-                TrackManager.CurrentTrack.Elements[i].WorldUp = midpointsWorldUps[i];
-                TrackManager.CurrentTrack.Elements[i].WorldSide = midpointsWorldSides[i];
-                TrackManager.CurrentTrack.Elements[i].CurveCant = midpointsCant[i];
-                TrackManager.CurrentTrack.Elements[i].CurveCantTangent = 0.0;
-            }
-        }
-        // find turns
-        bool[] isTurn = new bool[TrackManager.CurrentTrack.Elements.Length];
-        {
-            TrackManager.TrackFollower follower = new TrackManager.TrackFollower();
-            for (int i = 1; i < TrackManager.CurrentTrack.Elements.Length - 1; i++)
-            {
-                int m = i % subdivisions;
-                if (m == 0)
-                {
-                    double p = 0.00000001 * TrackManager.CurrentTrack.Elements[i - 1].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition;
-                    TrackManager.UpdateTrackFollower(ref follower, p, true, false);
-                    Vector3 d1 = TrackManager.CurrentTrack.Elements[i].WorldDirection;
-                    Vector3 d2 = follower.WorldDirection;
-                    Vector3 d = d1 - d2;
-                    double t = d.x * d.y + d.z * d.z;
-                    const double e = 0.0001;
-                    if (t > e)
-                    {
-                        isTurn[i] = true;
-                    }
-                }
-            }
-        }
-        // replace turns by curves
-        double totalShortage = 0.0;
-        for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length; i++)
-        {
-            if (isTurn[i])
-            {
-                // estimate radius
-                Vector3 AP = TrackManager.CurrentTrack.Elements[i - 1].WorldPosition;
-                Vector3 AS = TrackManager.CurrentTrack.Elements[i - 1].WorldSide;
-                Vector3 BP = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition;
-                Vector3 BS = TrackManager.CurrentTrack.Elements[i + 1].WorldSide;
-                Vector3 S = AS - BS;
-                double rx;
-                if (S.x * S.x > 0.000001)
-                {
-                    rx = (BP.x - AP.x) / S.x;
-                }
-                else
-                {
-                    rx = 0.0;
-                }
-                double rz;
-                if (S.z * S.z > 0.000001)
-                {
-                    rz = (BP.z - AP.z) / S.z;
-                }
-                else
-                {
-                    rz = 0.0;
-                }
-                if (rx != 0.0 | rz != 0.0)
-                {
-                    double r;
-                    if (rx != 0.0 & rz != 0.0)
-                    {
-                        if (Math.Sign(rx) == Math.Sign(rz))
-                        {
-                            double f = rx / rz;
-                            if (f > -1.1 & f < -0.9 | f > 0.9 & f < 1.1)
-                            {
-                                r = Math.Sqrt(Math.Abs(rx * rz)) * Math.Sign(rx);
-                            }
-                            else
-                            {
-                                r = 0.0;
-                            }
-                        }
-                        else
-                        {
-                            r = 0.0;
-                        }
-                    }
-                    else if (rx != 0.0)
-                    {
-                        r = rx;
-                    }
-                    else
-                    {
-                        r = rz;
-                    }
-                    if (r * r > 1.0)
-                    {
-                        // apply radius
-                        TrackManager.TrackFollower follower = new TrackManager.TrackFollower();
-                        TrackManager.CurrentTrack.Elements[i - 1].CurveRadius = r;
-                        double p = 0.00000001 * TrackManager.CurrentTrack.Elements[i - 1].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition;
-                        TrackManager.UpdateTrackFollower(ref follower, p - 1.0, true, false);
-                        TrackManager.UpdateTrackFollower(ref follower, p, true, false);
-                        TrackManager.CurrentTrack.Elements[i].CurveRadius = r;
-                        //TrackManager.CurrentTrack.Elements[i].CurveCant = TrackManager.CurrentTrack.Elements[i].CurveCant;
-                        //TrackManager.CurrentTrack.Elements[i].CurveCantInterpolation = TrackManager.CurrentTrack.Elements[i].CurveCantInterpolation;
-                        TrackManager.CurrentTrack.Elements[i].WorldPosition = follower.WorldPosition;
-                        TrackManager.CurrentTrack.Elements[i].WorldDirection = follower.WorldDirection;
-                        TrackManager.CurrentTrack.Elements[i].WorldUp = follower.WorldUp;
-                        TrackManager.CurrentTrack.Elements[i].WorldSide = follower.WorldSide;
-                        // iterate to shorten track element length
-                        p = 0.00000001 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition;
-                        TrackManager.UpdateTrackFollower(ref follower, p - 1.0, true, false);
-                        TrackManager.UpdateTrackFollower(ref follower, p, true, false);
-                        Vector3 d = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - follower.WorldPosition;
-                        double bestT = d.x * d.x + d.y * d.y + d.z * d.z;
-                        int bestJ = 0;
-                        int n = 1000;
-                        double a = 1.0 / (double)n * (TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition - TrackManager.CurrentTrack.Elements[i].StartingTrackPosition);
-                        for (int j = 1; j < n - 1; j++)
-                        {
-                            TrackManager.UpdateTrackFollower(ref follower, TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition - (double)j * a, true, false);
-                            d = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - follower.WorldPosition;
-                            double t = d.x * d.x + d.y * d.y + d.z * d.z;
-                            if (t < bestT)
-                            {
-                                bestT = t;
-                                bestJ = j;
-                            }
-                            else
-                            {
-                                break;
-                            }
-                        }
-                        double s = (double)bestJ * a;
-                        for (int j = i + 1; j < TrackManager.CurrentTrack.Elements.Length; j++)
-                        {
-                            TrackManager.CurrentTrack.Elements[j].StartingTrackPosition -= s;
-                        }
-                        totalShortage += s;
-                        // introduce turn to compensate for curve
-                        p = 0.00000001 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition;
-                        TrackManager.UpdateTrackFollower(ref follower, p - 1.0, true, false);
-                        TrackManager.UpdateTrackFollower(ref follower, p, true, false);
-                        Vector3 AB = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - follower.WorldPosition;
-                        Vector3 AC = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - TrackManager.CurrentTrack.Elements[i].WorldPosition;
-                        Vector3 BC = follower.WorldPosition - TrackManager.CurrentTrack.Elements[i].WorldPosition;
-                        double sa = Math.Sqrt(BC.x * BC.x + BC.z * BC.z);
-                        double sb = Math.Sqrt(AC.x * AC.x + AC.z * AC.z);
-                        double sc = Math.Sqrt(AB.x * AB.x + AB.z * AB.z);
-                        double denominator = 2.0 * sa * sb;
-                        if (denominator != 0.0)
-                        {
-                            double originalAngle;
-                            {
-                                double value = (sa * sa + sb * sb - sc * sc) / denominator;
-                                if (value < -1.0)
-                                {
-                                    originalAngle = Math.PI;
-                                }
-                                else if (value > 1.0)
-                                {
-                                    originalAngle = 0;
-                                }
-                                else
-                                {
-                                    originalAngle = Math.Acos(value);
-                                }
-                            }
-                            TrackManager.TrackElement originalTrackElement = TrackManager.CurrentTrack.Elements[i];
-                            bestT = double.MaxValue;
-                            bestJ = 0;
-                            for (int j = -1; j <= 1; j++)
-                            {
-                                double g = (double)j * originalAngle;
-                                double cosg = Math.Cos(g);
-                                double sing = Math.Sin(g);
-                                TrackManager.CurrentTrack.Elements[i] = originalTrackElement;
-                                // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldDirection.X, ref TrackManager.CurrentTrack.Elements[i].WorldDirection.Y, ref TrackManager.CurrentTrack.Elements[i].WorldDirection.Z, 0.0, 1.0, 0.0, cosg, sing);
-                                // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldUp.X, ref TrackManager.CurrentTrack.Elements[i].WorldUp.Y, ref TrackManager.CurrentTrack.Elements[i].WorldUp.Z, 0.0, 1.0, 0.0, cosg, sing);
-                                // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldSide.X, ref TrackManager.CurrentTrack.Elements[i].WorldSide.Y, ref TrackManager.CurrentTrack.Elements[i].WorldSide.Z, 0.0, 1.0, 0.0, cosg, sing);
-                                p = 0.00000001 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition;
-                                TrackManager.UpdateTrackFollower(ref follower, p - 1.0, true, false);
-                                TrackManager.UpdateTrackFollower(ref follower, p, true, false);
-                                d = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - follower.WorldPosition;
-                                double t = d.x * d.x + d.y * d.y + d.z * d.z;
-                                if (t < bestT)
-                                {
-                                    bestT = t;
-                                    bestJ = j;
-                                }
-                            }
-                            {
-                                double newAngle = (double)bestJ * originalAngle;
-                                double cosg = Math.Cos(newAngle);
-                                double sing = Math.Sin(newAngle);
-                                TrackManager.CurrentTrack.Elements[i] = originalTrackElement;
-                                // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldDirection.X, ref TrackManager.CurrentTrack.Elements[i].WorldDirection.Y, ref TrackManager.CurrentTrack.Elements[i].WorldDirection.Z, 0.0, 1.0, 0.0, cosg, sing);
-                                // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldUp.X, ref TrackManager.CurrentTrack.Elements[i].WorldUp.Y, ref TrackManager.CurrentTrack.Elements[i].WorldUp.Z, 0.0, 1.0, 0.0, cosg, sing);
-                                // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldSide.X, ref TrackManager.CurrentTrack.Elements[i].WorldSide.Y, ref TrackManager.CurrentTrack.Elements[i].WorldSide.Z, 0.0, 1.0, 0.0, cosg, sing);
-                            }
-                            // iterate again to further shorten track element length
-                            p = 0.00000001 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition;
-                            TrackManager.UpdateTrackFollower(ref follower, p - 1.0, true, false);
-                            TrackManager.UpdateTrackFollower(ref follower, p, true, false);
-                            d = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - follower.WorldPosition;
-                            bestT = d.x * d.x + d.y * d.y + d.z * d.z;
-                            bestJ = 0;
-                            n = 1000;
-                            a = 1.0 / (double)n * (TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition - TrackManager.CurrentTrack.Elements[i].StartingTrackPosition);
-                            for (int j = 1; j < n - 1; j++)
-                            {
-                                TrackManager.UpdateTrackFollower(ref follower, TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition - (double)j * a, true, false);
-                                d = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - follower.WorldPosition;
-                                double t = d.x * d.x + d.y * d.y + d.z * d.z;
-                                if (t < bestT)
-                                {
-                                    bestT = t;
-                                    bestJ = j;
-                                }
-                                else
-                                {
-                                    break;
-                                }
-                            }
-                            s = (double)bestJ * a;
-                            for (int j = i + 1; j < TrackManager.CurrentTrack.Elements.Length; j++)
-                            {
-                                TrackManager.CurrentTrack.Elements[j].StartingTrackPosition -= s;
-                            }
-                            totalShortage += s;
-                        }
-                        // compensate for height difference
-                        p = 0.00000001 * TrackManager.CurrentTrack.Elements[i].StartingTrackPosition + 0.99999999 * TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition;
-                        TrackManager.UpdateTrackFollower(ref follower, p - 1.0, true, false);
-                        TrackManager.UpdateTrackFollower(ref follower, p, true, false);
-                        Vector3 d1 = TrackManager.CurrentTrack.Elements[i + 1].WorldPosition - TrackManager.CurrentTrack.Elements[i].WorldPosition;
-                        double a1 = Math.Atan(d1.y / Math.Sqrt(d1.x * d1.x + d1.z * d1.z));
-                        Vector3 d2 = follower.WorldPosition - TrackManager.CurrentTrack.Elements[i].WorldPosition;
-                        double a2 = Math.Atan(d2.y / Math.Sqrt(d2.x * d2.x + d2.z * d2.z));
-                        double b = a2 - a1;
-                        if (b * b > 0.00000001)
-                        {
-                            double cosa = Math.Cos(b);
-                            double sina = Math.Sin(b);
-                            // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldDirection.X, ref TrackManager.CurrentTrack.Elements[i].WorldDirection.Y, ref TrackManager.CurrentTrack.Elements[i].WorldDirection.Z, TrackManager.CurrentTrack.Elements[i].WorldSide.X, TrackManager.CurrentTrack.Elements[i].WorldSide.Y, TrackManager.CurrentTrack.Elements[i].WorldSide.Z, cosa, sina);
-                            // World.Rotate(ref TrackManager.CurrentTrack.Elements[i].WorldUp.X, ref TrackManager.CurrentTrack.Elements[i].WorldUp.Y, ref TrackManager.CurrentTrack.Elements[i].WorldUp.Z, TrackManager.CurrentTrack.Elements[i].WorldSide.X, TrackManager.CurrentTrack.Elements[i].WorldSide.Y, TrackManager.CurrentTrack.Elements[i].WorldSide.Z, cosa, sina);
-                        }
-                    }
-                }
-            }
-        }
-        // correct events
-        // for (int i = 0; i < TrackManager.CurrentTrack.Elements.Length - 1; i++)
-        // {
-        //     double startingTrackPosition = TrackManager.CurrentTrack.Elements[i].StartingTrackPosition;
-        //     double endingTrackPosition = TrackManager.CurrentTrack.Elements[i + 1].StartingTrackPosition;
-        //     for (int j = 0; j < TrackManager.CurrentTrack.Elements[i].Events.Length; j++)
-        //     {
-        //         double p = startingTrackPosition + TrackManager.CurrentTrack.Elements[i].Events[j].TrackPositionDelta;
-        //         if (p >= endingTrackPosition)
-        //         {
-        //             int len = TrackManager.CurrentTrack.Elements[i + 1].Events.Length;
-        //             Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[i + 1].Events, len + 1);
-        //             TrackManager.CurrentTrack.Elements[i + 1].Events[len] = TrackManager.CurrentTrack.Elements[i].Events[j];
-        //             TrackManager.CurrentTrack.Elements[i + 1].Events[len].TrackPositionDelta += startingTrackPosition - endingTrackPosition;
-        //             for (int k = j; k < TrackManager.CurrentTrack.Elements[i].Events.Length - 1; k++)
-        //             {
-        //                 TrackManager.CurrentTrack.Elements[i].Events[k] = TrackManager.CurrentTrack.Elements[i].Events[k + 1];
-        //             }
-        //             len = TrackManager.CurrentTrack.Elements[i].Events.Length;
-        //             Array.Resize<TrackManager.GeneralEvent>(ref TrackManager.CurrentTrack.Elements[i].Events, len - 1);
-        //             j--;
-        //         }
-        //     }
-        // }
-    }
-
-    private static void CreateMissingBlocks(ref RouteData routeData, ref int blocksUsed, int toIndex, bool previewOnly)
-    {
-        if (toIndex >= blocksUsed)
-        {
-            while (routeData.Blocks.Length <= toIndex)
-            {
-                Array.Resize<Block>(ref routeData.Blocks, routeData.Blocks.Length << 1);
-            }
-            for (int i = blocksUsed; i <= toIndex; i++)
-            {
-                routeData.Blocks[i] = new Block();
-                if (!previewOnly)
-                {
-                    routeData.Blocks[i].Background = -1;
-                    routeData.Blocks[i].Brightness = new Brightness[] { };
-                    //Data.Blocks[i].Fog = Data.Blocks[i - 1].Fog;
-                    routeData.Blocks[i].FogDefined = false;
-                    routeData.Blocks[i].Cycle = routeData.Blocks[i - 1].Cycle;
-                    routeData.Blocks[i].Height = double.NaN;
-                }
-                routeData.Blocks[i].RailType = new int[routeData.Blocks[i - 1].RailType.Length];
-                for (int j = 0; j < routeData.Blocks[i].RailType.Length; j++)
-                {
-                    routeData.Blocks[i].RailType[j] = routeData.Blocks[i - 1].RailType[j];
-                }
-                routeData.Blocks[i].Rail = new Rail[routeData.Blocks[i - 1].Rail.Length];
-                for (int j = 0; j < routeData.Blocks[i].Rail.Length; j++)
-                {
-                    routeData.Blocks[i].Rail[j].RailStart = routeData.Blocks[i - 1].Rail[j].RailStart;
-                    routeData.Blocks[i].Rail[j].RailStartX = routeData.Blocks[i - 1].Rail[j].RailStartX;
-                    routeData.Blocks[i].Rail[j].RailStartY = routeData.Blocks[i - 1].Rail[j].RailStartY;
-                    routeData.Blocks[i].Rail[j].RailStartRefreshed = false;
-                    routeData.Blocks[i].Rail[j].RailEnd = false;
-                    routeData.Blocks[i].Rail[j].RailEndX = routeData.Blocks[i - 1].Rail[j].RailStartX;
-                    routeData.Blocks[i].Rail[j].RailEndY = routeData.Blocks[i - 1].Rail[j].RailStartY;
-                }
-                if (!previewOnly)
-                {
-                    routeData.Blocks[i].RailWall = new WallDike[routeData.Blocks[i - 1].RailWall.Length];
-                    for (int j = 0; j < routeData.Blocks[i].RailWall.Length; j++)
-                    {
-                        routeData.Blocks[i].RailWall[j] = routeData.Blocks[i - 1].RailWall[j];
-                    }
-                    routeData.Blocks[i].RailDike = new WallDike[routeData.Blocks[i - 1].RailDike.Length];
-                    for (int j = 0; j < routeData.Blocks[i].RailDike.Length; j++)
-                    {
-                        routeData.Blocks[i].RailDike[j] = routeData.Blocks[i - 1].RailDike[j];
-                    }
-                    routeData.Blocks[i].RailPole = new Pole[routeData.Blocks[i - 1].RailPole.Length];
-                    for (int j = 0; j < routeData.Blocks[i].RailPole.Length; j++)
-                    {
-                        routeData.Blocks[i].RailPole[j] = routeData.Blocks[i - 1].RailPole[j];
-                    }
-                    routeData.Blocks[i].Form = new Form[] { };
-                    routeData.Blocks[i].Crack = new Crack[] { };
-                    routeData.Blocks[i].Signal = new Signal[] { };
-                    routeData.Blocks[i].Section = new Section[] { };
-                    routeData.Blocks[i].Sound = new Sound[] { };
-                    routeData.Blocks[i].Transponder = new Transponder[] { };
-                    routeData.Blocks[i].RailFreeObj = new FreeObj[][] { };
-                    routeData.Blocks[i].GroundFreeObj = new FreeObj[] { };
-                    routeData.Blocks[i].PointsOfInterest = new PointOfInterest[] { };
-                }
-                routeData.Blocks[i].Pitch = routeData.Blocks[i - 1].Pitch;
-                routeData.Blocks[i].Limit = new Limit[] { };
-                routeData.Blocks[i].Stop = new Stop[] { };
-                routeData.Blocks[i].Station = -1;
-                routeData.Blocks[i].StationPassAlarm = false;
-                routeData.Blocks[i].CurrentTrackState = routeData.Blocks[i - 1].CurrentTrackState;
-                routeData.Blocks[i].Turn = 0.0;
-                routeData.Blocks[i].Accuracy = routeData.Blocks[i - 1].Accuracy;
-                routeData.Blocks[i].AdhesionMultiplier = routeData.Blocks[i - 1].AdhesionMultiplier;
-            }
-            blocksUsed = toIndex + 1;
-        }
-    }
-
-    public static Material CreateSkyboxMaterial(Texture t)
-    {
-        // Material result = new Material(Shader.Find("RenderFX/Skybox"));
-        // result.SetTexture("_FrontTex", t);
-        // result.SetTexture("_BackTex", t);
-        // result.SetTexture("_LeftTex", t);
-        // result.SetTexture("_RightTex", t);
-        // result.SetTexture("_UpTex", t);
-        // result.SetTexture("_DownTex", t);
-        // return result;
-        return null;
-    }
+    
 }

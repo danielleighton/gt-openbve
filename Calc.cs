@@ -8,6 +8,12 @@ using Godot;
 
 public static class Calc
 {
+
+    public static double NormSquared(Vector3 d)
+    {
+	    return d.x * d.x + d.y * d.y + d.z * d.z;
+    }
+    
     #region Cross Product 
 
     public static void Cross(double ax, double ay, double az, double bx, double by, double bz, out double cx, out double cy, out double cz)

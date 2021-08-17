@@ -21,7 +21,7 @@ public class SceneLoader : Node {
 		string trainFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Train"));
 		string soundFolder = System.IO.Path.GetFullPath(System.IO.Path.Combine(rootResourcesPath, "Sound"));
 
-		//string routePath = System.IO.Path.Combine(routeFolder, @"Birmingham_Cross-City_South_BVE4\LowDetail\Day\LowDetail_158_Spring_2005_1200_Dry_Overcast.csv");
+//		string routePath = System.IO.Path.Combine(routeFolder, @"Birmingham_Cross-City_South_BVE4\LowDetail\Day\LowDetail_158_Spring_2005_1200_Dry_Overcast.csv");
 
 		string routePath = System.IO.Path.Combine(routeFolder, @"Animated Object Demonstration Route.csv");
 
@@ -37,7 +37,9 @@ public class SceneLoader : Node {
 		n2.Name = "Route Objects";
 		AddChild(n2);
 
-		CsvRwRouteParser.ParseRoute(n2, routePath, Encoding.Default, false, trainFolder, objectFolder, "", false);
+        UnifiedObject.RouteRootNode = n2;
+
+        CsvRwRouteParser.ParseRoute(n2, routePath, Encoding.Default, false, trainFolder, objectFolder, "", false);
 
 		
 	}

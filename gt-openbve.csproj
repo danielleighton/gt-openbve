@@ -17,6 +17,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="lblInformation.cs" />
+    <Compile Include="ObjectDisposalMode.cs" />
+    <Compile Include="Plugins\Object\BackgroundHandle.cs" />
+    <Compile Include="Plugins\Object\ObjectDictionary.cs" />
+    <Compile Include="Plugins\Object\SignalObject.cs" />
     <Compile Include="Plugins\Route - CsvRw\Parser\Expression.cs" />
     <Compile Include="Plugins\Route - CsvRw\Parser\PositionedExpression.cs" />
     <Compile Include="Plugins\Route - CsvRw\Parser\RouteData.cs" />
@@ -26,7 +30,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Plugins\Object\AnimatedObject.cs" />
     <Compile Include="Plugins\Object\CsvB3dObjectParser.cs" />
-    <Compile Include="Plugins\Object\ObjectManager.cs" />
     <Compile Include="Plugins\Object\StaticObject.cs" />
     <Compile Include="Plugins\Object\UnifiedObject.cs" />
     <Compile Include="Camera.cs" />
@@ -50,8 +53,12 @@
     <Compile Include="Plugins\Route - CsvRw\Structures\Route\StationStop.cs" />
     <Compile Include="Plugins\Route - CsvRw\Structures\Signals\Transponder.cs" />
     <Compile Include="Plugins\Route - CsvRw\Structures\Route\WallDike.cs" />
+    <Compile Include="Routes\RouteInformation.cs" />
+    <Compile Include="Routes\TrackElement.cs" />
+    <Compile Include="Routes\CurrentRoute.cs" />
+    <Compile Include="Routes\Track.cs" />
+    <Compile Include="Routes\TrackFollower.cs" />
     <Compile Include="TestGodotObject.cs" />
     <Compile Include="SceneLoader.cs" />
-    <Compile Include="TrackManager.cs" />
   </ItemGroup>
 </Project>

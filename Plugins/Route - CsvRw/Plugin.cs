@@ -14,7 +14,7 @@ public class Host
     {
         GD.Print(text);
     }
-   		
+
 }
 
 public static class Plugin
