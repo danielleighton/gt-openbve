@@ -29,7 +29,8 @@ internal class Form
 
     internal readonly StructureData Structure;
     private readonly CultureInfo Culture = CultureInfo.InvariantCulture;
-    internal void CreatePrimaryRail(Block currentBlock, Block nextBlock, Vector3 pos, Transform RailTransformation, float StartingDistance, float EndingDistance, string FileName)
+
+    internal void CreatePrimaryRail(Node parentNode, Block currentBlock, Block nextBlock, Vector3 pos, Transform RailTransformation, float StartingDistance, float EndingDistance, string FileName)
     {
 
         if (SecondaryRail == Form.SecondaryRailStub)
@@ -71,7 +72,7 @@ internal class Form
             }
             else
             {
-                UnifiedObject.CreateStaticObject((StaticObject)Structure.FormCL[FormType], pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0);
+                UnifiedObject.CreateStaticObject(parentNode,(StaticObject)Structure.FormCL[FormType], pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0);
             }
 
             if (RoofType > 0)
@@ -91,7 +92,7 @@ internal class Form
                 }
                 else
                 {
-                    UnifiedObject.CreateStaticObject((StaticObject)Structure.RoofCL[RoofType], pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
+                    UnifiedObject.CreateStaticObject(parentNode,(StaticObject)Structure.RoofCL[RoofType], pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
                 }
             }
         }
@@ -112,7 +113,7 @@ internal class Form
             }
             else
             {
-                UnifiedObject.CreateStaticObject((StaticObject)Structure.FormCR[FormType], pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
+                UnifiedObject.CreateStaticObject(parentNode,(StaticObject)Structure.FormCR[FormType], pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
             }
 
             if (RoofType > 0)
@@ -132,7 +133,7 @@ internal class Form
                 }
                 else
                 {
-                    UnifiedObject.CreateStaticObject((StaticObject)Structure.RoofCR[RoofType], pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
+                    UnifiedObject.CreateStaticObject(parentNode,(StaticObject)Structure.RoofCR[RoofType], pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
                 }
             }
         }
@@ -168,7 +169,7 @@ internal class Form
                     else
                     {
                         StaticObject FormC = (StaticObject)Structure.FormCL[FormType].Transform(d0, d1);
-                        UnifiedObject.CreateStaticObject(FormC, pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
+                        UnifiedObject.CreateStaticObject(parentNode,FormC, pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
                     }
 
                     if (RoofType > 0)
@@ -189,7 +190,7 @@ internal class Form
                         else
                         {
                             StaticObject RoofC = (StaticObject)Structure.RoofCL[RoofType].Transform(d0, d1);
-                            UnifiedObject.CreateStaticObject(RoofC, pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
+                            UnifiedObject.CreateStaticObject(parentNode,RoofC, pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
                         }
                     }
                 }
@@ -211,7 +212,7 @@ internal class Form
                     else
                     {
                         StaticObject FormC = (StaticObject)Structure.FormCR[FormType].Transform(d0, d1);
-                        UnifiedObject.CreateStaticObject(FormC, pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
+                        UnifiedObject.CreateStaticObject(parentNode,FormC, pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
                     }
 
                     if (RoofType > 0)
@@ -232,7 +233,7 @@ internal class Form
                         else
                         {
                             StaticObject RoofC = (StaticObject)Structure.RoofCR[RoofType].Transform(d0, d1);
-                            UnifiedObject.CreateStaticObject(RoofC, pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
+                            UnifiedObject.CreateStaticObject(parentNode,RoofC, pos, RailTransformation, Transform.Identity, 0.0f, StartingDistance, EndingDistance, StartingDistance, 1.0f);
                         }
                     }
                 }

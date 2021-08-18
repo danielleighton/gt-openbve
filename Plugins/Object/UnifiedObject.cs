@@ -109,9 +109,13 @@ public abstract class UnifiedObject
         // return retObject;
     }
 
-    public static int CreateStaticObject(StaticObject Prototype, Vector3 Position, Transform WorldTransformation, Transform LocalTransformation, float AccurateObjectDisposalZOffset, float StartingDistance, float EndingDistance, float TrackPosition, double Brightness)
+    public static int CreateStaticObject(Node parentNode, StaticObject Prototype, Vector3 Position, Transform WorldTransformation, Transform LocalTransformation, float AccurateObjectDisposalZOffset, float StartingDistance, float EndingDistance, float TrackPosition, double Brightness)
     {
-        // return CreateStaticObject(Prototype, Position, WorldTransformation, LocalTransformation, ObjectDisposalMode.Accurate, AccurateObjectDisposalZOffset, StartingDistance, EndingDistance, 25.0, TrackPosition, Brightness);
+        Vector3 pos = new Vector3(Position.x, Position.y, Position.z);
+        Transform rotate = WorldTransformation * LocalTransformation;
+
+        //return InstantiateObject(Prototype, Position, WorldTransformation, LocalTransformation, ObjectDisposalMode.Accurate, AccurateObjectDisposalZOffset, StartingDistance, EndingDistance, 25.0, TrackPosition, Brightness);
+        InstantiateObject(parentNode, Prototype, pos, WorldTransformation, LocalTransformation, true, StartingDistance, EndingDistance, 25.0f, TrackPosition);
         return 0;
     }
     

@@ -318,7 +318,7 @@ public class CsvB3dObjectParser
 
         bool isB3D = String.Equals(fileExtension, ".b3d", StringComparison.OrdinalIgnoreCase);
 
-        GD.Print("Processing {0} lines from {1}", lines.Length, fileName);
+        Plugin.CurrentHost.AddMessage(MessageType.Warning, false, String.Format("Processing {0} lines from {1}", lines.Length, fileName));
 
         // Overall object mesh is made up of one or more submesh builders (i.e. "CreateMeshBuilder" command)
         MeshBuilder currentSubMesh = null;
@@ -1041,7 +1041,7 @@ public class CsvB3dObjectParser
 
                     default:
 
-                        GD.Print("Unknown command '{0}' - at line {1} in file {2}", command, i + 1, fileName);
+                        Plugin.CurrentHost.AddMessage(MessageType.Error, true, String.Format("Unknown command '{0}' - at line {1} in file {2}", command, i + 1, fileName));
                         break;
 
                 }

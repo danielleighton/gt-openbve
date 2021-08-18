@@ -1268,7 +1268,7 @@ public class CurrentRoute
                         // primary rail
                         if (routeData.Blocks[blockIdx].Forms[k].PrimaryRail == j)
                         {
-                            routeData.Blocks[blockIdx].Forms[k].CreatePrimaryRail(routeData.Blocks[blockIdx], routeData.Blocks[blockIdx + 1], pos, railTransformation, startingDistance, endingDistance, fileName);
+                            routeData.Blocks[blockIdx].Forms[k].CreatePrimaryRail(routeRootNode, routeData.Blocks[blockIdx], routeData.Blocks[blockIdx + 1], pos, railTransformation, startingDistance, endingDistance, fileName);
                         }
                         // secondary rail
                         if (routeData.Blocks[blockIdx].Forms[k].SecondaryRail == j)
