@@ -21,6 +21,7 @@
     <Compile Include="Plugins\Object\BackgroundHandle.cs" />
     <Compile Include="Plugins\Object\ObjectDictionary.cs" />
     <Compile Include="Plugins\Object\SignalObject.cs" />
+    <Compile Include="Plugins\Route - CsvRw\CompatibilityObjects.cs" />
     <Compile Include="Plugins\Route - CsvRw\Parser\Expression.cs" />
     <Compile Include="Plugins\Route - CsvRw\Parser\PositionedExpression.cs" />
     <Compile Include="Plugins\Route - CsvRw\Parser\RouteData.cs" />
@@ -58,6 +59,7 @@
     <Compile Include="Routes\CurrentRoute.cs" />
     <Compile Include="Routes\Track.cs" />
     <Compile Include="Routes\TrackFollower.cs" />
+    <Compile Include="System\SimPaths.cs" />
     <Compile Include="TestGodotObject.cs" />
     <Compile Include="SceneLoader.cs" />
   </ItemGroup>

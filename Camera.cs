@@ -48,7 +48,7 @@ public class Camera : Godot.Camera
             switch (((InputEventMouseButton)e).ButtonIndex)
             {
                 case (int)ButtonList.Right:
-                    Input.SetMouseMode(e.IsPressed() ? Input.MouseMode.Captured : Input.MouseMode.Visible);
+                    Input.MouseMode = e.IsPressed() ? Input.MouseModeEnum.Captured : Input.MouseModeEnum.Visible;
                     break;
                 case (int)ButtonList.WheelUp:
                     _vel_multiplier = Mathf.Clamp(_vel_multiplier * 1.1f, 0.2f, 20f);
@@ -79,7 +79,7 @@ public class Camera : Godot.Camera
 
     public void UpdateMouseLook()
     {
-        if (Input.GetMouseMode() == Input.MouseMode.Captured)
+        if (Input.MouseMode == Input.MouseModeEnum.Captured)
         {
 		    _mouse_position *= sensitivity;
 		    float yaw = _mouse_position.x;

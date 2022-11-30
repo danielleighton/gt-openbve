@@ -24,6 +24,7 @@ main_run_args="\"D:\\LegacyContent\\Railway\\Route\\Animated Object Demonstratio
 
 [mono]
 
+project/assembly_name="gt-openbve"
 debugger_agent/wait_timeout=10000
 
 [rendering]

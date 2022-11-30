@@ -1,8 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "ZlB7wGQ0qFmu1P48J8wkEvFB2uR43acjB3Jr3xAvdSwhWAjQXPLNmmDcE6DCqkfRg9G9hIC0549ikVJo0du7fw==",
+  "dgSpecHash": "NQ8SJqWTkliJbf6ki8RuOCeHheLO7u/DO195483LiLeGyT8Jj3peQ1qLeXiOpWnvU9Vrdmn6onfL17r0HeKN1A==",
   "success": true,
   "projectFilePath": "D:\\Development\\Repos\\gt-openbve\\gt-openbve.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "C:\\Users\\danie\\.nuget\\packages\\microsoft.netframework.referenceassemblies\\1.0.2\\microsoft.netframework.referenceassemblies.1.0.2.nupkg.sha512",
+    "C:\\Users\\danie\\.nuget\\packages\\microsoft.netframework.referenceassemblies.net472\\1.0.2\\microsoft.netframework.referenceassemblies.net472.1.0.2.nupkg.sha512"
+  ],
   "logs": []
 }

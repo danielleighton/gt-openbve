@@ -4207,12 +4207,12 @@ public static class CsvRwRouteParser
                                 break;
                             case "track.limit":
                                 {
-                                    double limit = 0.0;
+                                    float limit = 0.0f;
                                     int direction = 0, cource = 0;
-                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseDoubleVb6(arguments[0], out limit))
+                                    if (arguments.Length >= 1 && arguments[0].Length > 0 && !Conversions.TryParseFloatVb6(arguments[0], out limit))
                                     {
                                         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Speed is invalid in Track.Limit at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
-                                        limit = 0.0;
+                                        limit = 0.0f;
                                     }
                                     if (arguments.Length >= 2 && arguments[1].Length > 0 && !Conversions.TryParseIntVb6(arguments[1], out direction))
                                     {
@@ -4224,12 +4224,17 @@ public static class CsvRwRouteParser
                                         Plugin.CurrentHost.AddMessage(MessageType.Error, false, "Cource is invalid in Track.Limit at line " + routeExpressions[j].Line.ToString(culture) + ", column " + routeExpressions[j].Column.ToString(culture) + " in file " + routeExpressions[j].File);
                                         cource = 0;
                                     }
+                                    // int n = routeData.Blocks[blockIndex].Limits.Length;
+                                    // Array.Resize<Limit>(ref routeData.Blocks[blockIndex].Limits, n + 1);
+                                    // routeData.Blocks[blockIndex].Limits[n].TrackPosition = routeData.TrackPosition;
+                                    // routeData.Blocks[blockIndex].Limits[n].Speed = limit <= 0.0 ? double.PositiveInfinity : routeData.UnitOfSpeed * limit;
+                                    // routeData.Blocks[blockIndex].Limits[n].Direction = direction;
+                                    // routeData.Blocks[blockIndex].Limits[n].Cource = cource;
+
                                     int n = routeData.Blocks[blockIndex].Limits.Length;
-                                    Array.Resize<Limit>(ref routeData.Blocks[blockIndex].Limits, n + 1);
-                                    routeData.Blocks[blockIndex].Limits[n].TrackPosition = routeData.TrackPosition;
-                                    routeData.Blocks[blockIndex].Limits[n].Speed = limit <= 0.0 ? double.PositiveInfinity : routeData.UnitOfSpeed * limit;
-                                    routeData.Blocks[blockIndex].Limits[n].Direction = direction;
-                                    routeData.Blocks[blockIndex].Limits[n].Cource = cource;
+		                			Array.Resize(ref routeData.Blocks[blockIndex].Limits, n + 1);
+					                routeData.Blocks[blockIndex].Limits[n] = new Limit(routeData.TrackPosition, limit <= 0.0f ? float.PositiveInfinity : routeData.UnitOfSpeed * limit, direction, cource);
+		
                                 }
                                 break;
                             case "track.stop":
